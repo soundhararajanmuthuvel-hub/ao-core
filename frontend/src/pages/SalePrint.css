@@ -1,0 +1,15 @@
+.print-actions {
+  max-width: 800px;
+  margin: 1rem auto;
+  padding: 0 1rem;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .invoice-template {
+    margin: 0;
+    max-width: 100%;
+  }
+}

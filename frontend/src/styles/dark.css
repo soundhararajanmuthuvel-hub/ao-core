@@ -1,0 +1,12 @@
+[data-theme='dark'] .btn-secondary {
+  background: #334155;
+  border-color: #475569;
+}
+
+[data-theme='dark'] .form-control {
+  background: #0f172a;
+}
+
+[data-theme='dark'] table.data-table th {
+  background: #0f172a;
+}
