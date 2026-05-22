@@ -24,9 +24,8 @@ router.get('/test/ping', (req, res) => {
 });
 
 /* ==============================
-   PROTECTED ROUTES
+   AUTH MIDDLEWARE
 ============================== */
-
 router.use(auth);
 
 /* ==============================
