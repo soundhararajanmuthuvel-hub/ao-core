@@ -1,8 +1,10 @@
 require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
+const mongoose = require('mongoose');
 
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
@@ -12,17 +14,21 @@ const app = express();
 /* =========================
    DATABASE CONNECTION
 ========================= */
-connectDB().catch((err) => {
-  console.error('DB connection failed:', err.message);
-  process.exit(1);
-});
+connectDB()
+  .then(() => {
+    console.log('✅ MongoDB Connected');
+  })
+  .catch((err) => {
+    console.error('❌ DB Connection Failed:', err.message);
+    process.exit(1);
+  });
 
 /* =========================
-   MIDDLEWARES
+   MIDDLEWARE
 ========================= */
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: process.env.CLIENT_URL || '*',
     credentials: true,
   })
 );
@@ -32,48 +38,34 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /* =========================
-   STATIC FILES
+   STATIC FOLDER
 ========================= */
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 /* =========================
-   HOME ROUTE
+   ROOT ROUTE
 ========================= */
 app.get('/', (req, res) => {
-  res.send(`
-    <h1>🚀 AO Core ERP API Running Successfully</h1>
-    <p>Backend deployed successfully on Render.</p>
-
-    <h3>Available API Routes:</h3>
-    <ul>
-      <li>/api/health</li>
-      <li>/api/auth</li>
-      <li>/api/users</li>
-      <li>/api/products</li>
-      <li>/api/customers</li>
-      <li>/api/sales</li>
-      <li>/api/purchases</li>
-      <li>/api/inventory</li>
-      <li>/api/suppliers</li>
-      <li>/api/settings</li>
-      <li>/api/analytics</li>
-      <li>/api/reports</li>
-      <li>/api/notifications</li>
-      <li>/api/activity</li>
-      <li>/api/search</li>
-    </ul>
-  `);
+  res.status(200).json({
+    success: true,
+    message: '🚀 AO Core ERP API Running Successfully',
+  });
 });
 
 /* =========================
    HEALTH CHECK
 ========================= */
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
+  res.status(200).json({
+    success: true,
     app: 'AO Core ERP',
-    server: 'running',
-    time: new Date(),
+    status: 'OK',
+    database:
+      mongoose.connection.readyState === 1
+        ? 'Connected'
+        : 'Disconnected',
+    uptime: process.uptime(),
+    timestamp: new Date(),
   });
 });
 
@@ -101,7 +93,7 @@ app.use('/api/search', require('./routes/searchRoutes'));
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: 'API Route Not Found',
+    message: `Route Not Found: ${req.originalUrl}`,
   });
 });
 
