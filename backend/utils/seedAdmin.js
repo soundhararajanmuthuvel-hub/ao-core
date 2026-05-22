@@ -5,7 +5,12 @@ const Settings = require('../models/Settings');
 
 const seed = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    const uri = (process.env.MONGO_URI || process.env.MONGODB_URI || '').trim();
+    if (!uri) {
+      throw new Error('MONGO_URI is not defined in environment');
+    }
+
+    await mongoose.connect(uri);
     const existing = await User.findOne({ email: 'admin@aocore.com' });
     if (!existing) {
       await User.create({

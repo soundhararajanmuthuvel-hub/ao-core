@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { resolveAssetUrl } from '../utils/url';
 
 const empty = { name: '', sku: '', barcode: '', category: 'General', stock: 0, lowStockThreshold: 10, unit: 'pcs', purchasePrice: 0, sellingPrice: 0, gstPercent: 0, supplier: '' };
 
@@ -90,7 +91,7 @@ export default function Products() {
             <tbody>
               {products.map((p) => (
                 <tr key={p._id}>
-                  <td>{p.image ? <img src={p.image} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} /> : '—'}</td>
+                  <td>{p.image ? <img src={resolveAssetUrl(p.image)} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} /> : '—'}</td>
                   <td>{p.name} {p.stock <= p.lowStockThreshold && <span className="badge badge-warning">Low</span>}</td>
                   <td>{p.sku}</td>
                   <td>{p.category}</td>

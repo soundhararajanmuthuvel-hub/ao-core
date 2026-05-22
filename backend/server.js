@@ -10,45 +10,43 @@ const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
+const PORT = process.env.PORT || 5000;
+const normalizeOrigin = (value) => value?.trim().replace(/\/$/, '');
 
-/* =========================
-   DATABASE CONNECTION
-========================= */
-connectDB()
-  .then(() => {
-    console.log('✅ MongoDB Connected');
-  })
-  .catch((err) => {
-    console.error('❌ DB Connection Failed:', err.message);
-    process.exit(1);
-  });
+const allowedOrigins = [
+  normalizeOrigin(process.env.CLIENT_URL),
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+].filter(Boolean);
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true,
+};
 
 /* =========================
    MIDDLEWARE
 ========================= */
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL || '*',
-    credentials: true,
-  })
-);
-
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-/* =========================
-   STATIC FOLDER
-========================= */
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 /* =========================
    ROOT ROUTE
 ========================= */
 app.get('/', (req, res) => {
-  res.status(200).json({
+  res.json({
     success: true,
-    message: '🚀 AO Core ERP API Running Successfully',
+    message: 'AO Core ERP API Running Successfully',
   });
 });
 
@@ -56,22 +54,18 @@ app.get('/', (req, res) => {
    HEALTH CHECK
 ========================= */
 app.get('/api/health', (req, res) => {
-  res.status(200).json({
+  res.json({
     success: true,
-    app: 'AO Core ERP',
     status: 'OK',
     database:
-      mongoose.connection.readyState === 1
-        ? 'Connected'
-        : 'Disconnected',
-    uptime: process.uptime(),
-    timestamp: new Date(),
+      mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
   });
 });
 
 /* =========================
    API ROUTES
 ========================= */
+app.use('/api/test', require('./routes/testRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
@@ -102,11 +96,16 @@ app.use((req, res) => {
 ========================= */
 app.use(errorHandler);
 
-/* =========================
-   SERVER
-========================= */
-const PORT = process.env.PORT || 5000;
+const startServer = async () => {
+  try {
+    await connectDB();
+    app.listen(PORT, () => {
+      console.log(`AO Core API running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('DB connection failed:', err.message);
+    process.exit(1);
+  }
+};
 
-app.listen(PORT, () => {
-  console.log(`🚀 AO Core API running on port ${PORT}`);
-});
+startServer();

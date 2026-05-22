@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
+import { resolveAssetUrl } from '../utils/url';
 
 const allNav = [
   { to: '/', icon: '📊', label: 'Dashboard', end: true },
@@ -26,7 +27,7 @@ export default function Sidebar({ collapsed, open, onClose }) {
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${open ? 'open' : ''}`}>
       <div className="sidebar-brand">
         {settings?.logo ? (
-          <img src={settings.logo} alt="Logo" />
+          <img src={resolveAssetUrl(settings.logo)} alt="Logo" />
         ) : (
           <span style={{ fontSize: '1.5rem' }}>🌿</span>
         )}

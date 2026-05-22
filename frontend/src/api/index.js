@@ -18,8 +18,8 @@ export const productsApi = {
   categories: () => client.get('/products/categories'),
   get: (id) => client.get(`/products/${id}`),
   history: (id) => client.get(`/products/${id}/history`),
-  create: (data) => client.post('/products', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
-  update: (id, data) => client.put(`/products/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  create: (data) => client.post('/products', data),
+  update: (id, data) => client.put(`/products/${id}`, data),
   remove: (id) => client.delete(`/products/${id}`),
 };
 
@@ -63,7 +63,7 @@ export const inventoryApi = {
 export const settingsApi = {
   get: () => client.get('/settings'),
   update: (data) => client.put('/settings', data),
-  uploadLogo: (formData) => client.post('/settings/logo', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  uploadLogo: (formData) => client.post('/settings/logo', formData),
 };
 
 export const analyticsApi = {

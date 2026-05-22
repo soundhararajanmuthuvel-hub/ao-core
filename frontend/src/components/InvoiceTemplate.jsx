@@ -1,4 +1,5 @@
 import '../styles/invoice-template.css';
+import { resolveAssetUrl } from '../utils/url';
 
 export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-capture' }) {
   if (!sale) return null;
@@ -6,7 +7,7 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
   return (
     <div id={captureId} className="invoice-template">
       <header className="invoice-template-header">
-        {settings?.logo && <img src={settings.logo} alt="" className="invoice-logo" crossOrigin="anonymous" />}
+        {settings?.logo && <img src={resolveAssetUrl(settings.logo)} alt="" className="invoice-logo" crossOrigin="anonymous" />}
         <div>
           <h1>{settings?.companyName || 'AO Core'}</h1>
           <p>{settings?.address}</p>

@@ -12,8 +12,8 @@ const {
 
 router.use(auth);
 router.get('/', getCustomers);
-router.get('/:id', getCustomer);
 router.get('/:id/sales', getCustomerSales);
+router.get('/:id', getCustomer);
 router.post('/', createCustomer);
 router.put('/:id', updateCustomer);
 router.delete('/:id', deleteCustomer);

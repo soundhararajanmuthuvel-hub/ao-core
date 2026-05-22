@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useToast } from '../context/ToastContext';
+import { resolveAssetUrl } from '../utils/url';
 import './Login.css';
 
 export default function Login() {
@@ -15,8 +16,7 @@ export default function Login() {
   const navigate = useNavigate();
 
   if (user) {
-    navigate('/');
-    return null;
+    return <Navigate to="/" replace />;
   }
 
   const handleSubmit = async (e) => {
@@ -37,7 +37,7 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-brand">
-          {settings?.logo ? <img src={settings.logo} alt="Logo" /> : <span className="login-icon">🌿</span>}
+          {settings?.logo ? <img src={resolveAssetUrl(settings.logo)} alt="Logo" /> : <span className="login-icon">🌿</span>}
           <h1>{settings?.companyName || 'AO Core'}</h1>
           <p>Organic Products ERP</p>
         </div>

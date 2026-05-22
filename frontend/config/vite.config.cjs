@@ -1,8 +1,7 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+const path = require('path');
 
-export default defineConfig({
-  plugins: [react()],
+module.exports = {
+  root: path.resolve(__dirname, '..'),
   server: {
     port: 5173,
     proxy: {
@@ -10,4 +9,4 @@ export default defineConfig({
       '/uploads': { target: 'http://localhost:5000', changeOrigin: true },
     },
   },
-});
+};

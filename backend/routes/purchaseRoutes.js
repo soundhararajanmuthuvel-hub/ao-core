@@ -2,14 +2,21 @@ const express = require('express');
 
 const router = express.Router();
 
-/* ==============================
-   TEST ROUTE
-============================== */
-router.get('/test/ping', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: '✅ Purchase Route Working',
-  });
-});
+const auth = require('../middleware/auth');
+const authorize = require('../middleware/role');
+const {
+  getPurchases,
+  getPurchaseById,
+  createPurchase,
+  updatePurchase,
+  deletePurchase,
+} = require('../controllers/purchaseController');
+
+router.use(auth, authorize('admin'));
+router.get('/', getPurchases);
+router.get('/:id', getPurchaseById);
+router.post('/', createPurchase);
+router.put('/:id', updatePurchase);
+router.delete('/:id', deletePurchase);
 
 module.exports = router;
