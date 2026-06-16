@@ -4,8 +4,6 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
-const mongoose = require('mongoose');
-
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -21,7 +19,9 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Dynamically match localhost, 127.0.0.1, and local private network subnets (192.168.x.x, 10.x.x.x, 172.16.x.x)
+    const isLocalNetwork = /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+):\d+$/i.test(origin);
+    if (!origin || allowedOrigins.includes(origin) || isLocalNetwork) {
       return callback(null, true);
     }
 
@@ -53,13 +53,24 @@ app.get('/', (req, res) => {
 /* =========================
    HEALTH CHECK
 ========================= */
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+  let dbStatus = 'Disconnected';
+  try {
+    await connectDB.sequelize.authenticate();
+    dbStatus = 'Connected';
+  } catch {}
   res.json({
     success: true,
     status: 'OK',
-    database:
-      mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
+    database: dbStatus,
   });
+});
+
+app.post('/api/client-error', (req, res) => {
+  console.log('\n=== CLIENT-SIDE ERROR RECEIVED ===');
+  console.log(JSON.stringify(req.body, null, 2));
+  console.log('==================================\n');
+  res.json({ success: true });
 });
 
 /* =========================
@@ -79,7 +90,17 @@ app.use('/api/analytics', require('./routes/analyticsRoutes'));
 app.use('/api/reports', require('./routes/reportsRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/activity', require('./routes/activityRoutes'));
+app.use('/api/repack', require('./routes/repackRoutes'));
+app.use('/api/raw-materials', require('./routes/rawMaterialRoutes'));
+app.use('/api/manufacturing', require('./routes/manufacturingRoutes'));
+app.use('/api/ai', require('./routes/aiRoutes'));
+app.use('/api/shipping', require('./routes/shippingRoutes'));
+app.use('/api/couriers', require('./routes/courierRoutes'));
 app.use('/api/search', require('./routes/searchRoutes'));
+app.use('/api/integrations', require('./routes/integrationRoutes'));
+app.use('/api/webhooks', require('./routes/webhookRoutes'));
+app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/migration', require('./routes/migrationRoutes'));
 
 /* =========================
    404 HANDLER
@@ -99,11 +120,16 @@ app.use(errorHandler);
 const startServer = async () => {
   try {
     await connectDB();
+    
+    // Initialize background WooCommerce auto-sync scheduler
+    const { startScheduler } = require('./utils/scheduler');
+    startScheduler();
+
     app.listen(PORT, () => {
       console.log(`AO Core API running on port ${PORT}`);
     });
   } catch (err) {
-    console.error('DB connection failed:', err.message);
+    console.error('DB connection failed:', err);
     process.exit(1);
   }
 };

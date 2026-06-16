@@ -10,7 +10,9 @@ export default function RoleRoute({ children, roles = ['admin'] }) {
 
   if (!user) return <Navigate to="/login" replace />;
 
-  if (!roles.includes(user.role)) {
+  const hasAccess = roles.includes(user.role) || user.role === 'admin' || user.role === 'Super Admin';
+
+  if (!hasAccess) {
     if (!warned.current) {
       warned.current = true;
       toast('Access denied', 'error');

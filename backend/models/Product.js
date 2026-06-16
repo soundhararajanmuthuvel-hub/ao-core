@@ -1,25 +1,195 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
+const { makeMongooseCompatible } = require('./compat');
 
-const productSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true, trim: true },
-    sku: { type: String, required: true, unique: true, trim: true },
-    barcode: { type: String, trim: true },
-    category: { type: String, trim: true, default: 'General' },
-    stock: { type: Number, default: 0, min: 0 },
-    lowStockThreshold: { type: Number, default: 10 },
-    unit: { type: String, default: 'pcs' },
-    purchasePrice: { type: Number, default: 0 },
-    sellingPrice: { type: Number, default: 0 },
-    gstPercent: { type: Number, default: 0 },
-    supplier: { type: String, trim: true },
-    image: { type: String, default: '' },
+const Product = sequelize.define('Product', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
   },
-  { timestamps: true }
-);
-
-productSchema.virtual('isLowStock').get(function () {
-  return this.stock <= this.lowStockThreshold;
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  sku: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
+  },
+  barcode: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  category: {
+    type: DataTypes.STRING,
+    defaultValue: 'General',
+  },
+  stock: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  lowStockThreshold: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 10,
+  },
+  unit: {
+    type: DataTypes.STRING,
+    defaultValue: 'pcs',
+  },
+  purchasePrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  sellingPrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  gstPercent: {
+    type: DataTypes.DECIMAL(5, 2),
+    defaultValue: 0,
+  },
+  supplier: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  image: {
+    type: DataTypes.STRING,
+    defaultValue: '',
+  },
+  productType: {
+    type: DataTypes.ENUM('manufactured', 'repacking', 'trading', 'raw_material', 'packaging_material'),
+    defaultValue: 'manufactured',
+  },
+  reorderQty: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 100,
+  },
+  preferredSupplierId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  weight: {
+    type: DataTypes.DECIMAL(10, 3),
+    defaultValue: 0.200,
+  },
+  wooProductId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  woocommerce_product_id: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  brand: {
+    type: DataTypes.STRING,
+    defaultValue: '',
+  },
+  galleryImages: {
+    type: DataTypes.TEXT,
+    defaultValue: '[]',
+  },
+  dimensions: {
+    type: DataTypes.STRING,
+    defaultValue: '',
+  },
+  stockStatus: {
+    type: DataTypes.STRING,
+    defaultValue: 'instock',
+  },
+  woocommerce_last_modified: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  woocommerce_sync_status: {
+    type: DataTypes.STRING,
+    defaultValue: 'synced',
+  },
+  woocommerce_permalink: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  description: {
+    type: DataTypes.TEXT,
+    defaultValue: '',
+  },
+  shortDescription: {
+    type: DataTypes.TEXT,
+    defaultValue: '',
+  },
+  price: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  salePrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  status: {
+    type: DataTypes.STRING,
+    defaultValue: 'publish',
+  },
+  attributes: {
+    type: DataTypes.TEXT,
+    defaultValue: '',
+  },
+  tags: {
+    type: DataTypes.TEXT,
+    defaultValue: '',
+  },
+  gstClass: {
+    type: DataTypes.STRING,
+    defaultValue: '',
+  },
+  lastModifiedDate: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  lastSyncTimestamp: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  lastWooUpdateTimestamp: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  isArchived: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  isLowStock: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      // Return true if stock is less than or equal to lowStockThreshold
+      return Number(this.stock) <= Number(this.lowStockThreshold);
+    },
+  },
 });
 
-module.exports = mongoose.model('Product', productSchema);
+Product.beforeCreate((product) => {
+  if (!product.productType) {
+    if (product.supplier === 'repack') {
+      product.productType = 'repacking';
+    } else {
+      product.productType = 'manufactured';
+    }
+  }
+});
+
+Product.beforeUpdate((product) => {
+  if (!product.productType) {
+    if (product.supplier === 'repack') {
+      product.productType = 'repacking';
+    } else {
+      product.productType = 'manufactured';
+    }
+  }
+});
+
+Product.belongsTo(require('./Supplier'), { as: 'preferredSupplier', foreignKey: 'preferredSupplierId' });
+
+makeMongooseCompatible(Product, {
+  preferredSupplier: 'preferredSupplierId',
+});
+
+module.exports = Product;

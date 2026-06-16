@@ -1,21 +1,55 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
+const Product = require('./Product');
+const Supplier = require('./Supplier');
+const User = require('./User');
+const { makeMongooseCompatible } = require('./compat');
 
-const stockMovementSchema = new mongoose.Schema(
-  {
-    product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-    type: {
-      type: String,
-      enum: ['sale', 'purchase', 'adjustment', 'repack', 'manufacturing'],
-      required: true,
-    },
-    quantity: { type: Number, required: true },
-    referenceId: { type: mongoose.Schema.Types.ObjectId },
-    referenceModel: { type: String },
-    notes: { type: String, trim: true },
-    supplier: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+const StockMovement = sequelize.define('StockMovement', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
   },
-  { timestamps: true }
-);
+  type: {
+    type: DataTypes.ENUM('sale', 'purchase', 'adjustment', 'repack', 'manufacturing'),
+    allowNull: false,
+  },
+  quantity: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+  },
+  referenceId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  referenceModel: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  notes: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  batchNumber: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  expiryDate: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+});
 
-module.exports = mongoose.model('StockMovement', stockMovementSchema);
+// Associations
+StockMovement.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
+StockMovement.belongsTo(Supplier, { as: 'supplier', foreignKey: 'supplierId' });
+StockMovement.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById' });
+
+makeMongooseCompatible(StockMovement, {
+  product: 'productId',
+  supplier: 'supplierId',
+  createdBy: 'createdById',
+});
+
+module.exports = StockMovement;

@@ -1,0 +1,131 @@
+.raw-materials-container {
+  --brand-primary: #10b981;
+  --brand-primary-light: #ecfdf5;
+  --brand-primary-hover: #059669;
+  --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --border-color: #e5e7eb;
+}
+
+.rm-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.rm-stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.rm-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.rm-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: var(--brand-primary-light);
+  color: var(--brand-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.rm-stat-info h3 {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0 0 0.25rem 0;
+  font-weight: 500;
+}
+
+.rm-stat-info p {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.rm-tabs-bar {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.25rem;
+  overflow-x: auto;
+}
+
+.rm-tab-btn {
+  padding: 0.75rem 1.25rem;
+  background: none;
+  border: none;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.rm-tab-btn:hover {
+  color: var(--brand-primary);
+  background: #f9fafb;
+}
+
+.rm-tab-btn.active {
+  color: var(--brand-primary);
+  border-bottom: 3px solid var(--brand-primary);
+  background: var(--brand-primary-light);
+}
+
+.rm-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .rm-layout.with-sidebar {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.rm-grid-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.rm-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.rm-badge-active {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.rm-badge-inactive {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.rm-badge-warning {
+  background-color: #fef3c7;
+  color: #92400e;
+}

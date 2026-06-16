@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { inventoryApi, productsApi, suppliersApi } from '../api';
 import { useToast } from '../context/ToastContext';
 import Pagination from '../components/Pagination';
 import LoadingSpinner from '../components/LoadingSpinner';
 
-export default function Inventory() {
+export default function Inventory({ defaultTab }) {
   const { toast } = useToast();
-  const [tab, setTab] = useState('movements');
+  const [tab, setTab] = useState(defaultTab || 'movements');
   const [movements, setMovements] = useState([]);
   const [report, setReport] = useState(null);
   const [products, setProducts] = useState([]);
@@ -15,9 +15,14 @@ export default function Inventory() {
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [adjust, setAdjust] = useState({ productId: '', quantity: 0, notes: '', supplierId: '' });
+  const [adjust, setAdjust] = useState({ productId: '', quantity: 0, notes: '', supplierId: '', batchNumber: '', expiryDate: '' });
   const [repack, setRepack] = useState({ fromProductId: '', toProductId: '', fromQty: 0, toQty: 0, notes: '', supplierId: '' });
   const [mfg, setMfg] = useState({ inputId: '', inputQty: 0, outputId: '', outputQty: 0, notes: '', supplierId: '' });
+  const [expandedProducts, setExpandedProducts] = useState({});
+
+  const toggleExpand = (id) => {
+    setExpandedProducts((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   useEffect(() => {
     productsApi.list({ limit: 200 }).then(({ data }) => setProducts(data.products));
@@ -43,6 +48,7 @@ export default function Inventory() {
     try {
       await inventoryApi.adjust(adjust);
       toast('Stock adjusted', 'success');
+      setAdjust({ productId: '', quantity: 0, notes: '', supplierId: '', batchNumber: '', expiryDate: '' });
       setTab('movements');
     } catch (err) {
       toast(err.response?.data?.message || 'Failed', 'error');
@@ -116,14 +122,16 @@ export default function Inventory() {
         <>
           {tab === 'movements' && (
             <div className="card table-wrap">
-              <table className="data-table">
-                <thead><tr><th>Product</th><th>Type</th><th>Qty</th><th>Supplier</th><th>Notes</th><th>Date</th></tr></thead>
+              <table className="data-table movements-table">
+                <thead><tr><th>Product</th><th>Type</th><th>Qty</th><th>Batch</th><th>Expiry</th><th>Supplier</th><th>Notes</th><th>Date</th></tr></thead>
                 <tbody>
                   {movements.map((m) => (
                     <tr key={m._id}>
                       <td>{m.product?.name}</td>
                       <td><span className="badge badge-success">{m.type}</span></td>
                       <td>{m.quantity > 0 ? '+' : ''}{m.quantity}</td>
+                      <td>{m.batchNumber || '—'}</td>
+                      <td>{m.expiryDate ? new Date(m.expiryDate).toLocaleDateString() : '—'}</td>
                       <td>{m.supplier?.name || '—'}</td>
                       <td>{m.notes}</td>
                       <td>{new Date(m.createdAt).toLocaleString()}</td>
@@ -138,17 +146,64 @@ export default function Inventory() {
             <div className="card">
               <p>Total inventory value: ₹{report.totalValue?.toLocaleString()}</p>
               <p>Low stock items: {report.lowStockCount}</p>
-              <table className="data-table">
+              <table className="data-table inventory-table">
                 <thead><tr><th>Product</th><th>Stock</th><th>Supplier</th><th>Value</th></tr></thead>
                 <tbody>
-                  {report.products?.map((p) => (
-                    <tr key={p._id}>
-                      <td>{p.name}</td>
-                      <td>{p.stock}</td>
-                      <td>{p.supplier || '—'}</td>
-                      <td>₹{(p.stock * p.purchasePrice).toFixed(2)}</td>
-                    </tr>
-                  ))}
+                  {report.products?.map((p) => {
+                    const isExpanded = !!expandedProducts[p._id || p.id];
+                    const hasPacks = p.packSizes && p.packSizes.length > 0;
+                    return (
+                      <React.Fragment key={p._id || p.id}>
+                        <tr onClick={() => hasPacks && toggleExpand(p._id || p.id)} style={{ cursor: hasPacks ? 'pointer' : 'default' }}>
+                          <td>
+                            {hasPacks && (
+                              <span style={{ marginRight: '0.5rem', display: 'inline-block', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+                                ▶
+                              </span>
+                            )}
+                            <strong>{p.name}</strong>
+                            {hasPacks && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginLeft: '0.5rem' }}>({p.packSizes.length} Pack Sizes Available)</span>}
+                          </td>
+                          <td>{p.stock} {p.unit}</td>
+                          <td>{p.supplier || '—'}</td>
+                          <td>₹{(p.stock * p.purchasePrice).toFixed(2)}</td>
+                        </tr>
+                        {hasPacks && isExpanded && (
+                          <tr>
+                            <td colSpan="4" style={{ paddingLeft: '2.5rem', background: '#f8fafc' }}>
+                              <div style={{ padding: '0.5rem 0' }}>
+                                <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', color: '#ff9800', fontWeight: 600 }}>Available Pack Sizes Inventory</h5>
+                                <table style={{ width: '100%', maxWidth: '700px', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                                  <thead>
+                                    <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
+                                      <th style={{ padding: '0.25rem 0' }}>Pack Size Name</th>
+                                      <th>Weight (g)</th>
+                                      <th>Physical Stock</th>
+                                      <th>Selling Price</th>
+                                      <th>MRP</th>
+                                      <th>Packaging Cost</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {p.packSizes.map((ps) => (
+                                      <tr key={ps.id || ps._id} style={{ borderBottom: '1px dashed #e2e8f0' }}>
+                                        <td style={{ padding: '0.4rem 0' }}><strong>{ps.packName}</strong></td>
+                                        <td>{ps.weightInGrams}g</td>
+                                        <td><span className="badge badge-success" style={{ backgroundColor: '#22c55e', color: '#fff' }}>{ps.stock} packs</span></td>
+                                        <td>₹{ps.sellingPrice}</td>
+                                        <td>₹{ps.mrp}</td>
+                                        <td>₹{ps.packagingCost}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -158,6 +213,8 @@ export default function Inventory() {
               <div className="form-group"><label>Product</label><ProductSelect value={adjust.productId} onChange={(v) => setAdjust({ ...adjust, productId: v })} /></div>
               <div className="form-group"><label>Quantity (+/-)</label><input type="number" className="form-control" value={adjust.quantity} onChange={(e) => setAdjust({ ...adjust, quantity: Number(e.target.value) })} /></div>
               <SupplierSelect value={adjust.supplierId} onChange={(v) => setAdjust({ ...adjust, supplierId: v })} list={suppliers} label="Supplier (optional)" />
+              <div className="form-group"><label>Batch Number (Optional)</label><input className="form-control" value={adjust.batchNumber || ''} onChange={(e) => setAdjust({ ...adjust, batchNumber: e.target.value })} placeholder="e.g. BATCH-001" /></div>
+              <div className="form-group"><label>Expiry Date (Optional)</label><input type="date" className="form-control" value={adjust.expiryDate || ''} onChange={(e) => setAdjust({ ...adjust, expiryDate: e.target.value })} /></div>
               <div className="form-group"><label>Notes</label><input className="form-control" value={adjust.notes} onChange={(e) => setAdjust({ ...adjust, notes: e.target.value })} /></div>
               <button type="button" className="btn btn-primary" onClick={doAdjust}>Apply</button>
             </div>

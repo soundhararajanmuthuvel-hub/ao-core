@@ -27,12 +27,34 @@ client.interceptors.request.use((config) => {
     }
   }
 
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ao-loading-start', {
+      detail: {
+        url: config.url || '',
+        method: config.method || 'get',
+        data: config.data
+      }
+    }));
+  }
+
   return config;
 });
 
 client.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ao-loading-end', {
+        detail: { url: res.config?.url || '', success: true }
+      }));
+    }
+    return res;
+  },
   (err) => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ao-loading-end', {
+        detail: { url: err.config?.url || '', success: false, error: err }
+      }));
+    }
     if (err.response?.status === 401 && !err.config?.url?.includes('/auth/login')) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');

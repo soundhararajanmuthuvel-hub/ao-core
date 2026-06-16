@@ -1,5 +1,5 @@
 const express = require('express');
-const mongoose = require('mongoose');
+const { sequelize } = require('../config/db');
 
 const router = express.Router();
 
@@ -10,13 +10,22 @@ router.get('/ping', (req, res) => {
   });
 });
 
-router.get('/db', (req, res) => {
-  res.json({
-    success: true,
-    status: 'OK',
-    database:
-      mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
-  });
+router.get('/db', async (req, res) => {
+  try {
+    await sequelize.authenticate();
+    res.json({
+      success: true,
+      status: 'OK',
+      database: 'Connected',
+    });
+  } catch (err) {
+    res.json({
+      success: false,
+      status: 'Error',
+      database: 'Disconnected',
+      error: err.message,
+    });
+  }
 });
 
 module.exports = router;

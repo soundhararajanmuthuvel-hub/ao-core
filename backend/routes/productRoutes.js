@@ -11,16 +11,24 @@ const {
   createProduct,
   updateProduct,
   deleteProduct,
+  getProductDependenciesApi,
+  restoreProduct,
+  deleteProductPermanent,
+  adjustProductStockToZero,
 } = require('../controllers/productController');
 
 router.use(auth);
 router.get('/', getProducts);
 router.get('/low-stock', getLowStock);
 router.get('/categories', getCategories);
+router.get('/:id/dependencies', getProductDependenciesApi);
 router.get('/:id/history', getStockHistory);
 router.get('/:id', getProduct);
 router.post('/', uploadProduct, createProduct);
+router.post('/:id/restore', restoreProduct);
+router.post('/:id/adjust-zero', adjustProductStockToZero);
 router.put('/:id', uploadProduct, updateProduct);
+router.delete('/:id/permanent', deleteProductPermanent);
 router.delete('/:id', deleteProduct);
 
 module.exports = router;

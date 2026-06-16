@@ -1,14 +1,35 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
+const User = require('./User');
+const { makeMongooseCompatible } = require('./compat');
 
-const activityLogSchema = new mongoose.Schema(
-  {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    action: { type: String, required: true },
-    module: { type: String, required: true },
-    details: { type: String },
-    metadata: { type: mongoose.Schema.Types.Mixed },
+const ActivityLog = sequelize.define('ActivityLog', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
   },
-  { timestamps: true }
-);
+  action: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  module: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  details: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  metadata: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
+});
 
-module.exports = mongoose.model('ActivityLog', activityLogSchema);
+// Associations
+ActivityLog.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+
+makeMongooseCompatible(ActivityLog, { user: 'userId' });
+
+module.exports = ActivityLog;

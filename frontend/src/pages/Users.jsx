@@ -53,7 +53,7 @@ export default function Users() {
       </div>
       {loading ? <LoadingSpinner /> : (
         <div className="card table-wrap">
-          <table className="data-table">
+          <table className="data-table users-table">
             <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th>Actions</th></tr></thead>
             <tbody>
               {users.map((u) => (

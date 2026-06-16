@@ -15,7 +15,7 @@ exports.updateSettings = async (req, res, next) => {
     let settings = await getSettings();
     Object.assign(settings, req.body);
     await settings.save();
-    await logActivity(req.user._id, 'update', 'settings', 'Updated company settings');
+    await logActivity(req.user.id, 'update', 'settings', 'Updated company settings');
     res.json({ settings });
   } catch (err) {
     next(err);

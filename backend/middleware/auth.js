@@ -9,7 +9,8 @@ const auth = async (req, res, next) => {
     }
     const token = header.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select('-password');
+    // Find the user by primary key (id). The defaultScope excludes password.
+    const user = await User.findByPk(decoded.id);
     if (!user || !user.isActive) {
       return res.status(401).json({ message: 'User not found or inactive' });
     }

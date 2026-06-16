@@ -10,6 +10,7 @@ export default function Reports() {
   const [sales, setSales] = useState(null);
   const [purchases, setPurchases] = useState(null);
   const [daily, setDaily] = useState(null);
+  const [shipping, setShipping] = useState(null);
 
   const download = (blob, name) => {
     const url = URL.createObjectURL(blob);
@@ -35,6 +36,11 @@ export default function Reports() {
     setDaily(data);
   };
 
+  const loadShipping = async () => {
+    const { data } = await reportsApi.shipping({ from, to });
+    setShipping(data);
+  };
+
   const exportSales = async () => {
     try {
       const { data } = await reportsApi.exportSales({ from, to });
@@ -57,9 +63,20 @@ export default function Reports() {
     toast('Exported', 'success');
   };
 
+  const exportShipping = async () => {
+    try {
+      const { data } = await reportsApi.exportShipping({ from, to });
+      download(data, 'shipping-report.xlsx');
+      toast('Exported', 'success');
+    } catch {
+      toast('Export failed', 'error');
+    }
+  };
+
   return (
     <div className="page">
       <div className="page-header"><h1 className="page-title">Reports</h1></div>
+      
       <div className="card" style={{ marginBottom: '1rem' }}>
         <h3>Sales Report</h3>
         <div className="form-row">
@@ -70,12 +87,29 @@ export default function Reports() {
         </div>
         {sales && <p>{sales.count} invoices — Total: ₹{sales.total}</p>}
       </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <h3>Shipping & Delivery Report</h3>
+        <div className="form-row">
+          <input type="date" className="form-control" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <input type="date" className="form-control" value={to} onChange={(e) => setTo(e.target.value)} />
+          <button type="button" className="btn btn-secondary" onClick={loadShipping}>Load</button>
+          <button type="button" className="btn btn-primary" onClick={exportShipping}>Export Excel</button>
+        </div>
+        {shipping && (
+          <p>
+            {shipping.count} Shipments total | Delivered: <strong>{shipping.metrics.delivered}</strong> | In Transit: <strong>{shipping.metrics.inTransit}</strong> | Pending: <strong>{shipping.metrics.pending}</strong> | Returned: <strong>{shipping.metrics.returned}</strong>
+          </p>
+        )}
+      </div>
+
       <div className="card" style={{ marginBottom: '1rem' }}>
         <h3>Purchases Report</h3>
         <button type="button" className="btn btn-secondary" onClick={loadPurchases}>Load</button>
         <button type="button" className="btn btn-primary" onClick={exportPurchases}>Export Excel</button>
         {purchases && <p>{purchases.count} purchases — Total: ₹{purchases.total}</p>}
       </div>
+      
       <div className="card">
         <h3>Daily Report</h3>
         <input type="date" className="form-control" style={{ maxWidth: 200 }} value={date} onChange={(e) => setDate(e.target.value)} />

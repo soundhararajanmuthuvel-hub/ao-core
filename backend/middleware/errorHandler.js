@@ -4,24 +4,24 @@ const errorHandler = (err, req, res, next) => {
   let statusCode = err.statusCode || err.status || 500;
   let message = err.message || 'Server Error';
 
-  if (err.code === 11000) {
+  // Handle Sequelize Unique Constraint Error (e.g. duplicate email or SKU)
+  if (err.name === 'SequelizeUniqueConstraintError') {
     statusCode = 400;
-    message = 'Duplicate field value';
+    message = err.errors && err.errors.length
+      ? err.errors.map((e) => `${e.path} must be unique`).join(', ')
+      : 'Duplicate field value';
   }
 
-  if (err.name === 'ValidationError') {
+  // Handle Sequelize Validation Error
+  else if (err.name === 'SequelizeValidationError') {
     statusCode = 400;
-    message = Object.values(err.errors)
-      .map((item) => item.message)
-      .join(', ');
+    message = err.errors && err.errors.length
+      ? err.errors.map((e) => e.message).join(', ')
+      : 'Validation error';
   }
 
-  if (err.name === 'CastError') {
-    statusCode = 400;
-    message = `Invalid ${err.path}`;
-  }
-
-  if (err.name === 'MulterError') {
+  // Handle legacy/other errors (like Multer upload issues)
+  else if (err.name === 'MulterError') {
     statusCode = 400;
     message = err.message;
   }

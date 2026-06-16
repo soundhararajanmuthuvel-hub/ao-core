@@ -1,50 +1,622 @@
+/* AO CORE ERP - ENTERPRISE PREMIUM SaaS LOGIN PAGE STYLING */
+
+/* Reset & Root Layout */
 .login-page {
-  min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, var(--bg-page) 0%, #dbeafe 100%);
-  padding: 1rem;
+  width: 100%;
+  height: 100vh;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #f8fafc;
+  box-sizing: border-box;
 }
 
 [data-theme='dark'] .login-page {
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+  background-color: #030712;
 }
 
-.login-card {
-  background: var(--bg-card);
-  border-radius: 16px;
-  padding: 2.5rem;
-  width: 100%;
-  max-width: 400px;
-  box-shadow: var(--shadow-lg);
-  border: 1px solid var(--border);
+/* ==========================================================================
+   70% LEFT SIDE - BRAND PANEL
+   ========================================================================== */
+.login-left-panel {
+  width: 70%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 4rem;
+  background: linear-gradient(135deg, #071B4D 0%, #08225E 50%, #0A2C7A 100%);
+  color: #ffffff;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  box-sizing: border-box;
 }
 
-.login-brand {
-  text-align: center;
-  margin-bottom: 2rem;
+/* Orange Spotlight Glow behind Title Section */
+.spotlight-glow {
+  position: absolute;
+  top: 15%;
+  left: 10%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(255, 152, 0, 0.15) 0%, rgba(255, 152, 0, 0) 70%);
+  pointer-events: none;
+  filter: blur(80px);
+  z-index: 1;
 }
 
-.login-brand img {
-  width: 64px;
-  height: 64px;
+.left-panel-content {
+  position: relative;
+  z-index: 3;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Glassmorphism Badge for Top Brand Info */
+.brand-glass-badge {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(255, 255, 255, 0.92); /* Bright high-contrast white glass */
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 0.85rem 1.5rem;
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  width: fit-content;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.15);
+}
+
+.brand-logo-top {
+  width: 42px;
+  height: 42px;
   object-fit: contain;
+  background: #ffffff; /* White background container for logo image */
+  padding: 6px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.brand-icon-top {
+  font-size: 2rem;
+  display: inline-flex;
+}
+
+.brand-logo-text-top {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #071B4D; /* Dark text color for contrast */
+}
+
+/* Hero Typography styling */
+.left-panel-hero {
+  margin-top: 2.5rem;
+  max-width: 90%;
+}
+
+.giant-brand-title {
+  font-size: 4rem; /* 64px */
+  font-weight: 900;
+  margin: 0 0 1rem 0;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-ao-gradient {
+  background: linear-gradient(90deg, #FF9800 0%, #FFB74D 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 15px rgba(255, 152, 0, 0.35));
+}
+
+.brand-white-title {
+  color: #ffffff;
+}
+
+.hero-subtitle-primary {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.01em;
+}
+
+.hero-subtitle-detail {
+  font-size: 1.05rem;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0;
+  line-height: 1.5;
+  max-width: 650px;
+}
+
+/* 2x2 Dark Glass Feature Grid */
+.premium-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin: 2.5rem 0;
+}
+
+.glass-feature-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1.5rem;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+}
+
+.glass-feature-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 152, 0, 0.4);
+  box-shadow: 0 8px 30px rgba(255, 152, 0, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.feature-icon {
+  font-size: 1.85rem;
+  display: inline-flex;
   margin-bottom: 0.75rem;
 }
 
-.login-icon {
-  font-size: 3rem;
-  display: block;
-  margin-bottom: 0.5rem;
+.glass-feature-card h4 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 0.35rem 0;
+  color: #ffffff;
 }
 
-.login-brand h1 {
-  font-size: 1.5rem;
-  margin-bottom: 0.25rem;
+.glass-feature-card p {
+  font-size: 0.825rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+  line-height: 1.4;
 }
 
-.login-brand p {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
+/* Bottom Highlight Strip (Dark Glass + Orange Border) */
+.bottom-highlight-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  padding: 1.25rem 2rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-left: 4px solid #FF9800;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 4px solid #FF9800;
+  border-radius: 4px 12px 12px 4px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-sizing: border-box;
+}
+
+.highlight-item {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+}
+
+/* ==========================================================================
+   30% RIGHT SIDE - LOGIN PANEL
+   ========================================================================== */
+.login-right-panel {
+  width: 30%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem;
+  background-color: #f8fafc;
+  box-sizing: border-box;
+}
+
+[data-theme='dark'] .login-right-panel {
+  background-color: #0b0f19;
+}
+
+.login-card-container {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Pure White Card Redesign */
+.login-glass-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.06), 0 5px 15px rgba(0, 0, 0, 0.02);
+  border-radius: 16px;
+  padding: 3.5rem 2.5rem;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+
+[data-theme='dark'] .login-glass-card {
+  background: #111827;
+  border-color: #1f2937;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+
+.login-glass-card:hover {
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.09);
+}
+
+/* Card Header */
+.login-card-header h2 {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 0.25rem 0;
+  letter-spacing: -0.03em;
+}
+
+[data-theme='dark'] .login-card-header h2 {
+  color: #f8fafc;
+}
+
+.login-card-header .welcome-desc {
+  font-size: 0.9rem;
+  color: #64748b;
+  font-weight: 500;
+  margin: 0;
+}
+
+[data-theme='dark'] .login-card-header .welcome-desc {
+  color: #94a3b8;
+}
+
+.mobile-logo-header {
+  display: none;
+}
+
+/* Form Styles */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+[data-theme='dark'] .form-label {
+  color: #cbd5e1;
+}
+
+.input-with-icon {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon-left {
+  position: absolute;
+  left: 16px;
+  font-size: 1.1rem;
+  color: #94a3b8;
+  pointer-events: none;
+  display: inline-flex;
+}
+
+.input-with-icon .form-control {
+  width: 100%;
+  height: 50px;
+  padding: 10px 16px 10px 48px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  color: #0f172a;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+[data-theme='dark'] .input-with-icon .form-control {
+  background-color: #1f2937;
+  border-color: #374151;
+  color: #f8fafc;
+}
+
+.input-with-icon .form-control:focus {
+  border-color: #ff9800;
+  box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.15);
+  outline: none;
+}
+
+.select-role {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 16px;
+  padding-right: 44px !important;
+}
+
+/* Password Toggle */
+.password-toggle-btn {
+  position: absolute;
+  right: 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.15rem;
+  padding: 4px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Actions Row */
+.form-actions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: #64748b;
+  font-weight: 500;
+}
+
+[data-theme='dark'] .checkbox-label {
+  color: #94a3b8;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  accent-color: #ff9800;
+  cursor: pointer;
+}
+
+.forgot-password-link {
+  color: #ff9800;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.forgot-password-link:hover {
+  color: #e68a00;
+}
+
+/* Orange Gradient Button (56px) */
+.btn-login-gradient {
+  height: 56px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ff9800 0%, #ff6b00 100%);
+  border: none;
+  color: #ffffff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(255, 107, 0, 0.35);
+  margin-top: 0.5rem;
+}
+
+.btn-login-gradient:hover:not(:disabled) {
+  box-shadow: 0 6px 22px rgba(255, 107, 0, 0.5);
+  transform: translateY(-2px);
+}
+
+.btn-login-gradient:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-login-gradient:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+/* Spinner */
+.login-spinner-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.login-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: loginSpin 0.8s linear infinite;
+}
+
+/* Footer Section */
+.login-footer {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 0.5rem;
+}
+
+.footer-copyright {
+  margin: 0;
+  font-weight: 700;
+  color: #64748b;
+}
+
+[data-theme='dark'] .footer-copyright {
+  color: #cbd5e1;
+}
+
+.footer-powered {
+  margin: 4px 0 0 0;
+  color: #94a3b8;
+}
+
+/* ==========================================================================
+   GLOBAL ANIMATIONS
+   ========================================================================== */
+.animate-fade-in {
+  animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes loginSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   MOBILE & RESPONSIVE BREAKPOINTS (STACKED ORDER FIRST FOR LOGIN CARD)
+   ========================================================================== */
+@media (max-width: 1200px) {
+  .login-left-panel {
+    padding: 3rem 2.5rem;
+  }
+  .giant-brand-title {
+    font-size: 3.25rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .login-page {
+    flex-direction: column;
+    overflow-y: auto;
+    height: auto;
+  }
+  
+  .login-right-panel {
+    width: 100%;
+    order: 1; /* Render Login card FIRST on mobile/tablet */
+    height: auto;
+    padding: 3rem 2rem;
+  }
+  
+  .login-left-panel {
+    width: 100%;
+    order: 2; /* Render Brand Highlight SECOND on mobile/tablet */
+    height: auto;
+    padding: 3rem 2rem;
+  }
+  
+  .login-card-container {
+    max-width: 520px;
+    margin: auto;
+  }
+  
+  .login-glass-card {
+    padding: 3rem 2rem;
+    border-radius: 16px;
+  }
+  
+  /* Mobile header branding inside the login card */
+  .mobile-logo-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding-bottom: 1rem;
+  }
+  
+  [data-theme='dark'] .mobile-logo-header {
+    border-bottom-color: rgba(255, 255, 255, 0.05);
+  }
+  
+  .mobile-logo {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+  }
+  
+  .mobile-icon {
+    font-size: 1.5rem;
+    display: inline-flex;
+  }
+  
+  .mobile-logo-header h3 {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+    letter-spacing: 0.5px;
+  }
+  
+  [data-theme='dark'] .mobile-logo-header h3 {
+    color: #f8fafc;
+  }
+  
+  .premium-feature-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-right-panel {
+    padding: 1.5rem 1rem;
+  }
+  .login-left-panel {
+    padding: 2rem 1.25rem;
+  }
+  .login-glass-card {
+    padding: 2.25rem 1.25rem;
+  }
+  .login-card-header h2 {
+    font-size: 1.65rem;
+  }
+  .giant-brand-title {
+    font-size: 2.5rem;
+    flex-wrap: wrap;
+  }
 }

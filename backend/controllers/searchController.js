@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const Invoice = require('../models/Invoice');
@@ -7,11 +8,36 @@ exports.globalSearch = async (req, res, next) => {
     const q = req.query.q || '';
     if (!q || q.length < 2) return res.json({ products: [], customers: [], invoices: [] });
 
-    const regex = new RegExp(q, 'i');
     const [products, customers, invoices] = await Promise.all([
-      Product.find({ $or: [{ name: regex }, { sku: regex }] }).limit(5).select('name sku stock'),
-      Customer.find({ $or: [{ name: regex }, { phone: regex }, { email: regex }] }).limit(5).select('name phone'),
-      Invoice.find({ invoiceNumber: regex }).limit(5).select('invoiceNumber grandTotal date'),
+      Product.findAll({
+        where: {
+          isArchived: { [Op.ne]: true },
+          [Op.or]: [
+            { name: { [Op.like]: `%${q}%` } },
+            { sku: { [Op.like]: `%${q}%` } },
+          ],
+        },
+        attributes: ['id', 'name', 'sku', 'stock'],
+        limit: 5,
+      }),
+      Customer.findAll({
+        where: {
+          [Op.or]: [
+            { name: { [Op.like]: `%${q}%` } },
+            { phone: { [Op.like]: `%${q}%` } },
+            { email: { [Op.like]: `%${q}%` } },
+          ],
+        },
+        attributes: ['id', 'name', 'phone'],
+        limit: 5,
+      }),
+      Invoice.findAll({
+        where: {
+          invoiceNumber: { [Op.like]: `%${q}%` },
+        },
+        attributes: ['id', 'invoiceNumber', 'grandTotal', 'date'],
+        limit: 5,
+      }),
     ]);
 
     res.json({ products, customers, invoices });

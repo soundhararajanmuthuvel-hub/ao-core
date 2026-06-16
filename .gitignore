@@ -5,3 +5,7 @@ backend/uploads/*
 !backend/uploads/.gitkeep
 *.log
 .DS_Store
+backend/database.sqlite
+mock_zoho_backup.zip
+dump_db.js
+scratch_alter_customer.js

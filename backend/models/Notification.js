@@ -1,15 +1,39 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
+const User = require('./User');
+const { makeMongooseCompatible } = require('./compat');
 
-const notificationSchema = new mongoose.Schema(
-  {
-    title: { type: String, required: true },
-    message: { type: String, required: true },
-    type: { type: String, enum: ['info', 'warning', 'error', 'success'], default: 'info' },
-    isRead: { type: Boolean, default: false },
-    link: { type: String },
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+const Notification = sequelize.define('Notification', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
   },
-  { timestamps: true }
-);
+  title: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  message: {
+    type: DataTypes.TEXT,
+    allowNull: false,
+  },
+  type: {
+    type: DataTypes.ENUM('info', 'warning', 'error', 'success'),
+    defaultValue: 'info',
+  },
+  isRead: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  link: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+});
 
-module.exports = mongoose.model('Notification', notificationSchema);
+// Associations
+Notification.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+
+makeMongooseCompatible(Notification, { user: 'userId' });
+
+module.exports = Notification;

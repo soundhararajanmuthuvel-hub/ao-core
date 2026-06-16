@@ -27,16 +27,29 @@ const fileFilter = (req, file, cb) => {
   else cb(new Error('Only image files allowed'));
 };
 
+const purchaseInvoiceFileFilter = (req, file, cb) => {
+  const isPdf = path.extname(file.originalname).toLowerCase() === '.pdf';
+  const isPdfMime = file.mimetype === 'application/pdf';
+  if (isPdf && isPdfMime) cb(null, true);
+  else cb(new Error('Only PDF files are allowed for purchase invoices'));
+};
+
 const uploadLogo = multer({
   storage: storage('logos'),
-  limits: { fileSize: 2 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter,
 }).single('logo');
 
 const uploadProduct = multer({
   storage: storage('products'),
-  limits: { fileSize: 2 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter,
 }).single('image');
 
-module.exports = { uploadLogo, uploadProduct };
+const uploadPurchaseInvoice = multer({
+  storage: storage('purchase-invoices'),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: purchaseInvoiceFileFilter,
+}).single('invoicePdf');
+
+module.exports = { uploadLogo, uploadProduct, uploadPurchaseInvoice };
