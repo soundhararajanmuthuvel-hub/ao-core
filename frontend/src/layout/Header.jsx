@@ -19,6 +19,13 @@ export default function Header({ onMenuToggle }) {
   const [showNotif, setShowNotif] = useState(false);
   const [showUser, setShowUser] = useState(false);
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     notificationsApi.list().then(({ data }) => {
       setNotifications(data.notifications);
@@ -44,6 +51,93 @@ export default function Header({ onMenuToggle }) {
     else if (type === 'customer') navigate('/customers');
     else if (type === 'invoice') navigate(`/sales/${item._id || item.id}`);
   };
+
+  if (isMobile) {
+    return (
+      <header className="app-header mobile-header-layout" style={{ position: 'sticky', top: 0, zIndex: 999, display: 'flex', flexDirection: 'column', padding: '0.5rem 1rem', height: 'auto', gap: '0.5rem' }}>
+        {/* Row 1 */}
+        <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button type="button" className="menu-toggle" onClick={onMenuToggle} style={{ display: 'block', background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-primary)', minHeight: '44px', minWidth: '44px' }}>
+              ☰
+            </button>
+            <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>AO Core ERP</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div className="notifications-panel" style={{ position: 'relative' }}>
+              <button type="button" className="btn-icon" onClick={() => setShowNotif(!showNotif)} style={{ minHeight: '44px', minWidth: '44px', background: 'none', border: 'none', fontSize: '1.25rem' }}>
+                🔔{unread > 0 ? <span style={{ background: '#ef4444', color: '#fff', fontSize: '0.75rem', padding: '1px 6px', borderRadius: '50%', marginLeft: '2px', verticalAlign: 'top', fontWeight: 'bold' }}>{unread}</span> : ''}
+              </button>
+              {showNotif && (
+                <div className="notifications-dropdown" style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '100%',
+                  marginTop: '0.5rem',
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                  width: '280px',
+                  maxHeight: '350px',
+                  overflowY: 'auto',
+                  zIndex: 1000,
+                  padding: '0.5rem'
+                }}>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No notifications</div>
+                  ) : (
+                    notifications.slice(0, 5).map((n) => (
+                      <div key={n._id || n.id} style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                        <strong style={{ display: 'block' }}>{n.title}</strong>
+                        <span style={{ color: 'var(--text-secondary)' }}>{n.message}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <button type="button" className="btn-icon" onClick={toggleDarkMode} style={{ minHeight: '44px', minWidth: '44px', background: 'none', border: 'none', fontSize: '1.25rem' }}>
+              {darkMode ? '☀️' : '🌙'}
+            </button>
+          </div>
+        </div>
+
+        {/* Row 2: Search */}
+        <div style={{ width: '100%', position: 'relative' }}>
+          <div className="search-box" style={{ width: '100%', maxWidth: '100%' }}>
+            <input
+              type="search"
+              placeholder="🔍 Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ width: '100%', minHeight: '40px', paddingLeft: '2.2rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-page)', color: 'var(--text-primary)' }}
+            />
+            {results && (
+              <div className="search-dropdown" style={{ left: 0, right: 0, width: '100%' }}>
+                {results.products?.map((p) => (
+                  <div key={p._id || p.id} className="search-dropdown-item" onClick={() => handleSearchClick('product', p)}>
+                    📦 {p.name}
+                  </div>
+                ))}
+                {results.customers?.map((c) => (
+                  <div key={c._id || c.id} className="search-dropdown-item" onClick={() => handleSearchClick('customer', c)}>
+                    👤 {c.name}
+                  </div>
+                ))}
+                {results.invoices?.map((i) => (
+                  <div key={i._id || i.id} className="search-dropdown-item" onClick={() => handleSearchClick('invoice', i)}>
+                    🧾 {i.invoiceNumber}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="app-header">

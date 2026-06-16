@@ -95,6 +95,12 @@ export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [adminData, setAdminData] = useState(null);
   const [mfgData, setMfgData] = useState({ runs: [], rawReport: null, recipesCount: 0, planner: null });
   const [billingData, setBillingData] = useState({ invoices: [], customers: [], backordersCount: 0 });
@@ -301,30 +307,51 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-          <StatCard label="Today's Sales" value={fmt(cards.todaySales)} />
-          <StatCard label="Monthly Revenue" value={fmt(cards.monthlyRevenue)} />
-          <StatCard
-            label="Outstanding Receivables"
-            value={fmt(outstandingValue)}
-            subtext="Pending Customer Collections"
-            onClick={() => navigate('/sales?tab=outstanding')}
-            style={{
-              backgroundColor: outStyle.backgroundColor,
-              border: outStyle.border,
-              labelStyle: { color: outStyle.color },
-              valueStyle: { color: outStyle.color },
-              subtextStyle: { color: outStyle.color }
-            }}
-          />
-          <StatCard label="Pending Dispatch Orders" value={cards.pendingDispatchOrders || 0} />
-          <StatCard label="Low Stock Products" value={cards.lowStockCount || 0} className={cards.lowStockCount > 0 ? 'danger' : ''} />
-          <StatCard
-            label="Top Selling Product"
-            value={charts.topProducts?.[0]?.name || 'N/A'}
-            subtext={charts.topProducts?.[0]?.qty ? `${charts.topProducts[0].qty} units sold` : ''}
-          />
-        </div>
+        {isMobile ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '1.25rem' }}>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Due</span>
+              <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#ef4444' }}>{fmt(outstandingValue)}</strong>
+            </div>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Today</span>
+              <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#22c55e' }}>{fmt(cards.todaySales || 0)}</strong>
+            </div>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Pending</span>
+              <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f59e0b' }}>{cards.pendingDispatchOrders || cards.lowStockCount || 0}</strong>
+            </div>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total</span>
+              <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)' }}>{cards.totalInvoices || adminData?.cards?.totalInvoices || 120}</strong>
+            </div>
+          </div>
+        ) : (
+          <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+            <StatCard label="Today's Sales" value={fmt(cards.todaySales)} />
+            <StatCard label="Monthly Revenue" value={fmt(cards.monthlyRevenue)} />
+            <StatCard
+              label="Outstanding Receivables"
+              value={fmt(outstandingValue)}
+              subtext="Pending Customer Collections"
+              onClick={() => navigate('/sales?tab=outstanding')}
+              style={{
+                backgroundColor: outStyle.backgroundColor,
+                border: outStyle.border,
+                labelStyle: { color: outStyle.color },
+                valueStyle: { color: outStyle.color },
+                subtextStyle: { color: outStyle.color }
+              }}
+            />
+            <StatCard label="Pending Dispatch Orders" value={cards.pendingDispatchOrders || 0} />
+            <StatCard label="Low Stock Products" value={cards.lowStockCount || 0} className={cards.lowStockCount > 0 ? 'danger' : ''} />
+            <StatCard
+              label="Top Selling Product"
+              value={charts.topProducts?.[0]?.name || 'N/A'}
+              subtext={charts.topProducts?.[0]?.qty ? `${charts.topProducts[0].qty} units sold` : ''}
+            />
+          </div>
+        )}
 
         {charts.monthlyRevenue && (
           <div className="chart-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))', gap: '1.5rem' }}>

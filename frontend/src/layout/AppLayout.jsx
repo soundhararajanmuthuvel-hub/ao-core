@@ -501,28 +501,17 @@ export default function AppLayout() {
       <div className="fab-container">
         <div className={`fab-menu ${fabOpen ? 'open' : ''}`}>
           <div className="fab-action-item" onClick={() => handleFabAction('/sales?tab=new')}>
-            <span className="fab-action-icon">✍️</span> New Sale / Invoice
+            <span className="fab-action-icon">✍️</span> New Invoice
           </div>
-          {(isSuperAdmin || userRole === 'Manufacturing Manager') && (
-            <div className="fab-action-item" onClick={() => handleFabAction('/manufacturing?tab=runs')}>
-              <span className="fab-action-icon">🏭</span> Start Production
-            </div>
-          )}
-          {(isSuperAdmin || userRole === 'Billing Executive' || userRole === 'Sales Executive' || userRole === 'Dispatch Executive') && (
-            <div className="fab-action-item" onClick={() => handleFabAction('/sales?tab=shipping')}>
-              <span className="fab-action-icon">🚚</span> Create Shipment
-            </div>
-          )}
-          {(isSuperAdmin || userRole === 'Sales Executive' || userRole === 'Billing Executive') && (
-            <div className="fab-action-item" onClick={() => handleFabAction('/customers')}>
-              <span className="fab-action-icon">👥</span> Add Customer
-            </div>
-          )}
-          {(isSuperAdmin || userRole === 'Store Keeper') && (
-            <div className="fab-action-item" onClick={() => handleFabAction('/products')}>
-              <span className="fab-action-icon">📦</span> Add Product
-            </div>
-          )}
+          <div className="fab-action-item" onClick={() => handleFabAction('/customers')}>
+            <span className="fab-action-icon">👥</span> New Customer
+          </div>
+          <div className="fab-action-item" onClick={() => handleFabAction('/products')}>
+            <span className="fab-action-icon">📦</span> New Product
+          </div>
+          <div className="fab-action-item" onClick={() => handleFabAction('/sales?tab=payments')}>
+            <span className="fab-action-icon">💰</span> Record Payment
+          </div>
         </div>
         <button 
           type="button" 
@@ -534,34 +523,27 @@ export default function AppLayout() {
         </button>
       </div>
 
-      {/* Mobile Bottom Navigation (Dashboard, Products, Sales, Inventory, More) */}
       <nav className="mobile-bottom-nav">
         <NavLink to="/" end className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-          <span className="bottom-nav-icon">📊</span>
-          <span>Dashboard</span>
+          <span className="bottom-nav-icon">🏠</span>
+          <span>Home</span>
         </NavLink>
-        {(isSuperAdmin || userRole === 'Store Keeper') && (
-          <NavLink to="/products" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-            <span className="bottom-nav-icon">📦</span>
-            <span>Products</span>
-          </NavLink>
-        )}
-        {(isSuperAdmin || userRole === 'Billing Executive' || userRole === 'Sales Executive' || userRole === 'Dispatch Executive') && (
-          <NavLink to="/sales" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-            <span className="bottom-nav-icon">🧾</span>
-            <span>Sales</span>
-          </NavLink>
-        )}
-        {(isSuperAdmin || userRole === 'Store Keeper' || userRole === 'Manufacturing Manager') && (
-          <NavLink to="/inventory" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-            <span className="bottom-nav-icon">📋</span>
-            <span>Inventory</span>
-          </NavLink>
-        )}
-        <button type="button" className="bottom-nav-item" onClick={() => setDrawerOpen(true)}>
-          <span className="bottom-nav-icon">✨</span>
-          <span>More</span>
-        </button>
+        <NavLink to="/inventory" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <span className="bottom-nav-icon">📦</span>
+          <span>Inventory</span>
+        </NavLink>
+        <NavLink to="/sales" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <span className="bottom-nav-icon">🧾</span>
+          <span>Sales</span>
+        </NavLink>
+        <NavLink to="/customers" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <span className="bottom-nav-icon">👥</span>
+          <span>Customers</span>
+        </NavLink>
+        <NavLink to="/settings" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <span className="bottom-nav-icon">⚙️</span>
+          <span>Settings</span>
+        </NavLink>
       </nav>
 
       {/* Slide-out Drawer for "More" Mobile menus */}

@@ -247,3 +247,25 @@ table.data-table tbody tr:hover td {
   background: rgba(15, 23, 42, 0.85) !important;
   border: 1px solid rgba(255, 255, 255, 0.05) !important;
 }
+
+/* ========================================================
+   AO CORE ERP - MOBILE-FIRST LAYOUT ADAPTATIONS
+   ======================================================== */
+html, body, #root, .app-shell {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden !important;
+}
+
+@media (max-width: 768px) {
+  * {
+    max-width: 100%;
+  }
+  
+  .page {
+    padding: 0.75rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+}

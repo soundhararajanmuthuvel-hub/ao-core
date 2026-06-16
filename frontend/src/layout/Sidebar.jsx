@@ -19,6 +19,8 @@ const simplifiedNav = [
 
 import { motion } from 'framer-motion';
 
+import { useState, useEffect } from 'react';
+
 export default function Sidebar({ collapsed, open, onClose }) {
   const { user } = useAuth();
   const { settings } = useSettings();
@@ -31,10 +33,17 @@ export default function Sidebar({ collapsed, open, onClose }) {
     return item.roles.includes(userRole);
   });
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
     <motion.aside 
       className={`sidebar ${collapsed ? 'collapsed' : ''} ${open ? 'open' : ''}`}
-      animate={{ width: collapsed ? 72 : 260 }}
+      animate={{ width: isMobile ? 280 : (collapsed ? 72 : 260) }}
       transition={{ type: 'spring', stiffness: 220, damping: 26 }}
       style={{ overflow: 'hidden' }}
     >
