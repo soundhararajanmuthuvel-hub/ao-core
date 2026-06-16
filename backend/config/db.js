@@ -218,6 +218,16 @@ const connectDB = async () => {
   await addColumnIfNotExist('Invoices', 'courierCost', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('Invoices', 'loadingCost', "DECIMAL(10, 2) DEFAULT 0.00");
 
+  // Ensure Settings.logo column length is VARCHAR(1000) for URL support in MySQL/SQLite
+  try {
+    if (dialect === 'mysql') {
+      console.log('Modifying Settings.logo column to VARCHAR(1000)...');
+      await sequelize.query("ALTER TABLE Settings MODIFY COLUMN logo VARCHAR(1000) DEFAULT '';");
+    }
+  } catch (err) {
+    console.error('Failed to alter Settings.logo column type:', err.message);
+  }
+
   // One-time data correction/migration for existing products
   try {
     const Product = require('../models/Product');

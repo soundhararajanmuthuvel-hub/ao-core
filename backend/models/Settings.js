@@ -13,7 +13,7 @@ const Settings = sequelize.define('Settings', {
     defaultValue: 'AO Core',
   },
   logo: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(1000),
     defaultValue: '',
   },
   address: {

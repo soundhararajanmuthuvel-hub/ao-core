@@ -95,6 +95,7 @@ export const settingsApi = {
   get: () => client.get('/settings'),
   update: (data) => client.put('/settings', data),
   uploadLogo: (formData) => client.post('/settings/logo', formData),
+  uploadWpLogo: (formData) => client.post('/settings/upload-wp-logo', formData),
 };
 
 export const analyticsApi = {

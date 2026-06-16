@@ -42,6 +42,7 @@ export default function SettingsPage() {
 
   const [form, setForm] = useState({});
   const [logo, setLogo] = useState(null);
+  const [wpUploading, setWpUploading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [syncingType, setSyncingType] = useState('');
 
@@ -153,6 +154,26 @@ export default function SettingsPage() {
       toast('Logo uploaded successfully', 'success');
     } catch (err) {
       toast(err.response?.data?.message || 'Upload failed', 'error');
+    }
+  };
+
+  const uploadLogoToWP = async (file) => {
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('logo', file);
+    setWpUploading(true);
+    try {
+      const { data } = await settingsApi.uploadWpLogo(fd);
+      if (data && data.url) {
+        setForm(prev => ({ ...prev, logo: data.url }));
+        toast('Logo uploaded to WordPress successfully', 'success');
+      } else {
+        toast('Upload failed: No URL returned from server', 'error');
+      }
+    } catch (err) {
+      toast(err.response?.data?.message || 'WordPress upload failed', 'error');
+    } finally {
+      setWpUploading(false);
     }
   };
 

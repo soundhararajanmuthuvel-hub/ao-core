@@ -71,6 +71,38 @@ class WooCommerceService {
     }
   }
 
+
+  async uploadMedia(filePath, fileName, mimeType) {
+    if (!this.url || !this.consumerKey || !this.consumerSecret) {
+      throw new Error('WooCommerce store is not connected');
+    }
+    const fs = require('fs');
+    const endpoint = `${this.url}/wp-json/wp/v2/media`;
+    try {
+      const fileBuffer = fs.readFileSync(filePath);
+      const response = await axios.post(endpoint, fileBuffer, {
+        headers: {
+          'Content-Type': mimeType,
+          'Content-Disposition': `attachment; filename="${fileName}"`,
+        },
+        auth: {
+          username: this.consumerKey,
+          password: this.consumerSecret,
+        },
+        timeout: 30000,
+      });
+      return response.data;
+    } catch (err) {
+      if (err.response) {
+        const errorData = err.response.data;
+        const errorMessage = errorData?.message || errorData?.code || 'WordPress API Error';
+        throw new Error(errorMessage);
+      } else {
+        throw err;
+      }
+    }
+  }
+
   async deleteProduct(wooProductId) {
     if (!this.url || !this.consumerKey || !this.consumerSecret) {
       throw new Error('WooCommerce store is not connected');
