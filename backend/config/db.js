@@ -1,12 +1,13 @@
 const { Sequelize } = require('sequelize');
 const path = require('path');
 
-const dialect = process.env.DB_DIALECT || 'sqlite';
+let dialect = process.env.DB_DIALECT || 'sqlite';
 
 let sequelize;
 
 if (process.env.DATABASE_URL || process.env.MYSQL_URL) {
   console.log('Using MySQL database connection URL...');
+  dialect = 'mysql';
   sequelize = new Sequelize(process.env.DATABASE_URL || process.env.MYSQL_URL, {
     dialect: 'mysql',
     logging: process.env.NODE_ENV === 'development' ? (msg) => console.log(`[Sequelize] ${msg}`) : false,
