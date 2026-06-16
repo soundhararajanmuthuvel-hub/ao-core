@@ -125,6 +125,25 @@ const startServer = async () => {
     const { startScheduler } = require('./utils/scheduler');
     startScheduler();
 
+    // Auto-seed database if no users exist
+    try {
+      const User = require('./models/User');
+      const userCount = await User.count();
+      if (userCount === 0) {
+        console.log('No users found in database. Running auto-seed...');
+        const { exec } = require('child_process');
+        exec('node utils/seedAdmin.js', (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Auto-seed error: ${error}`);
+            return;
+          }
+          console.log(`Auto-seed completed successfully: ${stdout}`);
+        });
+      }
+    } catch (seedErr) {
+      console.error('Auto-seed check failed:', seedErr);
+    }
+
     app.listen(PORT, () => {
       console.log(`AO Core API running on port ${PORT}`);
     });
