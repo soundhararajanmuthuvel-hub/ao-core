@@ -2,12 +2,14 @@ const { Sequelize } = require('sequelize');
 const path = require('path');
 
 let dialect = process.env.DB_DIALECT || 'sqlite';
+if (process.env.MYSQLHOST || process.env.DATABASE_URL || process.env.MYSQL_URL) {
+  dialect = 'mysql';
+}
 
 let sequelize;
 
 if (process.env.DATABASE_URL || process.env.MYSQL_URL) {
   console.log('Using MySQL database connection URL...');
-  dialect = 'mysql';
   sequelize = new Sequelize(process.env.DATABASE_URL || process.env.MYSQL_URL, {
     dialect: 'mysql',
     logging: process.env.NODE_ENV === 'development' ? (msg) => console.log(`[Sequelize] ${msg}`) : false,
@@ -18,12 +20,12 @@ if (process.env.DATABASE_URL || process.env.MYSQL_URL) {
 } else if (dialect === 'mysql') {
   console.log('Using MySQL database configuration...');
   sequelize = new Sequelize(
-    process.env.DB_NAME || 'ao_core',
-    process.env.DB_USER || 'root',
-    process.env.DB_PASSWORD || '',
+    process.env.MYSQLDATABASE || process.env.DB_NAME || 'ao_core',
+    process.env.MYSQLUSER || process.env.DB_USER || 'root',
+    process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || '',
     {
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 3306,
+      host: process.env.MYSQLHOST || process.env.DB_HOST || 'localhost',
+      port: process.env.MYSQLPORT || process.env.DB_PORT || 3306,
       dialect: 'mysql',
       logging: process.env.NODE_ENV === 'development' ? (msg) => console.log(`[Sequelize] ${msg}`) : false,
       define: {
