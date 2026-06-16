@@ -18,6 +18,14 @@ export default function SaleView() {
   const [busy, setBusy] = useState('');
   const { user } = useAuth();
 
+  // Payment recording state
+  const [payments, setPayments] = useState([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [payAmount, setPayAmount] = useState(0);
+  const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
+  const [payMethod, setPayMethod] = useState('upi');
+  const [payRefNumber, setPayRefNumber] = useState('');
+
   // Edit Form state
   const [isEditing, setIsEditing] = useState(false);
   const [customers, setCustomers] = useState([]);
@@ -38,9 +46,103 @@ export default function SaleView() {
   const [editNotes, setEditNotes] = useState('');
   const [editCart, setEditCart] = useState([]);
 
+  // Load payment history helper
+  const loadPaymentHistory = (customerId) => {
+    if (!customerId) return;
+    salesApi.listPayments({ customerId }).then(({ data }) => {
+      setPayments(data || []);
+    }).catch(err => console.error('Error loading payments:', err));
+  };
+
   useEffect(() => {
-    salesApi.get(id).then(({ data }) => { setSale(data.sale); setSettings(data.settings); });
+    salesApi.get(id).then(({ data }) => { 
+      setSale(data.sale); 
+      setSettings(data.settings); 
+      if (data.sale?.customerId || data.sale?.customer?.id) {
+        loadPaymentHistory(data.sale.customerId || data.sale.customer?.id);
+      }
+    });
   }, [id]);
+
+  // Sync Record Payment pre-filled values
+  useEffect(() => {
+    if (showPaymentModal && sale) {
+      const outstanding = Math.max(0, Number(sale.grandTotal || 0) - Number(sale.amountPaid || 0));
+      setPayAmount(outstanding);
+      setPayDate(new Date().toISOString().split('T')[0]);
+      setPayMethod('upi');
+      setPayRefNumber('');
+    }
+  }, [showPaymentModal, sale]);
+
+  // Computed allocations for the current invoice
+  const invoicePayments = useMemo(() => {
+    if (!sale || !payments.length) return [];
+    return payments.filter(p => {
+      let allocs = [];
+      if (typeof p.allocations === 'string') {
+        try { allocs = JSON.parse(p.allocations); } catch (e) {}
+      } else if (Array.isArray(p.allocations)) {
+        allocs = p.allocations;
+      }
+      return allocs.some(alloc => String(alloc.invoiceId) === String(sale.id || id));
+    });
+  }, [payments, sale, id]);
+
+  const getInvoiceAllocatedAmount = (payment) => {
+    let allocs = [];
+    if (typeof payment.allocations === 'string') {
+      try { allocs = JSON.parse(payment.allocations); } catch (e) {}
+    } else if (Array.isArray(payment.allocations)) {
+      allocs = payment.allocations;
+    }
+    const matched = allocs.find(alloc => String(alloc.invoiceId) === String(sale.id || id));
+    return matched ? Number(matched.amount || 0) : Number(payment.amount || 0);
+  };
+
+  const handleSavePayment = async (e) => {
+    e.preventDefault();
+    if (payAmount <= 0) {
+      toast('Payment amount must be greater than zero', 'error');
+      return;
+    }
+    const outstanding = Math.max(0, Number(sale.grandTotal || 0) - Number(sale.amountPaid || 0));
+    if (payAmount > outstanding) {
+      if (!window.confirm(`Payment amount (₹${payAmount}) exceeds outstanding balance (₹${outstanding}). Continue?`)) {
+        return;
+      }
+    }
+
+    setBusy('saving-payment');
+    try {
+      await salesApi.recordPayment({
+        customerId: sale.customerId || sale.customer?.id,
+        amount: parseFloat(payAmount),
+        paymentMethod: payMethod,
+        referenceNumber: payRefNumber || null,
+        paymentDate: payDate,
+        allocations: [
+          { invoiceId: sale.id || id, amount: parseFloat(payAmount) }
+        ]
+      });
+
+      toast('Payment recorded successfully', 'success');
+      setShowPaymentModal(false);
+
+      // Reload sale details and payment history
+      const { data } = await salesApi.get(id);
+      setSale(data.sale);
+      setSettings(data.settings);
+      if (data.sale?.customerId || data.sale?.customer?.id) {
+        loadPaymentHistory(data.sale.customerId || data.sale.customer?.id);
+      }
+    } catch (err) {
+      console.error(err);
+      toast(err.response?.data?.message || 'Failed to record payment', 'error');
+    } finally {
+      setBusy('');
+    }
+  };
 
   // Calculations helper for frontend edit form
   const computedValues = useMemo(() => {
@@ -408,14 +510,26 @@ export default function SaleView() {
         </h1>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {(user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'admin') && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 650 }}
-              onClick={startEdit}
-            >
-              ✏️ Edit Invoice
-            </button>
+            <>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 650 }}
+                onClick={startEdit}
+              >
+                ✏️ Edit Invoice
+              </button>
+              {sale.paymentStatus !== 'paid' && (
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  style={{ backgroundColor: '#10b981', borderColor: '#10b981', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 650 }}
+                  onClick={() => setShowPaymentModal(true)}
+                >
+                  💳 Record Payment
+                </button>
+              )}
+            </>
           )}
           {activeShipment ? (
             <>
@@ -457,7 +571,15 @@ export default function SaleView() {
           <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.5rem', color: '#4b5563' }}>Billing Summary</h3>
           <p style={{ margin: '0 0 0.25rem 0' }}><strong>Customer:</strong> {sale.customer?.name} {sale.customer?.phone && `(${sale.customer.phone})`}</p>
           <p style={{ margin: '0 0 0.25rem 0' }}><strong>Date:</strong> {new Date(sale.date).toLocaleDateString()}</p>
-          <p style={{ margin: 0 }}><strong>Payment:</strong> {sale.paymentMethod} — {sale.paymentStatus}</p>
+          <p style={{ margin: '0 0 0.25rem 0' }}><strong>Total Amount:</strong> ₹{Number(sale.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+          <p style={{ margin: '0 0 0.25rem 0' }}><strong>Already Paid:</strong> ₹{Number(sale.amountPaid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+          <p style={{ margin: '0 0 0.25rem 0' }}>
+            <strong>Outstanding:</strong>{' '}
+            <span style={{ color: Number(sale.grandTotal || 0) - Number(sale.amountPaid || 0) > 0 ? '#dc2626' : '#16a34a', fontWeight: 'bold' }}>
+              ₹{Math.max(0, Number(sale.grandTotal || 0) - Number(sale.amountPaid || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </span>
+          </p>
+          <p style={{ margin: 0 }}><strong>Payment:</strong> <span style={{ textTransform: 'uppercase' }}>{sale.paymentMethod}</span> — <span style={{ textTransform: 'uppercase', fontWeight: 700 }}>{sale.paymentStatus}</span></p>
         </div>
 
         {activeShipment && (
@@ -909,6 +1031,178 @@ export default function SaleView() {
                 {busy === 'saving' ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Payment History Section */}
+      {invoicePayments.length > 0 && (
+        <div className="card" style={{ marginTop: '1.5rem' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#334155', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            📜 Payment History
+          </h3>
+          <div className="table-wrap">
+            <table className="data-table" style={{ fontSize: '0.85rem' }}>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Payment No</th>
+                  <th>Method</th>
+                  <th>Reference No</th>
+                  <th style={{ textAlign: 'right' }}>Amount Paid</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoicePayments.map((p, idx) => (
+                  <tr key={idx}>
+                    <td>{new Date(p.date).toLocaleDateString()}</td>
+                    <td><code>{p.paymentNumber}</code></td>
+                    <td><span style={{ textTransform: 'uppercase', fontWeight: 650 }}>{p.paymentMethod}</span></td>
+                    <td>{p.referenceNumber || 'N/A'}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#16a34a' }}>
+                      ₹{getInvoiceAllocatedAmount(p).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Record Payment Modal */}
+      {showPaymentModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.45)',
+          backdropFilter: 'blur(6px)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1.5rem'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '16px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            width: '100%',
+            maxWidth: '500px',
+            border: '1px solid #e2e8f0',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid #f1f5f9',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#f8fafc'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                💳 Record Payment
+              </h2>
+              <button 
+                type="button" 
+                onClick={() => setShowPaymentModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body / Form */}
+            <form onSubmit={handleSavePayment}>
+              <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.85rem', color: '#475569', backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px' }}>
+                  <div><strong>Invoice:</strong> {sale.invoiceNumber}</div>
+                  <div><strong>Customer:</strong> {sale.customer?.name}</div>
+                  <div><strong>Total Amount:</strong> ₹{Number(sale.grandTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                  <div><strong>Already Paid:</strong> ₹{Number(sale.amountPaid).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Payment Amount (₹)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    className="form-control" 
+                    value={payAmount} 
+                    onChange={(e) => setPayAmount(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Payment Date</label>
+                  <input 
+                    type="date" 
+                    className="form-control" 
+                    value={payDate} 
+                    onChange={(e) => setPayDate(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Payment Method</label>
+                  <select 
+                    className="form-control" 
+                    value={payMethod} 
+                    onChange={(e) => setPayMethod(e.target.value)}
+                    required
+                  >
+                    <option value="cash">CASH</option>
+                    <option value="upi">UPI / GPAY / PHONEPE</option>
+                    <option value="bank">BANK TRANSFER</option>
+                    <option value="card">CREDIT/DEBIT CARD</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Reference / Transaction No</label>
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    placeholder="Optional reference number"
+                    value={payRefNumber} 
+                    onChange={(e) => setPayRefNumber(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer Actions */}
+              <div style={{
+                padding: '1rem 1.5rem',
+                borderTop: '1px solid #f1f5f9',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '0.75rem',
+                background: '#f8fafc'
+              }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => setShowPaymentModal(false)}
+                  disabled={busy === 'saving-payment'}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-success" 
+                  style={{ backgroundColor: '#10b981', borderColor: '#10b981', color: '#ffffff', minWidth: '120px', fontWeight: 650 }}
+                  disabled={busy === 'saving-payment'}
+                >
+                  {busy === 'saving-payment' ? 'Saving...' : 'Save Payment'}
+                </button>
+              </div>
+            </form>
 
           </div>
         </div>
