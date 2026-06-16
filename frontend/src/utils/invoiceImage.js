@@ -20,7 +20,7 @@ export function buildInvoiceMessage(sale, settings) {
     ...lines,
     '',
     `*Total: ₹${Number(sale.grandTotal).toFixed(2)}*`,
-    `Payment: ${sale.paymentStatus}`,
+    `Payment: ${String(sale.paymentStatus).toLowerCase() === 'partial' ? 'PARTIALLY PAID' : String(sale.paymentStatus).toUpperCase()}`,
     '',
     'Thank you!',
   ].join('\n');

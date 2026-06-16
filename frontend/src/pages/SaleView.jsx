@@ -506,7 +506,7 @@ export default function SaleView() {
       <div className="page-header">
         <h1 className="page-title">
           Invoice {sale.invoiceNumber}
-          <span style={getStatusBadgeStyle(sale.paymentStatus)}>{String(sale.paymentStatus).toUpperCase()}</span>
+          <span style={getStatusBadgeStyle(sale.paymentStatus)}>{String(sale.paymentStatus).toLowerCase() === 'partial' ? 'PARTIALLY PAID' : String(sale.paymentStatus).toUpperCase()}</span>
         </h1>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {(user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'admin') && (
@@ -579,7 +579,7 @@ export default function SaleView() {
               ₹{Math.max(0, Number(sale.grandTotal || 0) - Number(sale.amountPaid || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </span>
           </p>
-          <p style={{ margin: 0 }}><strong>Payment:</strong> <span style={{ textTransform: 'uppercase' }}>{sale.paymentMethod}</span> — <span style={{ textTransform: 'uppercase', fontWeight: 700 }}>{sale.paymentStatus}</span></p>
+          <p style={{ margin: 0 }}><strong>Payment:</strong> <span style={{ textTransform: 'uppercase' }}>{sale.paymentMethod}</span> — <span style={{ textTransform: 'uppercase', fontWeight: 700 }}>{String(sale.paymentStatus).toLowerCase() === 'partial' ? 'PARTIALLY PAID' : String(sale.paymentStatus).toUpperCase()}</span></p>
         </div>
 
         {activeShipment && (

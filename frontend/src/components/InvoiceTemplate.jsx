@@ -183,7 +183,7 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
       </div>
 
       <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.8rem', color: '#64748b' }}>
-        <p style={{ margin: '0 0 0.25rem 0' }}>Payment Mode: <strong style={{ textTransform: 'uppercase' }}>{sale.paymentMethod}</strong> — Status: <strong style={{ textTransform: 'uppercase' }}>{sale.paymentStatus}</strong></p>
+        <p style={{ margin: '0 0 0.25rem 0' }}>Payment Mode: <strong style={{ textTransform: 'uppercase' }}>{sale.paymentMethod}</strong> — Status: <strong style={{ textTransform: 'uppercase' }}>{String(sale.paymentStatus).toLowerCase() === 'partial' ? 'PARTIALLY PAID' : String(sale.paymentStatus).toUpperCase()}</strong></p>
         {sale.gstBillingMode && <p style={{ margin: '0 0 0.5rem 0' }}>Tax Invoicing: GST {sale.gstBillingMode.toUpperCase()}</p>}
         <p className="invoice-footer" style={{ margin: 0, fontWeight: 600 }}>Thank you for your business!</p>
       </div>

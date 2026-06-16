@@ -113,7 +113,7 @@ export async function downloadInvoicePdf(sale, settings) {
   } else {
     doc.setTextColor(239, 68, 68); // Red for unpaid/pending
   }
-  doc.text(`Status: ${paymentStatus.toUpperCase()}`, 196, 36, { align: 'right' });
+  doc.text(`Status: ${paymentStatus.toLowerCase() === 'partial' ? 'PARTIALLY PAID' : paymentStatus.toUpperCase()}`, 196, 36, { align: 'right' });
 
   // 4. Divider Line
   doc.setDrawColor(220, 220, 220);
