@@ -89,46 +89,101 @@ const calcInvoiceTotals = (items, discount = 0, gstMode = 'exclusive', charges =
 const getNextInvoiceNumber = async (opts = {}) => {
   const queryOpts = opts && opts.commit ? { transaction: opts.commit } : opts;
   const settings = await getSettings(queryOpts);
-  settings.invoiceCounter += 1;
+  const Invoice = require('../models/Invoice');
+  let invoiceNumber;
+  let isUnique = false;
+
+  while (!isUnique) {
+    settings.invoiceCounter += 1;
+    const num = String(settings.invoiceCounter).padStart(5, '0');
+    invoiceNumber = `${settings.invoicePrefix}-${settings.financialYear}-${num}`;
+    const existing = await Invoice.findOne({ where: { invoiceNumber }, ...queryOpts });
+    if (!existing) {
+      isUnique = true;
+    }
+  }
   await settings.save(queryOpts);
-  const num = String(settings.invoiceCounter).padStart(5, '0');
-  return `${settings.invoicePrefix}-${settings.financialYear}-${num}`;
+  return invoiceNumber;
 };
 
 const getNextPurchaseNumber = async (opts = {}) => {
   const queryOpts = opts && opts.commit ? { transaction: opts.commit } : opts;
   const settings = await getSettings(queryOpts);
-  settings.purchaseCounter += 1;
+  const Purchase = require('../models/Purchase');
+  let purchaseNumber;
+  let isUnique = false;
+
+  while (!isUnique) {
+    settings.purchaseCounter += 1;
+    const num = String(settings.purchaseCounter).padStart(5, '0');
+    purchaseNumber = `PO-${settings.financialYear}-${num}`;
+    const existing = await Purchase.findOne({ where: { purchaseNumber }, ...queryOpts });
+    if (!existing) {
+      isUnique = true;
+    }
+  }
   await settings.save(queryOpts);
-  const num = String(settings.purchaseCounter).padStart(5, '0');
-  return `PO-${settings.financialYear}-${num}`;
+  return purchaseNumber;
 };
 
 const getNextShipmentNumber = async (opts = {}) => {
   const queryOpts = opts && opts.commit ? { transaction: opts.commit } : opts;
   const settings = await getSettings(queryOpts);
-  settings.shipmentCounter = (settings.shipmentCounter || 0) + 1;
+  const Shipment = require('../models/Shipment');
+  let shipmentNumber;
+  let isUnique = false;
+
+  while (!isUnique) {
+    settings.shipmentCounter = (settings.shipmentCounter || 0) + 1;
+    const num = String(settings.shipmentCounter).padStart(5, '0');
+    shipmentNumber = `SHP-${settings.financialYear}-${num}`;
+    const existing = await Shipment.findOne({ where: { shipmentNumber }, ...queryOpts });
+    if (!existing) {
+      isUnique = true;
+    }
+  }
   await settings.save(queryOpts);
-  const num = String(settings.shipmentCounter).padStart(5, '0');
-  return `SHP-${settings.financialYear}-${num}`;
+  return shipmentNumber;
 };
 
 const getNextOrderNumber = async (opts = {}) => {
   const queryOpts = opts && opts.commit ? { transaction: opts.commit } : opts;
   const settings = await getSettings(queryOpts);
-  settings.orderCounter = (settings.orderCounter || 0) + 1;
+  const Order = require('../models/Order');
+  let orderNumber;
+  let isUnique = false;
+
+  while (!isUnique) {
+    settings.orderCounter = (settings.orderCounter || 0) + 1;
+    const num = String(settings.orderCounter).padStart(5, '0');
+    orderNumber = `ORD-${settings.financialYear}-${num}`;
+    const existing = await Order.findOne({ where: { orderNumber }, ...queryOpts });
+    if (!existing) {
+      isUnique = true;
+    }
+  }
   await settings.save(queryOpts);
-  const num = String(settings.orderCounter).padStart(5, '0');
-  return `ORD-${settings.financialYear}-${num}`;
+  return orderNumber;
 };
 
 const getNextPaymentNumber = async (opts = {}) => {
   const queryOpts = opts && opts.commit ? { transaction: opts.commit } : opts;
   const settings = await getSettings(queryOpts);
-  settings.paymentCounter = (settings.paymentCounter || 0) + 1;
+  const Payment = require('../models/Payment');
+  let paymentNumber;
+  let isUnique = false;
+
+  while (!isUnique) {
+    settings.paymentCounter = (settings.paymentCounter || 0) + 1;
+    const num = String(settings.paymentCounter).padStart(5, '0');
+    paymentNumber = `PAY-${settings.financialYear}-${num}`;
+    const existing = await Payment.findOne({ where: { paymentNumber }, ...queryOpts });
+    if (!existing) {
+      isUnique = true;
+    }
+  }
   await settings.save(queryOpts);
-  const num = String(settings.paymentCounter).padStart(5, '0');
-  return `PAY-${settings.financialYear}-${num}`;
+  return paymentNumber;
 };
 
 module.exports = {
