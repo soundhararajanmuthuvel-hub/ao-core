@@ -166,20 +166,47 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
     toast('Reminder PDF downloaded successfully', 'success');
   };
 
-  // Send via WhatsApp
-  const sendWhatsApp = () => {
-    // 1. Download JPG first so they can paste it
-    downloadJpg();
+  // Send via WhatsApp or Share natively
+  const handleWhatsAppOrShare = async () => {
+    if (!imgUrl) return;
 
-    // 2. Open WhatsApp reminder text
+    // Try Web Share API first (highly optimized for mobile sharing of files)
+    if (navigator.share && navigator.canShare) {
+      try {
+        const response = await fetch(imgUrl);
+        const blob = await response.blob();
+        const file = new File([blob], `Reminder-${invoice.invoiceNumber}.jpg`, { type: 'image/jpeg' });
+
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: `Payment Reminder - ${invoice.invoiceNumber}`,
+            text: `Dear ${customer.name},\n\nKindly find the payment reminder attached.\n\nThank you,\nAmudhasurabiy Organics`
+          });
+          toast('Shared successfully', 'success');
+          return;
+        }
+      } catch (err) {
+        console.error('Native sharing failed, falling back to WhatsApp link:', err);
+      }
+    }
+
+    // Fallback to standard WhatsApp wa.me redirect
     const textMsg = `Dear ${customer.name},\n\nKindly find the payment reminder attached.\n\nThank you,\nAmudhasurabiy Organics`;
     let rawPhone = customer.phone || '';
     let cleanPhone = rawPhone.replace(/\D/g, '');
     if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
 
     const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(textMsg)}`;
+    
+    // On mobile, avoid triggering multiple actions (download + redirect) in one click handler
+    // to prevent browser security popup blockers from stopping the redirect.
+    if (!isMobileViewport) {
+      downloadJpg();
+    }
+
     window.open(whatsappUrl, '_blank');
-    toast('WhatsApp reminder link opened in new tab. Attach the downloaded image.', 'success');
+    toast('WhatsApp link opened. Attach the downloaded image.', 'success');
   };
 
   // Styles configuration based on template choice
@@ -308,7 +335,7 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
               <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={downloadJpg} disabled={loading}>JPG</button>
               <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={downloadPdf} disabled={loading}>PDF</button>
             </div>
-            <button type="button" className="btn btn-whatsapp" style={{ width: isMobileViewport ? '100%' : 'auto' }} onClick={sendWhatsApp} disabled={loading}>
+            <button type="button" className="btn btn-whatsapp" style={{ width: isMobileViewport ? '100%' : 'auto' }} onClick={handleWhatsAppOrShare} disabled={loading}>
               💬 Send WhatsApp
             </button>
           </div>
