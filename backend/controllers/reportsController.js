@@ -434,7 +434,7 @@ exports.salesReport = async (req, res, next) => {
     }
     const sales = await Invoice.findAll({
       where: query,
-      include: [{ model: Customer, as: 'customer', attributes: ['name'] }],
+      include: [{ model: Customer, as: 'customer', attributes: ['name', 'customerCode'] }],
       order: [['date', 'DESC']],
     });
 
@@ -750,7 +750,7 @@ exports.dailyReport = async (req, res, next) => {
           [Op.lt]: nextDay,
         },
       },
-      include: [{ model: Customer, as: 'customer', attributes: ['name'] }],
+      include: [{ model: Customer, as: 'customer', attributes: ['name', 'customerCode'] }],
     });
     const total = sales.reduce((sum, item) => sum + Number(item.grandTotal), 0);
 
@@ -793,7 +793,7 @@ exports.shippingReport = async (req, res, next) => {
         {
           model: Invoice,
           as: 'invoice',
-          include: [{ model: Customer, as: 'customer', attributes: ['name', 'phone', 'email'] }],
+          include: [{ model: Customer, as: 'customer', attributes: ['name', 'phone', 'email', 'customerCode'] }],
         },
       ],
       order: [['createdAt', 'DESC']],
@@ -882,7 +882,7 @@ exports.shippingCostReport = async (req, res, next) => {
 
     const invoices = await Invoice.findAll({
       where: query,
-      include: [{ model: Customer, as: 'customer', attributes: ['id', 'name'] }],
+      include: [{ model: Customer, as: 'customer', attributes: ['id', 'name', 'customerCode'] }],
       order: [['date', 'DESC']],
     });
 
@@ -897,6 +897,7 @@ exports.shippingCostReport = async (req, res, next) => {
       return {
         invoiceNumber: inv.invoiceNumber,
         customerName: inv.customer?.name || 'Walk-in',
+        customerCode: inv.customer?.customerCode || '',
         date: inv.date.toISOString().split('T')[0],
         shippingChargeCollected: collected,
         packingCost: packing,
@@ -1302,7 +1303,7 @@ const loadSalesGstRows = async ({ from, to } = {}) => {
       {
         model: Customer,
         as: 'customer',
-        attributes: ['id', 'name', 'gstNumber', 'state', 'pincode', 'gstBillingMode']
+        attributes: ['id', 'name', 'gstNumber', 'state', 'pincode', 'gstBillingMode', 'customerCode']
       },
       {
         model: InvoiceItem,
@@ -1366,6 +1367,7 @@ const loadSalesGstRows = async ({ from, to } = {}) => {
       id: inv.id,
       invoiceNumber: inv.invoiceNumber,
       customerId: inv.customerId,
+      customerCode: inv.customer?.customerCode || '',
       customerName: inv.customer?.name || 'Walk-in Customer',
       customerGstNumber: inv.customer?.gstNumber || '',
       customerState: inv.customer?.state || '',

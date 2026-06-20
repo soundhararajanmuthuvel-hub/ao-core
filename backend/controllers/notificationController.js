@@ -7,6 +7,13 @@ exports.getNotifications = async (req, res, next) => {
       [Op.or]: [{ userId: null }, { userId: req.user.id }],
     };
 
+    // Filter by read/unread status
+    if (req.query.status === 'unread') {
+      whereClause.isRead = false;
+    } else if (req.query.status === 'read') {
+      whereClause.isRead = true;
+    }
+
     const notifications = await Notification.findAll({
       where: whereClause,
       order: [['createdAt', 'DESC']],
@@ -16,7 +23,7 @@ exports.getNotifications = async (req, res, next) => {
     const unreadCount = await Notification.count({
       where: {
         isRead: false,
-        ...whereClause,
+        [Op.or]: [{ userId: null }, { userId: req.user.id }],
       },
     });
 
@@ -28,8 +35,12 @@ exports.getNotifications = async (req, res, next) => {
 
 exports.markRead = async (req, res, next) => {
   try {
-    await Notification.update({ isRead: true }, { where: { id: req.params.id } });
-    res.json({ message: 'Marked as read' });
+    const { isRead } = req.body;
+    await Notification.update(
+      { isRead: isRead !== undefined ? isRead : true },
+      { where: { id: req.params.id } }
+    );
+    res.json({ message: 'Marked status updated' });
   } catch (err) {
     next(err);
   }
@@ -47,6 +58,36 @@ exports.markAllRead = async (req, res, next) => {
       }
     );
     res.json({ message: 'All marked as read' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteNotification = async (req, res, next) => {
+  try {
+    const result = await Notification.destroy({
+      where: {
+        id: req.params.id,
+        [Op.or]: [{ userId: null }, { userId: req.user.id }],
+      },
+    });
+    if (!result) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+    res.json({ message: 'Notification deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.clearAllNotifications = async (req, res, next) => {
+  try {
+    await Notification.destroy({
+      where: {
+        [Op.or]: [{ userId: null }, { userId: req.user.id }],
+      },
+    });
+    res.json({ message: 'All notifications cleared' });
   } catch (err) {
     next(err);
   }

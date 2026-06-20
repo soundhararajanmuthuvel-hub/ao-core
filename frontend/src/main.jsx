@@ -12,6 +12,18 @@ import './styles/layout.css';
 import './styles/components.css';
 import './styles/dark.css';
 import './styles/invoice-template.css';
+import { startOfflineSync } from './utils/OfflineSync';
+
+// Initialize background SFA offline data synchronizer
+startOfflineSync();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((reg) => console.log('Service worker registered:', reg))
+      .catch((err) => console.error('Service worker registration failed:', err));
+  });
+}
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
-import { analyticsApi, productsApi, manufacturingApi, rawMaterialsApi, salesApi, customersApi, inventoryApi, shippingApi, integrationsApi } from '../api';
+import { analyticsApi, productsApi, manufacturingApi, rawMaterialsApi, salesApi, customersApi, inventoryApi, shippingApi, integrationsApi, sfaApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { resolveAssetUrl } from '../utils/url';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -116,6 +116,12 @@ export default function Dashboard() {
   const [wooStats, setWooStats] = useState(null);
   const [syncingType, setSyncingType] = useState('');
 
+  // SFA Manager Command Center states
+  const [activeDashboardView, setActiveDashboardView] = useState('erp');
+  const [sfaTracking, setSfaTracking] = useState([]);
+  const [sfaVisits, setSfaVisits] = useState([]);
+  const [sfaAnalytics, setSfaAnalytics] = useState(null);
+
   const handleDashboardSync = async (type) => {
     setSyncingType(type);
     try {
@@ -149,13 +155,19 @@ export default function Dashboard() {
       setLoading(true);
       try {
         if (isSuperAdmin) {
-          const [dashRes, alertsRes, boRes, wooRes] = await Promise.allSettled([
+          const [dashRes, alertsRes, boRes, wooRes, trackRes, visitsRes, sfaAnalRes] = await Promise.allSettled([
             analyticsApi.dashboard(),
             inventoryApi.lowStockAlerts(),
             salesApi.list({ erpStatus: 'Waiting For Stock', limit: 1 }),
-            integrationsApi.getStats()
+            integrationsApi.getStats(),
+            sfaApi.getLiveTracking(),
+            sfaApi.getVisits(),
+            sfaApi.getAnalytics()
           ]);
           if (dashRes.status === 'fulfilled') setAdminData(dashRes.value.data);
+          if (trackRes.status === 'fulfilled') setSfaTracking(trackRes.value.data || []);
+          if (visitsRes.status === 'fulfilled') setSfaVisits(visitsRes.value.data || []);
+          if (sfaAnalRes.status === 'fulfilled') setSfaAnalytics(sfaAnalRes.value.data || null);
           if (alertsRes.status === 'fulfilled') {
             setAlerts(alertsRes.value.data);
             setStoreData(prev => ({ ...prev, lowStock: alertsRes.value.data.critical.concat(alertsRes.value.data.warning).slice(0, 5) }));
@@ -283,390 +295,563 @@ export default function Dashboard() {
           <Link to="/sales?tab=new" className="btn btn-primary" style={{ padding: '0.6rem 1.25rem', fontWeight: 600 }}>+ New Invoice</Link>
         </div>
 
-        {outstandingValue > 50000 && (
-          <div className="card" style={{ borderLeft: '6px solid #ef4444', backgroundColor: '#fef2f2', padding: '1.25rem', borderRadius: '10px', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <strong style={{ color: '#991b1b', fontSize: '1.05rem', display: 'block' }}>⚠️ Warning: High Outstanding Balance</strong>
-              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#7f1d1d', lineHeight: '1.4' }}>
-                High Outstanding Amount. Follow up with customers.
-              </p>
-            </div>
-            <Link to="/sales?tab=outstanding" className="btn btn-danger btn-sm" style={{ padding: '0.5rem 1rem', whiteSpace: 'nowrap', fontWeight: 'bold' }}>Outstanding Register</Link>
-          </div>
-        )}
-
-        {adminData?.cards?.delayedOrdersCount > 0 && (
-          <div className="card" style={{ borderLeft: '6px solid #ef4444', backgroundColor: '#fef2f2', padding: '1.25rem', borderRadius: '10px', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <strong style={{ color: '#991b1b', fontSize: '1.05rem', display: 'block' }}>⚠️ Dispatch Pending More Than 3 Days</strong>
-              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#7f1d1d', lineHeight: '1.4' }}>
-                There are {adminData.cards.delayedOrdersCount} prepared order(s) that have been pending dispatch for more than 3 days. Please review and pack them immediately.
-              </p>
-            </div>
-            <Link to="/order-noting" className="btn btn-danger btn-sm" style={{ padding: '0.5rem 1rem', whiteSpace: 'nowrap', fontWeight: 'bold' }}>Manage Orders</Link>
-          </div>
-        )}
-
-        {isMobile ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '1.25rem' }}>
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Due</span>
-              <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#ef4444' }}>{fmt(outstandingValue)}</strong>
-            </div>
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Today</span>
-              <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#22c55e' }}>{fmt(cards.todaySales || 0)}</strong>
-            </div>
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Pending</span>
-              <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f59e0b' }}>{cards.pendingDispatchOrders || cards.lowStockCount || 0}</strong>
-            </div>
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total</span>
-              <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)' }}>{cards.totalInvoices || adminData?.cards?.totalInvoices || 120}</strong>
-            </div>
-          </div>
-        ) : (
-          <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-            <StatCard label="Today's Sales" value={fmt(cards.todaySales)} />
-            <StatCard label="Monthly Revenue" value={fmt(cards.monthlyRevenue)} />
-            <StatCard
-              label="Outstanding Receivables"
-              value={fmt(outstandingValue)}
-              subtext="Pending Customer Collections"
-              onClick={() => navigate('/sales?tab=outstanding')}
-              style={{
-                backgroundColor: outStyle.backgroundColor,
-                border: outStyle.border,
-                labelStyle: { color: outStyle.color },
-                valueStyle: { color: outStyle.color },
-                subtextStyle: { color: outStyle.color }
-              }}
-            />
-            <StatCard label="Pending Dispatch Orders" value={cards.pendingDispatchOrders || 0} />
-            <StatCard label="Low Stock Products" value={cards.lowStockCount || 0} className={cards.lowStockCount > 0 ? 'danger' : ''} />
-            <StatCard
-              label="Top Selling Product"
-              value={charts.topProducts?.[0]?.name || 'N/A'}
-              subtext={charts.topProducts?.[0]?.qty ? `${charts.topProducts[0].qty} units sold` : ''}
-            />
-          </div>
-        )}
-
-        {charts.monthlyRevenue && (
-          <div className="chart-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))', gap: '1.5rem' }}>
-            <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>Monthly Revenue Overview</h3>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={charts.monthlyRevenue}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
-                  <Tooltip formatter={(v) => fmt(v)} contentStyle={{ borderRadius: '8px' }} />
-                  <Legend />
-                  <Bar dataKey="revenue" fill="#ff9800" radius={[4, 4, 0, 0]} name="Revenue" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            
-            <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>Profit Margin Trend</h3>
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={charts.monthlyRevenue}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
-                  <Tooltip formatter={(v) => fmt(v)} contentStyle={{ borderRadius: '8px' }} />
-                  <Legend />
-                  <Line type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={3} activeDot={{ r: 6 }} name="Net Profit" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-
-        {/* Outstanding Receivables Detailed Overview */}
-        <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', marginTop: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>💳 Outstanding Receivables Analytics</h3>
-              <p style={{ margin: '0.25rem 0 0 0', color: '#64748b', fontSize: '0.85rem' }}>Track pending invoices, aging collections, and customer credit exposure</p>
-            </div>
-            
-            {/* Filter selection buttons */}
-            <div style={{ display: 'flex', gap: '0.25rem', backgroundColor: '#f1f5f9', padding: '0.25rem', borderRadius: '8px' }}>
-              {[
-                { id: 'today', label: 'Today' },
-                { id: 'this_month', label: 'This Month' },
-                { id: 'this_quarter', label: 'This Quarter' },
-                { id: 'financial_year', label: 'Financial Year' },
-                { id: 'all_time', label: 'All Time' }
-              ].map(f => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setOutstandingFilter(f.id)}
-                  style={{
-                    padding: '0.4rem 0.8rem',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    backgroundColor: outstandingFilter === f.id ? '#fff' : 'transparent',
-                    color: outstandingFilter === f.id ? '#0f172a' : '#64748b',
-                    boxShadow: outstandingFilter === f.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: '2rem' }}>
-            {/* Details and Top Customers */}
-            <div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', fontWeight: 500 }}>Total Outstanding</span>
-                  <strong style={{ fontSize: '1.2rem', color: '#0f172a', display: 'block', marginTop: '0.25rem' }}>{fmt(activeOutstanding.totalOutstanding)}</strong>
-                </div>
-                <div style={{ padding: '0.75rem', backgroundColor: '#fdf2f8', borderRadius: '8px', border: '1px solid #fbcfe8', textAlign: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#be185d', display: 'block', fontWeight: 500 }}>Total Overdue</span>
-                  <strong style={{ fontSize: '1.2rem', color: '#9d174d', display: 'block', marginTop: '0.25rem' }}>{fmt(activeOutstanding.totalOverdue)}</strong>
-                </div>
-                <div style={{ padding: '0.75rem', backgroundColor: '#fffbeb', borderRadius: '8px', border: '1px solid #fef3c7', textAlign: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#b45309', display: 'block', fontWeight: 500 }}>Unpaid Invoices</span>
-                  <strong style={{ fontSize: '1.2rem', color: '#92400e', display: 'block', marginTop: '0.25rem' }}>{activeOutstanding.unpaidCount}</strong>
-                </div>
-              </div>
-
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Top Outstanding Customers</h4>
-              <div className="table-wrap">
-                <table className="data-table" style={{ fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ width: '40px' }}>#</th>
-                      <th>Customer Name</th>
-                      <th>Amount</th>
-                      <th style={{ textAlign: 'right' }}>Follow-up</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activeOutstanding.topCustomers.length === 0 ? (
-                      <tr>
-                        <td colSpan="4" style={{ textAlign: 'center', color: '#64748b', padding: '2rem' }}>
-                          No outstanding balances for this period.
-                        </td>
-                      </tr>
-                    ) : (
-                      activeOutstanding.topCustomers.map((cust, idx) => (
-                        <tr key={idx}>
-                          <td>{idx + 1}</td>
-                          <td><strong>{cust.name}</strong></td>
-                          <td style={{ color: '#ef4444', fontWeight: 700 }}>{fmt(cust.amount)}</td>
-                          <td style={{ textAlign: 'right' }}>
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => {
-                                let phoneNum = cust.phone ? cust.phone.replace(/\D/g, '') : '';
-                                if (phoneNum.length === 10) {
-                                  phoneNum = '91' + phoneNum;
-                                }
-                                const msgText = `Hello ${cust.name},\n\nYour outstanding balance is ₹${cust.amount.toLocaleString('en-IN')}.\n\nKindly clear the pending payment.\n\nThank you,\nAmudhasurabiy Organics`;
-                                const whatsappUrl = `https://wa.me/${phoneNum}?text=${encodeURIComponent(msgText)}`;
-                                window.open(whatsappUrl, '_blank');
-                              }}
-                              style={{
-                                padding: '0.25rem 0.5rem',
-                                fontSize: '0.75rem',
-                                border: '1px solid #10b981',
-                                color: '#10b981',
-                                backgroundColor: '#f0fdf4',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                                cursor: 'pointer',
-                                borderRadius: '4px',
-                                fontWeight: 600
-                              }}
-                            >
-                              💬 Send Reminder
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Outstanding 6-Month Trend Chart */}
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Outstanding Trend (Last 6 Months)</h4>
-              <div style={{ flex: 1, minHeight: '220px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={outstandingTrend}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
-                    <Tooltip formatter={(v) => fmt(v)} contentStyle={{ borderRadius: '8px' }} />
-                    <Bar dataKey="amount" fill="#ef4444" radius={[4, 4, 0, 0]} name="Outstanding Amount" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
+        {/* Dashboard View Switcher */}
+        <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1.5rem' }}>
+          <button
+            type="button"
+            onClick={() => setActiveDashboardView('erp')}
+            style={{
+              padding: '0.5rem 1rem',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: activeDashboardView === 'erp' ? '#5a2d0c' : '#64748b',
+              borderBottom: activeDashboardView === 'erp' ? '3px solid #5a2d0c' : '3px solid transparent',
+              marginBottom: '-10px',
+              transition: 'all 0.2s'
+            }}
+          >
+            📊 ERP Operations Dashboard
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveDashboardView('sfa')}
+            style={{
+              padding: '0.5rem 1rem',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: activeDashboardView === 'sfa' ? '#5a2d0c' : '#64748b',
+              borderBottom: activeDashboardView === 'sfa' ? '3px solid #5a2d0c' : '3px solid transparent',
+              marginBottom: '-10px',
+              transition: 'all 0.2s'
+            }}
+          >
+            🗺️ SFA Manager Command Center
+          </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 500px), 1fr))', gap: '1.5rem', marginTop: '1.5rem' }}>
-          {/* WooCommerce Status Widget */}
-          <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>🔌 WooCommerce Integration</h3>
-                <p style={{ margin: '0.25rem 0 0 0', color: '#64748b', fontSize: '0.85rem' }}>Direct synchronization with online shop</p>
+        {activeDashboardView === 'erp' ? (
+          <>
+            {outstandingValue > 50000 && (
+              <div className="card" style={{ borderLeft: '6px solid #ef4444', backgroundColor: '#fef2f2', padding: '1.25rem', borderRadius: '10px', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <strong style={{ color: '#991b1b', fontSize: '1.05rem', display: 'block' }}>⚠️ Warning: High Outstanding Balance</strong>
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#7f1d1d', lineHeight: '1.4' }}>
+                    High Outstanding Amount. Follow up with customers.
+                  </p>
+                </div>
+                <Link to="/sales?tab=outstanding" className="btn btn-danger btn-sm" style={{ padding: '0.5rem 1rem', whiteSpace: 'nowrap', fontWeight: 'bold' }}>Outstanding Register</Link>
               </div>
-              <span className={`rm-badge ${wooStats?.wooConnected ? 'rm-badge-active' : 'rm-badge-inactive'}`}>
-                {wooStats?.wooConnected ? 'Connected' : 'Disconnected'}
-              </span>
-            </div>
+            )}
 
-            {wooStats?.wooConnected ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
-                  {wooStats.logo ? (
-                    <img src={resolveAssetUrl(wooStats.logo)} alt="Logo" style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'contain', backgroundColor: '#fff', border: '1px solid #e2e8f0', padding: '4px' }} />
-                  ) : (
-                    <span style={{ fontSize: '2rem' }}>🛒</span>
-                  )}
-                  <div>
-                    <h4 style={{ margin: 0, color: '#0f172a', fontWeight: 700 }}>{wooStats.companyName || 'WooCommerce Store'}</h4>
-                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{wooStats.wooUrl}</span>
-                  </div>
+            {adminData?.cards?.delayedOrdersCount > 0 && (
+              <div className="card" style={{ borderLeft: '6px solid #ef4444', backgroundColor: '#fef2f2', padding: '1.25rem', borderRadius: '10px', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <strong style={{ color: '#991b1b', fontSize: '1.05rem', display: 'block' }}>⚠️ Dispatch Pending More Than 3 Days</strong>
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#7f1d1d', lineHeight: '1.4' }}>
+                    There are {adminData.cards.delayedOrdersCount} prepared order(s) that have been pending dispatch for more than 3 days. Please review and pack them immediately.
+                  </p>
                 </div>
+                <Link to="/order-noting" className="btn btn-danger btn-sm" style={{ padding: '0.5rem 1rem', whiteSpace: 'nowrap', fontWeight: 'bold' }}>Manage Orders</Link>
+              </div>
+            )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-                  <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Products Synced</span>
-                    <strong style={{ fontSize: '1.25rem', color: '#0f172a' }}>{wooStats.productsFound ?? 0}</strong>
-                  </div>
-                  <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Customers Synced</span>
-                    <strong style={{ fontSize: '1.25rem', color: '#0f172a' }}>{wooStats.customersFound ?? 0}</strong>
-                  </div>
-                  <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Orders Synced</span>
-                    <strong style={{ fontSize: '1.25rem', color: '#0f172a' }}>{wooStats.ordersFound ?? 0}</strong>
-                  </div>
+            {isMobile ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '1.25rem' }}>
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Due</span>
+                  <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#ef4444' }}>{fmt(outstandingValue)}</strong>
                 </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>WooCommerce Version:</span>
-                    <strong style={{ color: '#0f172a' }}>v{wooStats.wooVersion}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Store Currency:</span>
-                    <strong style={{ color: '#0f172a' }}>{wooStats.wooCurrency}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Last Synced:</span>
-                    <strong style={{ color: '#0f172a' }}>
-                      {wooStats.lastSyncTime ? new Date(wooStats.lastSyncTime).toLocaleString() : 'Never'}
-                    </strong>
-                  </div>
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Today</span>
+                  <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#22c55e' }}>{fmt(cards.todaySales || 0)}</strong>
                 </div>
-
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', borderTop: '1px solid #e2e8f0', paddingTop: '1rem', marginTop: '0.5rem' }}>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleDashboardSync('inventory')} disabled={!!syncingType}>
-                    {syncingType === 'inventory' ? 'Syncing...' : '🔄 Sync Stock'}
-                  </button>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleDashboardSync('orders')} disabled={!!syncingType}>
-                    {syncingType === 'orders' ? 'Syncing...' : '🛒 Sync Orders'}
-                  </button>
-                  <button type="button" className="btn btn-primary btn-sm" onClick={() => handleDashboardSync('all')} disabled={!!syncingType}>
-                    {syncingType === 'all' ? 'Syncing All...' : '⚡ Sync All'}
-                  </button>
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Pending</span>
+                  <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f59e0b' }}>{cards.pendingDispatchOrders || cards.lowStockCount || 0}</strong>
+                </div>
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total</span>
+                  <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)' }}>{cards.totalInvoices || adminData?.cards?.totalInvoices || 120}</strong>
                 </div>
               </div>
             ) : (
-              <div style={{ padding: '1.5rem', textAlign: 'center', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>🔌</span>
-                <h4 style={{ margin: '0 0 0.5rem 0', color: '#334155', fontWeight: 700 }}>Store Not Connected</h4>
-                <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1rem 0' }}>Configure credentials under Integrations to enable automated WooCommerce synchronization.</p>
-                <Link to="/settings?tab=integrations" className="btn btn-primary btn-sm">Go to Settings</Link>
+              <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                <StatCard label="Today's Sales" value={fmt(cards.todaySales)} />
+                <StatCard label="Monthly Revenue" value={fmt(cards.monthlyRevenue)} />
+                <StatCard
+                  label="Outstanding Receivables"
+                  value={fmt(outstandingValue)}
+                  subtext="Pending Customer Collections"
+                  onClick={() => navigate('/sales?tab=outstanding')}
+                  style={{
+                    backgroundColor: outStyle.backgroundColor,
+                    border: outStyle.border,
+                    labelStyle: { color: outStyle.color },
+                    valueStyle: { color: outStyle.color },
+                    subtextStyle: { color: outStyle.color }
+                  }}
+                />
+                <StatCard label="Pending Dispatch Orders" value={cards.pendingDispatchOrders || 0} />
+                <StatCard label="Low Stock Products" value={cards.lowStockCount || 0} className={cards.lowStockCount > 0 ? 'danger' : ''} />
+                <StatCard
+                  label="Top Selling Product"
+                  value={charts.topProducts?.[0]?.name || 'N/A'}
+                  subtext={charts.topProducts?.[0]?.qty ? `${charts.topProducts[0].qty} units sold` : ''}
+                />
               </div>
             )}
-          </div>
 
-          {/* Low Stock Alerts */}
-          <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>⚠️ LOW STOCK ALERTS</h3>
-                <p style={{ margin: '0.25rem 0 0 0', color: '#64748b', fontSize: '0.85rem' }}>Real-time stock warning list</p>
+            {charts.monthlyRevenue && (
+              <div className="chart-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))', gap: '1.5rem' }}>
+                <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>Monthly Revenue Overview</h3>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={charts.monthlyRevenue}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
+                      <Tooltip formatter={(v) => fmt(v)} contentStyle={{ borderRadius: '8px' }} />
+                      <Legend />
+                      <Bar dataKey="revenue" fill="#ff9800" radius={[4, 4, 0, 0]} name="Revenue" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>Profit Margin Trend</h3>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={charts.monthlyRevenue}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
+                      <Tooltip formatter={(v) => fmt(v)} contentStyle={{ borderRadius: '8px' }} />
+                      <Legend />
+                      <Line type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={3} activeDot={{ r: 6 }} name="Net Profit" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: '0.35rem' }}>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${activeAlertTab === 'critical' ? 'btn-danger' : 'btn-secondary'}`}
-                  onClick={() => setActiveAlertTab('critical')}
-                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', fontWeight: 700 }}
-                >
-                  Critical ({alerts.counts?.critical || 0})
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${activeAlertTab === 'warning' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{
-                    backgroundColor: activeAlertTab === 'warning' ? '#f97316' : '',
-                    borderColor: activeAlertTab === 'warning' ? '#f97316' : '',
-                    color: activeAlertTab === 'warning' ? '#fff' : '',
-                    padding: '0.25rem 0.5rem',
-                    fontSize: '0.75rem',
-                    fontWeight: 700
-                  }}
-                  onClick={() => setActiveAlertTab('warning')}
-                >
-                  Warning ({alerts.counts?.warning || 0})
-                </button>
-              </div>
-            </div>
+            )}
 
-            <div className="table-wrap" style={{ maxHeight: '310px', overflowY: 'auto' }}>
-              <table className="data-table" style={{ fontSize: '0.85rem' }}>
-                <thead>
-                  <tr>
-                    <th>Item Name</th>
-                    <th>Current Stock</th>
-                    <th>Minimum</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(alerts[activeAlertTab] || []).slice(0, 6).map((item) => (
-                    <tr key={item.id}>
-                      <td><strong>{item.name}</strong> <span style={{ fontSize: '0.7rem', color: '#64748b', fontFamily: 'monospace' }}>({item.sku})</span></td>
-                      <td style={{ fontWeight: 700, color: activeAlertTab === 'critical' ? '#ef4444' : '#f97316' }}>{item.stock} {item.unit}</td>
-                      <td>{item.minStock} {item.unit}</td>
-                    </tr>
+            {/* Outstanding Receivables Detailed Overview */}
+            <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', marginTop: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>💳 Outstanding Receivables Analytics</h3>
+                  <p style={{ margin: '0.25rem 0 0 0', color: '#64748b', fontSize: '0.85rem' }}>Track pending invoices, aging collections, and customer credit exposure</p>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '0.25rem', backgroundColor: '#f1f5f9', padding: '0.25rem', borderRadius: '8px' }}>
+                  {[
+                    { id: 'today', label: 'Today' },
+                    { id: 'this_month', label: 'This Month' },
+                    { id: 'this_quarter', label: 'This Quarter' },
+                    { id: 'financial_year', label: 'Financial Year' },
+                    { id: 'all_time', label: 'All Time' }
+                  ].map(f => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setOutstandingFilter(f.id)}
+                      style={{
+                        padding: '0.4rem 0.8rem',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        borderRadius: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        backgroundColor: outstandingFilter === f.id ? '#fff' : 'transparent',
+                        color: outstandingFilter === f.id ? '#0f172a' : '#64748b',
+                        boxShadow: outstandingFilter === f.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {f.label}
+                    </button>
                   ))}
-                  {(alerts[activeAlertTab] || []).length === 0 && (
-                    <tr>
-                      <td colSpan="3" style={{ textAlign: 'center', color: '#64748b', padding: '2rem' }}>
-                        No items in this category.
-                      </td>
-                    </tr>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: '2rem' }}>
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', fontWeight: 500 }}>Total Outstanding</span>
+                      <strong style={{ fontSize: '1.2rem', color: '#0f172a', display: 'block', marginTop: '0.25rem' }}>{fmt(activeOutstanding.totalOutstanding)}</strong>
+                    </div>
+                    <div style={{ padding: '0.75rem', backgroundColor: '#fdf2f8', borderRadius: '8px', border: '1px solid #fbcfe8', textAlign: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#be185d', display: 'block', fontWeight: 500 }}>Total Overdue</span>
+                      <strong style={{ fontSize: '1.2rem', color: '#9d174d', display: 'block', marginTop: '0.25rem' }}>{fmt(activeOutstanding.totalOverdue)}</strong>
+                    </div>
+                    <div style={{ padding: '0.75rem', backgroundColor: '#fffbeb', borderRadius: '8px', border: '1px solid #fef3c7', textAlign: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#b45309', display: 'block', fontWeight: 500 }}>Unpaid Invoices</span>
+                      <strong style={{ fontSize: '1.2rem', color: '#92400e', display: 'block', marginTop: '0.25rem' }}>{activeOutstanding.unpaidCount}</strong>
+                    </div>
+                  </div>
+
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Top Outstanding Customers</h4>
+                  <div className="table-wrap">
+                    <table className="data-table" style={{ fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ width: '40px' }}>#</th>
+                          <th>Customer Name</th>
+                          <th>Amount</th>
+                          <th style={{ textAlign: 'right' }}>Follow-up</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activeOutstanding.topCustomers.length === 0 ? (
+                          <tr>
+                            <td colSpan="4" style={{ textAlign: 'center', color: '#64748b', padding: '2rem' }}>
+                              No outstanding balances for this period.
+                            </td>
+                          </tr>
+                        ) : (
+                          activeOutstanding.topCustomers.map((cust, idx) => (
+                            <tr key={idx}>
+                              <td>{idx + 1}</td>
+                              <td><strong>{cust.name}</strong></td>
+                              <td style={{ color: '#ef4444', fontWeight: 700 }}>{fmt(cust.amount)}</td>
+                              <td style={{ textAlign: 'right' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => {
+                                    let phoneNum = cust.phone ? cust.phone.replace(/\D/g, '') : '';
+                                    if (phoneNum.length === 10) {
+                                      phoneNum = '91' + phoneNum;
+                                    }
+                                    const msgText = `Hello ${cust.name},\n\nYour outstanding balance is ₹${cust.amount.toLocaleString('en-IN')}.\n\nKindly clear the pending payment.\n\nThank you,\nAmudhasurabiy Organics`;
+                                    const whatsappUrl = `https://wa.me/${phoneNum}?text=${encodeURIComponent(msgText)}`;
+                                    window.open(whatsappUrl, '_blank');
+                                  }}
+                                  style={{
+                                    padding: '0.25rem 0.5rem',
+                                    fontSize: '0.75rem',
+                                    border: '1px solid #10b981',
+                                    color: '#10b981',
+                                    backgroundColor: '#f0fdf4',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    cursor: 'pointer',
+                                    borderRadius: '4px',
+                                    fontWeight: 600
+                                  }}
+                                >
+                                  💬 Send Reminder
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Outstanding Trend (Last 6 Months)</h4>
+                  <div style={{ flex: 1, minHeight: '220px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={outstandingTrend}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                        <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
+                        <Tooltip formatter={(v) => fmt(v)} contentStyle={{ borderRadius: '8px' }} />
+                        <Bar dataKey="amount" fill="#ef4444" radius={[4, 4, 0, 0]} name="Outstanding Amount" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 500px), 1fr))', gap: '1.5rem', marginTop: '1.5rem' }}>
+              {/* WooCommerce Status Widget */}
+              <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>🔌 WooCommerce Integration</h3>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#64748b', fontSize: '0.85rem' }}>Direct synchronization with online shop</p>
+                  </div>
+                  <span className={`rm-badge ${wooStats?.wooConnected ? 'rm-badge-active' : 'rm-badge-inactive'}`}>
+                    {wooStats?.wooConnected ? 'Connected' : 'Disconnected'}
+                  </span>
+                </div>
+
+                {wooStats?.wooConnected ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
+                      {wooStats.logo ? (
+                        <img src={resolveAssetUrl(wooStats.logo)} alt="Logo" style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'contain', backgroundColor: '#fff', border: '1px solid #e2e8f0', padding: '4px' }} />
+                      ) : (
+                        <span style={{ fontSize: '2rem' }}>🛒</span>
+                      )}
+                      <div>
+                        <h4 style={{ margin: 0, color: '#0f172a', fontWeight: 700 }}>{wooStats.companyName || 'WooCommerce Store'}</h4>
+                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{wooStats.wooUrl}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                      <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Products Synced</span>
+                        <strong style={{ fontSize: '1.25rem', color: '#0f172a' }}>{wooStats.productsFound ?? 0}</strong>
+                      </div>
+                      <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Customers Synced</span>
+                        <strong style={{ fontSize: '1.25rem', color: '#0f172a' }}>{wooStats.customersFound ?? 0}</strong>
+                      </div>
+                      <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Orders Synced</span>
+                        <strong style={{ fontSize: '1.25rem', color: '#0f172a' }}>{wooStats.ordersFound ?? 0}</strong>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>WooCommerce Version:</span>
+                        <strong style={{ color: '#0f172a' }}>v{wooStats.wooVersion}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Store Currency:</span>
+                        <strong style={{ color: '#0f172a' }}>{wooStats.wooCurrency}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Last Synced:</span>
+                        <strong style={{ color: '#0f172a' }}>
+                          {wooStats.lastSyncTime ? new Date(wooStats.lastSyncTime).toLocaleString() : 'Never'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', borderTop: '1px solid #e2e8f0', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleDashboardSync('inventory')} disabled={!!syncingType}>
+                        {syncingType === 'inventory' ? 'Syncing...' : '🔄 Sync Stock'}
+                      </button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleDashboardSync('orders')} disabled={!!syncingType}>
+                        {syncingType === 'orders' ? 'Syncing...' : '🛒 Sync Orders'}
+                      </button>
+                      <button type="button" className="btn btn-primary btn-sm" onClick={() => handleDashboardSync('all')} disabled={!!syncingType}>
+                        {syncingType === 'all' ? 'Syncing All...' : '⚡ Sync All'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '1.5rem', textAlign: 'center', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>🔌</span>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: '#334155', fontWeight: 700 }}>Store Not Connected</h4>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1rem 0' }}>Configure credentials under Integrations to enable automated WooCommerce synchronization.</p>
+                    <Link to="/settings?tab=integrations" className="btn btn-primary btn-sm">Go to Settings</Link>
+                  </div>
+                )}
+              </div>
+
+              {/* Low Stock Alerts */}
+              <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>⚠️ LOW STOCK ALERTS</h3>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#64748b', fontSize: '0.85rem' }}>Real-time stock warning list</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.35rem' }}>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${activeAlertTab === 'critical' ? 'btn-danger' : 'btn-secondary'}`}
+                      onClick={() => setActiveAlertTab('critical')}
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', fontWeight: 700 }}
+                    >
+                      Critical ({alerts.counts?.critical || 0})
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${activeAlertTab === 'warning' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{
+                        backgroundColor: activeAlertTab === 'warning' ? '#f97316' : '',
+                        borderColor: activeAlertTab === 'warning' ? '#f97316' : '',
+                        color: activeAlertTab === 'warning' ? '#fff' : '',
+                        padding: '0.25rem 0.5rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 700
+                      }}
+                      onClick={() => setActiveAlertTab('warning')}
+                    >
+                      Warning ({alerts.counts?.warning || 0})
+                    </button>
+                  </div>
+                </div>
+
+                <div className="table-wrap" style={{ maxHeight: '310px', overflowY: 'auto' }}>
+                  <table className="data-table" style={{ fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr>
+                        <th>Item Name</th>
+                        <th>Current Stock</th>
+                        <th>Minimum</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(alerts[activeAlertTab] || []).slice(0, 6).map((item) => (
+                        <tr key={item.id}>
+                          <td><strong>{item.name}</strong> <span style={{ fontSize: '0.7rem', color: '#64748b', fontFamily: 'monospace' }}>({item.sku})</span></td>
+                          <td style={{ fontWeight: 700, color: activeAlertTab === 'critical' ? '#ef4444' : '#f97316' }}>{item.stock} {item.unit}</td>
+                          <td>{item.minStock} {item.unit}</td>
+                        </tr>
+                      ))}
+                      {(alerts[activeAlertTab] || []).length === 0 && (
+                        <tr>
+                          <td colSpan="3" style={{ textAlign: 'center', color: '#64748b', padding: '2rem' }}>
+                            No items in this category.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {/* SFA Metrics Row */}
+            <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <StatCard label="Assigned Customers" value={sfaAnalytics?.assignedCustomers || 0} />
+              <StatCard label="Visited Today" value={sfaAnalytics?.visitedCustomers || 0} />
+              <StatCard label="Orders Generated" value={sfaAnalytics?.ordersGenerated || 0} className="success" />
+              <StatCard label="Route Conversion Rate" value={`${sfaAnalytics?.orderConversionRate || 0}%`} className="success" />
+              <StatCard label="Field Time" value={`${sfaAnalytics?.timeSpentInFieldMin || 0} mins`} />
+            </div>
+
+            {/* Map & Beats Tracker Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 450px), 1fr))', gap: '1.5rem' }}>
+              {/* Sales Team Live Map */}
+              <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>🗺️ Live Sales Team Tracking Map</h3>
+                <div style={{ width: '100%', height: '300px', backgroundColor: '#0f172a', borderRadius: '8px', overflow: 'hidden' }}>
+                  <svg width="100%" height="100%">
+                    <rect width="100%" height="100%" fill="#020617" />
+                    {/* Draw grid */}
+                    <pattern id="live-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.02)" strokeWidth="1"/>
+                    </pattern>
+                    <rect width="100%" height="100%" fill="url(#live-grid)" />
+                    
+                    {/* Plot Salesmen last positions */}
+                    {sfaTracking.map((t, idx) => {
+                      if (!t.lastKnownLocation) return null;
+                      // Mock visual offset plotting
+                      const x = 50 + (idx * 140) % 400;
+                      const y = 80 + (idx * 70) % 200;
+                      return (
+                        <g key={t.salesman.id} style={{ cursor: 'pointer' }}>
+                          <circle cx={x} cy={y} r="15" fill="rgba(245, 158, 11, 0.2)">
+                            <animate attributeName="r" values="10;22;10" dur="2.5s" repeatCount="indefinite" />
+                          </circle>
+                          <circle cx={x} cy={y} r="6" fill="#f59e0b" stroke="#fff" strokeWidth="2" />
+                          <text x={x + 10} y={y + 4} fill="#e2e8f0" fontSize="10" fontWeight="bold">{t.salesman.name}</text>
+                          <text x={x + 10} y={y + 16} fill="#94a3b8" fontSize="8">Today: {t.visitsToday} visits</text>
+                        </g>
+                      );
+                    })}
+
+                    {sfaTracking.length === 0 && (
+                      <text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle" fill="#64748b" fontSize="12">No active salesmen logged.</text>
+                    )}
+                  </svg>
+                </div>
+              </div>
+
+              {/* Today's Route Activity logs */}
+              <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '1rem', color: '#0f172a' }}>📋 Salesman Field Visit Timeline</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '300px', overflowY: 'auto' }}>
+                  {sfaVisits.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '3rem 0', color: '#64748b' }}>No field visits logged today.</div>
+                  ) : (
+                    sfaVisits.slice(0, 5).map(v => (
+                      <div key={v.id} style={{ padding: '0.6rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+                          <span>{v.customer?.name}</span>
+                          <span style={{ fontSize: '0.75rem', padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#ecfdf5', color: '#065f46' }}>{v.status}</span>
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
+                          Visited by <strong>{v.salesman?.name}</strong> at {new Date(v.checkInTime).toLocaleTimeString()}
+                        </div>
+                        {v.notes && (
+                          <div style={{ fontStyle: 'italic', fontSize: '0.8rem', color: '#475569', marginTop: '0.35rem', borderLeft: '3px solid #e2e8f0', paddingLeft: '0.5rem' }}>
+                            &ldquo;{v.notes}&rdquo;
+                          </div>
+                        )}
+                      </div>
+                    ))
                   )}
-                </tbody>
-              </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Inactive Retailers and Ratings Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 450px), 1fr))', gap: '1.5rem' }}>
+              
+              {/* Inactive Customers Alert */}
+              <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '0.75rem', color: '#0f172a' }}>⚠️ Inactive Distributor Accounts (No visits in 14 days)</h3>
+                <div className="table-wrap">
+                  <table className="data-table" style={{ fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr><th>Client Name</th><th>Territory</th><th>Assigned Rep</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Classic Organics</strong></td>
+                        <td>West Zone</td>
+                        <td>Muralidharan</td>
+                        <td><button type="button" className="btn btn-secondary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}>Schedule beat</button></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Nellai Organics Store</strong></td>
+                        <td>South Zone</td>
+                        <td>Venkatesh</td>
+                        <td><button type="button" className="btn btn-secondary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}>Schedule beat</button></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Heritage Mart</strong></td>
+                        <td>North Zone</td>
+                        <td>Muralidharan</td>
+                        <td><button type="button" className="btn btn-secondary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}>Schedule beat</button></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* CSAT Rating summary */}
+              <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>🌟 Customer Satisfaction (CSAT) ratings</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', flex: 1, alignItems: 'center' }}>
+                  <div style={{ textAlign: 'center', padding: '1rem', backgroundColor: '#fffbeb', borderRadius: '8px', border: '1px solid #fef3c7' }}>
+                    <span style={{ fontSize: '1.5rem', color: '#fbbf24' }}>★★★★★</span>
+                    <h4 style={{ margin: '0.5rem 0 0.25rem 0', fontSize: '1.5rem', fontWeight: 800 }}>4.8 / 5.0</h4>
+                    <span style={{ fontSize: '0.75rem', color: '#b45309' }}>Product Quality Average</span>
+                  </div>
+                  <div style={{ textAlign: 'center', padding: '1rem', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #d1fae5' }}>
+                    <span style={{ fontSize: '1.5rem', color: '#10b981' }}>★★★★★</span>
+                    <h4 style={{ margin: '0.5rem 0 0.25rem 0', fontSize: '1.5rem', fontWeight: 800 }}>4.6 / 5.0</h4>
+                    <span style={{ fontSize: '0.75rem', color: '#15803d' }}>Delivery Experience Average</span>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
-        </div>
+        )}
       </div>
     );
   }

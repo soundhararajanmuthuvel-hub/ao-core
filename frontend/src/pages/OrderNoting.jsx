@@ -567,7 +567,25 @@ export default function OrderNoting() {
                         </td>
                         <td>{new Date(order.orderDate).toLocaleDateString('en-IN')}</td>
                         <td>
-                          <div><strong>{order.customerName}</strong></div>
+                          <div>
+                            <strong>{order.customerName}</strong>
+                            {order.customer?.customerCode && (
+                              <span style={{
+                                fontSize: '0.65rem',
+                                fontFamily: 'monospace',
+                                backgroundColor: '#fef3c7',
+                                color: '#b45309',
+                                border: '1px solid #fde68a',
+                                padding: '1px 4px',
+                                borderRadius: '3px',
+                                marginLeft: '0.35rem',
+                                fontWeight: 'bold',
+                                textTransform: 'uppercase'
+                              }}>
+                                {order.customer.customerCode}
+                              </span>
+                            )}
+                          </div>
                           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                             {order.phoneNumber && <span>📞 {order.phoneNumber}</span>}
                             {order.area && <span style={{ marginLeft: '0.5rem' }}>📍 {order.area}</span>}
@@ -741,7 +759,7 @@ export default function OrderNoting() {
                 <option value="">-- Select Existing Customer (or enter new details below) --</option>
                 {customers.map((c) => (
                   <option key={c.id || c._id} value={c.id || c._id}>
-                    {c.name} ({c.customerType}) — Phone: {c.phone || 'N/A'}
+                    {c.customerCode ? `[${c.customerCode}] ` : ''}{c.name} ({c.customerType}) — Phone: {c.phone || 'N/A'}
                   </option>
                 ))}
               </select>
@@ -1125,6 +1143,24 @@ export default function OrderNoting() {
                     <div style={{ padding: '10px 12px', fontSize: isCompact ? '12px' : '14px', lineHeight: 1.4, color: '#1F2937', flex: 1 }}>
                       <strong style={{ fontSize: isCompact ? '13px' : '16px', color: '#0F172A', display: 'block', marginBottom: '4px' }}>
                         {selectedOrder.customerName}
+                        {selectedOrder.customer?.customerCode && (
+                          <span style={{
+                            fontSize: '0.65rem',
+                            fontFamily: 'monospace',
+                            backgroundColor: '#fef3c7',
+                            color: '#b45309',
+                            border: '1px solid #fde68a',
+                            padding: '1px 4px',
+                            borderRadius: '3px',
+                            marginLeft: '0.4rem',
+                            fontWeight: 'bold',
+                            display: 'inline-block',
+                            verticalAlign: 'middle',
+                            textTransform: 'uppercase'
+                          }}>
+                            {selectedOrder.customer.customerCode}
+                          </span>
+                        )}
                       </strong>
                       <span style={{ display: 'block', whiteSpace: 'pre-line', marginBottom: '6px' }}>
                         {selectedOrder.address || 'Walk-in'}

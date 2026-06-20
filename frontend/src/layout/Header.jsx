@@ -18,6 +18,8 @@ export default function Header({ onMenuToggle }) {
   const [unread, setUnread] = useState(0);
   const [showNotif, setShowNotif] = useState(false);
   const [showUser, setShowUser] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   useEffect(() => {
@@ -26,12 +28,16 @@ export default function Header({ onMenuToggle }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    notificationsApi.list().then(({ data }) => {
+  const fetchNotifications = () => {
+    notificationsApi.list({ status: activeFilter }).then(({ data }) => {
       setNotifications(data.notifications);
       setUnread(data.unreadCount);
     }).catch(() => {});
-  }, []);
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [activeFilter]);
 
   useEffect(() => {
     if (search.length < 2) {
@@ -52,6 +58,292 @@ export default function Header({ onMenuToggle }) {
     else if (type === 'invoice') navigate(`/sales/${item._id || item.id}`);
   };
 
+  const handleClearAll = async () => {
+    setShowClearConfirm(false);
+    setNotifications([]);
+    setUnread(0);
+    try {
+      await notificationsApi.clearAll();
+      fetchNotifications();
+    } catch (err) {
+      fetchNotifications();
+    }
+  };
+
+  const renderNotificationsDropdownContent = () => {
+    const handleToggleRead = async (e, id, currentIsRead) => {
+      e.stopPropagation();
+      const newIsRead = !currentIsRead;
+      // Optimistic update
+      setNotifications(prev => prev.map(n => (n.id === id || n._id === id) ? { ...n, isRead: newIsRead } : n));
+      setUnread(prev => newIsRead ? Math.max(0, prev - 1) : prev + 1);
+      
+      try {
+        await notificationsApi.markRead(id, newIsRead);
+        fetchNotifications();
+      } catch (err) {
+        fetchNotifications();
+      }
+    };
+
+    const handleDelete = async (e, id, isRead) => {
+      e.stopPropagation();
+      // Optimistic update
+      setNotifications(prev => prev.filter(n => n.id !== id && n._id !== id));
+      if (!isRead) {
+        setUnread(prev => Math.max(0, prev - 1));
+      }
+      try {
+        await notificationsApi.remove(id);
+        fetchNotifications();
+      } catch (err) {
+        fetchNotifications();
+      }
+    };
+
+    const handleMarkAllRead = async (e) => {
+      e.stopPropagation();
+      // Optimistic update
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUnread(0);
+      try {
+        await notificationsApi.markAllRead();
+        fetchNotifications();
+      } catch (err) {
+        fetchNotifications();
+      }
+    };
+
+    const handleClearAllClick = (e) => {
+      e.stopPropagation();
+      setShowClearConfirm(true);
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: 'inherit' }}>
+        {/* Header Actions Row */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingBottom: '0.5rem',
+          borderBottom: '1px solid var(--border)',
+          marginBottom: '0.5rem',
+          gap: '0.5rem'
+        }}>
+          <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Notifications</span>
+          <div style={{ display: 'flex', gap: '0.4rem' }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={handleMarkAllRead}
+              style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', fontWeight: 600 }}
+            >
+              Mark All Read
+            </button>
+            <button
+              type="button"
+              className="btn btn-danger btn-sm"
+              onClick={handleClearAllClick}
+              style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', fontWeight: 600 }}
+            >
+              Clear All
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Bar */}
+        <div style={{
+          display: 'flex',
+          gap: '0.25rem',
+          marginBottom: '0.5rem',
+          backgroundColor: 'var(--bg-page)',
+          padding: '0.2rem',
+          borderRadius: '6px'
+        }}>
+          {['all', 'unread', 'read'].map((filter) => (
+            <button
+              key={filter}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveFilter(filter);
+              }}
+              style={{
+                flex: 1,
+                border: 'none',
+                background: activeFilter === filter ? 'var(--bg-card)' : 'transparent',
+                color: activeFilter === filter ? 'var(--text-primary)' : 'var(--text-secondary)',
+                fontSize: '0.75rem',
+                fontWeight: activeFilter === filter ? 700 : 500,
+                padding: '0.3rem',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                textAlign: 'center',
+                boxShadow: activeFilter === filter ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {filter.charAt(0).toUpperCase() + filter.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {/* List or Empty State */}
+        <div style={{ overflowY: 'auto', flex: 1, maxHeight: '300px' }}>
+          {notifications.length === 0 ? (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '2rem 1rem',
+              textAlign: 'center',
+              color: 'var(--text-secondary)'
+            }}>
+              <span style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔔</span>
+              <strong style={{ fontSize: '0.85rem', display: 'block', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+                No Notifications Available
+              </strong>
+              <span style={{ fontSize: '0.75rem' }}>You are all caught up.</span>
+            </div>
+          ) : (
+            notifications.map((n) => {
+              const notificationId = n._id || n.id;
+              const hasInvoiceLink = n.link && n.link.includes('/sales/');
+              const invoiceIdMatch = n.link ? n.link.match(/\/sales\/(\d+)/) : null;
+              const invoiceId = invoiceIdMatch ? invoiceIdMatch[1] : null;
+
+              return (
+                <div
+                  key={notificationId}
+                  className={`notification-item ${!n.isRead ? 'unread' : ''}`}
+                  onClick={(e) => handleToggleRead(e, notificationId, n.isRead)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    padding: '0.75rem',
+                    borderBottom: '1px solid var(--border)',
+                    fontSize: '0.85rem',
+                    backgroundColor: !n.isRead ? 'var(--bg-active)' : 'transparent',
+                    borderRadius: '6px',
+                    marginBottom: '0.25rem',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    transition: 'background-color 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 0 }}>
+                      {/* Unread indicator dot */}
+                      {!n.isRead && (
+                        <span style={{
+                          display: 'inline-block',
+                          width: '6px',
+                          height: '6px',
+                          backgroundColor: 'var(--color-primary, #5a2d0c)',
+                          borderRadius: '50%',
+                          flexShrink: 0
+                        }} />
+                      )}
+                      <strong style={{
+                        color: 'var(--text-primary)',
+                        fontSize: '0.8rem',
+                        fontWeight: !n.isRead ? 700 : 500,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {n.title}
+                      </strong>
+                    </div>
+                    {/* Toggle and Delete Buttons */}
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleRead(e, notificationId, n.isRead)}
+                        title={n.isRead ? "Mark as unread" : "Mark as read"}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          padding: '2px',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        {n.isRead ? '📖' : '✉️'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDelete(e, notificationId, n.isRead)}
+                        title="Delete notification"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          color: '#ef4444',
+                          padding: '2px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          fontWeight: 700
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                  <p style={{
+                    margin: '0.25rem 0 0 0',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.75rem',
+                    whiteSpace: 'pre-wrap',
+                    paddingLeft: !n.isRead ? '0.65rem' : '0'
+                  }}>
+                    {n.message}
+                  </p>
+                  {hasInvoiceLink && invoiceId && (
+                    <div style={{ paddingLeft: !n.isRead ? '0.65rem' : '0', marginTop: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          padding: '0.15rem 0.5rem',
+                          fontSize: '0.7rem',
+                          borderColor: '#ff9800',
+                          color: '#ff9800',
+                          fontWeight: 700
+                        }}
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            const { data } = await salesApi.getWhatsAppReminder(invoiceId);
+                            if (data.whatsappUrl) {
+                              window.open(data.whatsappUrl, '_blank');
+                            }
+                          } catch (err) {
+                            console.error('Failed to open WhatsApp reminder:', err);
+                          }
+                        }}
+                      >
+                        💬 WhatsApp Reminder
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  };
+
   if (isMobile) {
     return (
       <header className="app-header mobile-header-layout" style={{ position: 'sticky', top: 0, zIndex: 999, display: 'flex', flexDirection: 'column', padding: '0.5rem 1rem', height: 'auto', gap: '0.5rem' }}>
@@ -65,8 +357,8 @@ export default function Header({ onMenuToggle }) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <div className="notifications-panel" style={{ position: 'relative' }}>
-              <button type="button" className="btn-icon" onClick={() => setShowNotif(!showNotif)} style={{ minHeight: '44px', minWidth: '44px', background: 'none', border: 'none', fontSize: '1.25rem' }}>
-                🔔{unread > 0 ? <span style={{ background: '#ef4444', color: '#fff', fontSize: '0.75rem', padding: '1px 6px', borderRadius: '50%', marginLeft: '2px', verticalAlign: 'top', fontWeight: 'bold' }}>{unread}</span> : ''}
+              <button type="button" className="btn-icon" onClick={() => setShowNotif(!showNotif)} style={{ minHeight: '44px', minWidth: '44px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                🔔{unread > 0 && <span className="badge badge-danger" style={{ marginLeft: '4px', padding: '0.15rem 0.4rem', fontSize: '0.7rem' }}>{unread}</span>}
               </button>
               {showNotif && (
                 <div className="notifications-dropdown" style={{
@@ -78,22 +370,14 @@ export default function Header({ onMenuToggle }) {
                   border: '1px solid var(--border)',
                   borderRadius: '12px',
                   boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                  width: '280px',
-                  maxHeight: '350px',
-                  overflowY: 'auto',
+                  width: '300px',
+                  maxHeight: '400px',
                   zIndex: 1000,
-                  padding: '0.5rem'
+                  padding: '0.75rem',
+                  display: 'flex',
+                  flexDirection: 'column'
                 }}>
-                  {notifications.length === 0 ? (
-                    <div style={{ padding: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No notifications</div>
-                  ) : (
-                    notifications.slice(0, 5).map((n) => (
-                      <div key={n._id || n.id} style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
-                        <strong style={{ display: 'block' }}>{n.title}</strong>
-                        <span style={{ color: 'var(--text-secondary)' }}>{n.message}</span>
-                      </div>
-                    ))
-                  )}
+                  {renderNotificationsDropdownContent()}
                 </div>
               )}
             </div>
@@ -135,6 +419,44 @@ export default function Header({ onMenuToggle }) {
             )}
           </div>
         </div>
+        {showClearConfirm && (
+          <div className="modal-overlay" style={{ zIndex: 1100 }}>
+            <div className="modal" style={{ maxWidth: '400px', margin: 'auto' }}>
+              <div className="modal-header">
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>Clear Notifications</h3>
+                <button 
+                  type="button" 
+                  className="btn-icon" 
+                  onClick={() => setShowClearConfirm(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="modal-body" style={{ padding: '1.5rem 1.25rem' }}>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  Are you sure you want to clear all notifications?
+                </p>
+              </div>
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => setShowClearConfirm(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-danger" 
+                  onClick={handleClearAll}
+                >
+                  Clear All
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
     );
   }
@@ -249,9 +571,9 @@ export default function Header({ onMenuToggle }) {
             <button type="button" className="btn-icon" onClick={toggleDarkMode} title="Toggle dark mode" style={{ minHeight: '44px', minWidth: '44px' }}>
               {darkMode ? '☀️' : '🌙'}
             </button>
-            <div className="notifications-panel">
-              <button type="button" className="btn-icon" onClick={() => setShowNotif(!showNotif)} style={{ minHeight: '44px', minWidth: '44px' }}>
-                🔔{unread > 0 ? ` (${unread})` : ''}
+            <div className="notifications-panel" style={{ position: 'relative' }}>
+              <button type="button" className="btn-icon" onClick={() => setShowNotif(!showNotif)} style={{ minHeight: '44px', minWidth: '44px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                🔔{unread > 0 && <span className="badge badge-danger" style={{ marginLeft: '4px', padding: '0.15rem 0.4rem', fontSize: '0.7rem' }}>{unread}</span>}
               </button>
               {showNotif && (
                 <div className="notifications-dropdown" style={{
@@ -263,71 +585,14 @@ export default function Header({ onMenuToggle }) {
                   border: '1px solid var(--border)',
                   borderRadius: '12px',
                   boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                  minWidth: '280px',
-                  maxWidth: '320px',
+                  width: '320px',
                   maxHeight: '400px',
-                  overflowY: 'auto',
                   zIndex: 1000,
-                  padding: '0.5rem'
+                  padding: '0.75rem',
+                  display: 'flex',
+                  flexDirection: 'column'
                 }}>
-                  {notifications.length === 0 ? (
-                    <div className="notification-item" style={{ padding: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No notifications</div>
-                  ) : (
-                    notifications.slice(0, 10).map((n) => {
-                      const notificationId = n._id || n.id;
-                      const hasInvoiceLink = n.link && n.link.includes('/sales/');
-                      const invoiceIdMatch = n.link ? n.link.match(/\/sales\/(\d+)/) : null;
-                      const invoiceId = invoiceIdMatch ? invoiceIdMatch[1] : null;
-
-                      return (
-                        <div 
-                          key={notificationId} 
-                          className={`notification-item ${!n.isRead ? 'unread' : ''}`}
-                          style={{
-                            padding: '0.75rem',
-                            borderBottom: '1px solid var(--border)',
-                            fontSize: '0.85rem',
-                            backgroundColor: !n.isRead ? 'var(--bg-active)' : 'transparent',
-                            borderRadius: '6px',
-                            marginBottom: '0.25rem'
-                          }}
-                        >
-                          <strong style={{ display: 'block', color: 'var(--text-primary)' }}>{n.title}</strong>
-                          <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>{n.message}</p>
-                          {hasInvoiceLink && invoiceId && (
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm"
-                              style={{
-                                marginTop: '0.5rem',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                                padding: '0.15rem 0.5rem',
-                                fontSize: '0.75rem',
-                                borderColor: '#ff9800',
-                                color: '#ff9800',
-                                fontWeight: 700
-                              }}
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                try {
-                                  const { data } = await salesApi.getWhatsAppReminder(invoiceId);
-                                  if (data.whatsappUrl) {
-                                    window.open(data.whatsappUrl, '_blank');
-                                  }
-                                } catch (err) {
-                                  console.error('Failed to open WhatsApp reminder:', err);
-                                }
-                              }}
-                            >
-                              💬 WhatsApp Reminder
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
+                  {renderNotificationsDropdownContent()}
                 </div>
               )}
             </div>
@@ -403,6 +668,44 @@ export default function Header({ onMenuToggle }) {
             </div>
           </div>
         </>
+      )}
+      {showClearConfirm && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal" style={{ maxWidth: '400px', margin: 'auto' }}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>Clear Notifications</h3>
+              <button 
+                type="button" 
+                className="btn-icon" 
+                onClick={() => setShowClearConfirm(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body" style={{ padding: '1.5rem 1.25rem' }}>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                Are you sure you want to clear all notifications?
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => setShowClearConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-danger" 
+                onClick={handleClearAll}
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </header>
   );

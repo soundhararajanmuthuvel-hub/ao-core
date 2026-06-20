@@ -194,7 +194,25 @@ function BackordersDashboard() {
                       <td style={{ fontWeight: 600 }}>
                         {isExpanded ? '▼ ' : '▶ '} {inv.invoiceNumber}
                       </td>
-                      <td>{inv.customer?.name || 'Walk-in'}</td>
+                      <td>
+                        {inv.customer?.name || 'Walk-in'}
+                        {inv.customer?.customerCode && (
+                          <span style={{
+                            fontSize: '0.65rem',
+                            fontFamily: 'monospace',
+                            backgroundColor: '#fef3c7',
+                            color: '#b45309',
+                            border: '1px solid #fde68a',
+                            padding: '1px 4px',
+                            borderRadius: '3px',
+                            marginLeft: '0.35rem',
+                            fontWeight: 'bold',
+                            textTransform: 'uppercase'
+                          }}>
+                            {inv.customer.customerCode}
+                          </span>
+                        )}
+                      </td>
                       <td>{formatDate(inv.date)}</td>
                       <td>{formatDate(inv.expectedDispatchDate)}</td>
                       <td>
@@ -375,7 +393,25 @@ function OutstandingRegister() {
                       <td><strong>{inv.invoiceNumber}</strong></td>
                       <td>{new Date(inv.date).toLocaleDateString()}</td>
                       <td>
-                        <div><strong>{inv.customer?.name}</strong></div>
+                        <div>
+                          <strong>{inv.customer?.name}</strong>
+                          {inv.customer?.customerCode && (
+                            <span style={{
+                              fontSize: '0.65rem',
+                              fontFamily: 'monospace',
+                              backgroundColor: '#fef3c7',
+                              color: '#b45309',
+                              border: '1px solid #fde68a',
+                              padding: '1px 4px',
+                              borderRadius: '3px',
+                              marginLeft: '0.35rem',
+                              fontWeight: 'bold',
+                              textTransform: 'uppercase'
+                            }}>
+                              {inv.customer.customerCode}
+                            </span>
+                          )}
+                        </div>
                         <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Terms: {inv.customer?.paymentTerms || 'COD'} | Cycle: {inv.customer?.paymentCycle || 'Bill to Bill'}</div>
                       </td>
                       <td>₹{Number(inv.grandTotal).toFixed(2)}</td>
@@ -571,7 +607,7 @@ function PaymentEntry({ customers }) {
             <option value="">-- Choose Customer --</option>
             {customers.map(c => (
               <option key={c.id || c._id} value={c.id || c._id}>
-                {c.name} ({c.customerType}) — Bal: ₹{Number(c.balance || 0).toLocaleString()}
+                {c.customerCode ? `[${c.customerCode}] ` : ''}{c.name} ({c.customerType}) — Bal: ₹{Number(c.balance || 0).toLocaleString()}
               </option>
             ))}
           </select>

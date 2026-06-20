@@ -119,6 +119,12 @@ const connectDB = async () => {
   require('../models/CrmNote');
   require('../models/CrmFollowUp');
   require('../models/ReminderHistory');
+  require('../models/Route');
+  require('../models/Visit');
+  require('../models/SalesmanLocation');
+  require('../models/CustomerReview');
+  require('../models/Lead');
+  require('../models/CrmOpportunity');
 
   const shouldAlter = false;
   await dropStaleSqliteBackupTables();
@@ -198,6 +204,48 @@ const connectDB = async () => {
   await addColumnIfNotExist('Settings', 'shippingZoneRates', "TEXT NULL");
   await addColumnIfNotExist('InvoiceItems', 'offerCost', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('InvoiceItems', 'actualProfit', "DECIMAL(10, 2) DEFAULT 0.00");
+
+  // SFA Customer enhancements
+  await addColumnIfNotExist('Customers', 'customerCode', "VARCHAR(255) DEFAULT ''");
+  await addColumnIfNotExist('Customers', 'tier', "VARCHAR(50) DEFAULT 'RED'");
+  await addColumnIfNotExist('Customers', 'latitude', "DECIMAL(10, 8) NULL");
+  await addColumnIfNotExist('Customers', 'longitude', "DECIMAL(11, 8) NULL");
+  await addColumnIfNotExist('Customers', 'territory', "VARCHAR(255) DEFAULT ''");
+  await addColumnIfNotExist('Customers', 'routeZone', "VARCHAR(255) DEFAULT ''");
+  await addColumnIfNotExist('Customers', 'assignedSalesmanId', "INTEGER NULL");
+  await addColumnIfNotExist('Customers', 'leadId', "INTEGER NULL");
+  await addColumnIfNotExist('Customers', 'lastVisitDate', "DATETIME NULL");
+  await addColumnIfNotExist('Customers', 'lastOrderDate', "DATETIME NULL");
+
+  // CRM Follow-up / Notes / Visits enhancements
+  await addColumnIfNotExist('CrmFollowUps', 'leadId', "INTEGER NULL");
+  await addColumnIfNotExist('CrmFollowUps', 'type', "VARCHAR(255) DEFAULT 'Call Customer'");
+  await addColumnIfNotExist('CrmFollowUps', 'status', "VARCHAR(50) DEFAULT 'Pending'");
+  await addColumnIfNotExist('CrmNotes', 'leadId', "INTEGER NULL");
+  await addColumnIfNotExist('Visits', 'leadId', "INTEGER NULL");
+
+  // SFA Product enhancements
+  await addColumnIfNotExist('Products', 'mrp', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Products', 'greenPrice', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Products', 'yellowPrice', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Products', 'redPrice', "DECIMAL(10, 2) DEFAULT 0.00");
+
+  // SFA Settings enhancements
+  await addColumnIfNotExist('Settings', 'minOrderGreen', "DECIMAL(10, 2) DEFAULT 10000.00");
+  await addColumnIfNotExist('Settings', 'minOrderYellow', "DECIMAL(10, 2) DEFAULT 5000.00");
+  await addColumnIfNotExist('Settings', 'minOrderRed', "DECIMAL(10, 2) DEFAULT 2000.00");
+  await addColumnIfNotExist('Settings', 'checkInRadius', "INTEGER DEFAULT 100");
+  await addColumnIfNotExist('Settings', 'sameDayCutoffHour', "INTEGER DEFAULT 13");
+
+  // Delivery Shipment enhancements
+  await addColumnIfNotExist('Shipments', 'deliveryStaffId', "INTEGER NULL");
+  await addColumnIfNotExist('Shipments', 'vehicleNumber', "VARCHAR(255) DEFAULT ''");
+  await addColumnIfNotExist('Shipments', 'deliveryRoute', "VARCHAR(255) DEFAULT ''");
+  await addColumnIfNotExist('Shipments', 'deliveryLatitude', "DECIMAL(10, 8) NULL");
+  await addColumnIfNotExist('Shipments', 'deliveryLongitude', "DECIMAL(11, 8) NULL");
+  await addColumnIfNotExist('Shipments', 'deliveryCommitment', "VARCHAR(50) DEFAULT 'Same Day'");
+  await addColumnIfNotExist('Shipments', 'expectedArrivalTime', "DATETIME NULL");
+  await addColumnIfNotExist('Shipments', 'deliverySequence', "INTEGER DEFAULT 0");
   
   // Internal logistics shipping costs columns
   await addColumnIfNotExist('Settings', 'packingCost', "DECIMAL(10, 2) DEFAULT 0.00");

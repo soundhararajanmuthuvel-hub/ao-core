@@ -100,6 +100,8 @@ app.use('/api/search', require('./routes/searchRoutes'));
 app.use('/api/integrations', require('./routes/integrationRoutes'));
 app.use('/api/webhooks', require('./routes/webhookRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/sfa', require('./routes/sfaRoutes'));
+app.use('/api/crm', require('./routes/crmRoutes'));
 app.use('/api/migration', require('./routes/migrationRoutes'));
 
 /* =========================

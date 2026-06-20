@@ -157,6 +157,22 @@ const Product = sequelize.define('Product', {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
+  mrp: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0.00,
+  },
+  greenPrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0.00,
+  },
+  yellowPrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0.00,
+  },
+  redPrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0.00,
+  },
   isLowStock: {
     type: DataTypes.VIRTUAL,
     get() {

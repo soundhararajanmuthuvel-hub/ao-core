@@ -35,7 +35,10 @@ const User = sequelize.define(
         'Billing Executive',
         'Store Keeper',
         'Dispatch Executive',
-        'Sales Executive'
+        'Sales Executive',
+        'Sales Manager',
+        'Salesman',
+        'Delivery Staff'
       ),
       defaultValue: 'Super Admin',
     },

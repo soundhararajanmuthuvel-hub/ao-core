@@ -248,6 +248,26 @@ const Settings = sequelize.define('Settings', {
     type: DataTypes.STRING,
     defaultValue: 'AMUDHASURABIY ORGANICS',
   },
+  minOrderGreen: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 10000.00,
+  },
+  minOrderYellow: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 5000.00,
+  },
+  minOrderRed: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 2000.00,
+  },
+  checkInRadius: {
+    type: DataTypes.INTEGER,
+    defaultValue: 100,
+  },
+  sameDayCutoffHour: {
+    type: DataTypes.INTEGER,
+    defaultValue: 13,
+  },
 });
 
 makeMongooseCompatible(Settings);

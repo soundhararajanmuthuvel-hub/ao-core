@@ -18,6 +18,24 @@ import AIAssistant from '../pages/AIAssistant';
 import PublicTracking from '../pages/PublicTracking';
 import ManufacturingPage from '../pages/ManufacturingPage';
 import OrderNoting from '../pages/OrderNoting';
+import RoutePlanner from '../pages/RoutePlanner';
+import CustomerVisits from '../pages/CustomerVisits';
+import MobileCatalog from '../pages/MobileCatalog';
+import FieldOrdering from '../pages/FieldOrdering';
+import DeliveryTracking from '../pages/DeliveryTracking';
+import ReviewPortal from '../pages/ReviewPortal';
+
+// CRM Pages
+import CrmDashboard from '../pages/CrmDashboard';
+import Leads from '../pages/Leads';
+import LeadFinder from '../pages/LeadFinder';
+import Opportunities from '../pages/Opportunities';
+import FollowUps from '../pages/FollowUps';
+import CustomerReviews from '../pages/CustomerReviews';
+
+// SFA Pages
+import FieldSalesDashboard from '../pages/FieldSalesDashboard';
+import FieldSalesAnalytics from '../pages/FieldSalesAnalytics';
 
 export default function AppRoutes() {
   return (
@@ -25,6 +43,7 @@ export default function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/track/:trackingNumber" element={<PublicTracking />} />
       <Route path="/track" element={<PublicTracking />} />
+      <Route path="/reviews/portal/:token" element={<ReviewPortal />} />
       <Route
         path="/"
         element={
@@ -34,6 +53,115 @@ export default function AppRoutes() {
         }
       >
         <Route index element={<Dashboard />} />
+
+        {/* CRM Routes */}
+        <Route
+          path="crm"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager']}>
+              <CrmDashboard />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="crm/leads"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+              <Leads />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="crm/lead-finder"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+              <LeadFinder />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="crm/opportunities"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+              <Opportunities />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="crm/followups"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+              <FollowUps />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="crm/reviews"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager']}>
+              <CustomerReviews />
+            </RoleRoute>
+          }
+        />
+
+        {/* Field Sales / SFA Routes */}
+        <Route
+          path="field-sales"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+              <FieldSalesDashboard />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="field-sales/analytics"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager']}>
+              <FieldSalesAnalytics />
+            </RoleRoute>
+          }
+        />
+        
+        <Route
+          path="route-planner"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+              <RoutePlanner />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="customer-visits"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+              <CustomerVisits />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="mobile-catalog"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+              <MobileCatalog />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="field-ordering"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+              <FieldOrdering />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="delivery-tracking"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Delivery Staff', 'Dispatch Executive']}>
+              <DeliveryTracking />
+            </RoleRoute>
+          }
+        />
         
         {/* Simplified Consolidated Pages & Role-based Routing */}
         <Route
@@ -79,7 +207,7 @@ export default function AppRoutes() {
         <Route
           path="customers"
           element={
-            <RoleRoute roles={['Super Admin', 'Sales Executive', 'Billing Executive']}>
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Executive', 'Billing Executive', 'Sales Manager', 'Salesman']}>
               <CustomersPage />
             </RoleRoute>
           }

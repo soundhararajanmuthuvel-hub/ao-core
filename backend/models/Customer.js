@@ -8,6 +8,10 @@ const Customer = sequelize.define('Customer', {
     primaryKey: true,
     autoIncrement: true,
   },
+  customerCode: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   name: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -141,8 +145,103 @@ const Customer = sequelize.define('Customer', {
     type: DataTypes.INTEGER,
     defaultValue: 0,
   },
+  tier: {
+    type: DataTypes.ENUM('GREEN', 'YELLOW', 'RED'),
+    defaultValue: 'RED',
+  },
+  latitude: {
+    type: DataTypes.DECIMAL(10, 8),
+    allowNull: true,
+  },
+  longitude: {
+    type: DataTypes.DECIMAL(11, 8),
+    allowNull: true,
+  },
+  territory: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  routeZone: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  assignedSalesmanId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  leadId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  lastVisitDate: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  lastOrderDate: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
 });
 
-makeMongooseCompatible(Customer);
+Customer.belongsTo(require('./User'), { as: 'salesman', foreignKey: 'assignedSalesmanId' });
+
+makeMongooseCompatible(Customer, {
+  salesman: 'assignedSalesmanId',
+});
+
+// Territory & Customer ID Assignment Hook
+const territoryService = require('../utils/territoryService');
+
+async function assignTerritoryAndCode(customer) {
+  let resolution = null;
+
+  // If address changed, but coordinates did NOT change, clear old coordinates to force re-geocoding
+  if (customer.changed('address') && !customer.changed('latitude') && !customer.changed('longitude')) {
+    customer.latitude = null;
+    customer.longitude = null;
+  }
+
+  if (customer.changed('territory') && customer.territory) {
+    resolution = territoryService.resolveByTerritoryName(customer.territory);
+  }
+
+  if (!resolution) {
+    resolution = territoryService.resolveTerritoryAndSalesman(
+      customer.latitude,
+      customer.longitude,
+      customer.address
+    );
+  }
+
+  if (resolution) {
+    customer.latitude = resolution.latitude;
+    customer.longitude = resolution.longitude;
+    customer.territory = resolution.territory;
+    customer.routeZone = resolution.routeZone;
+    customer.assignedSalesmanId = resolution.assignedSalesmanId;
+
+    const territoryCode = resolution.routeZone;
+    const currentCode = customer.customerCode;
+    if (!currentCode || !currentCode.startsWith(`${territoryCode}-`)) {
+      const generatedCode = await territoryService.generateUniqueCustomerCode(Customer, territoryCode);
+      customer.customerCode = generatedCode;
+    }
+  }
+}
+
+Customer.addHook('beforeCreate', async (customer, options) => {
+  await assignTerritoryAndCode(customer);
+});
+
+Customer.addHook('beforeUpdate', async (customer, options) => {
+  if (
+    customer.changed('address') ||
+    customer.changed('latitude') ||
+    customer.changed('longitude') ||
+    customer.changed('territory')
+  ) {
+    await assignTerritoryAndCode(customer);
+  }
+});
 
 module.exports = Customer;

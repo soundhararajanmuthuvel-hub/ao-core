@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { customersApi, productsApi, ordersApi } from '../api';
+import { customersApi, productsApi, ordersApi, sfaApi, crmApi } from '../api';
 import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
 import { resolveAssetUrl } from '../utils/url';
@@ -91,6 +91,8 @@ export default function Customers() {
   const [notesHistory, setNotesHistory] = useState([]);
   const [followupsHistory, setFollowupsHistory] = useState([]);
   const [remindersHistory, setRemindersHistory] = useState([]);
+  const [customerVisitsHistory, setCustomerVisitsHistory] = useState([]);
+  const [customerReviewsHistory, setCustomerReviewsHistory] = useState([]);
   
   // CRM text inputs
   const [newCrmNoteText, setNewCrmNoteText] = useState('');
@@ -174,13 +176,15 @@ export default function Customers() {
       const customerRes = await customersApi.get(cId);
       setSelectedCustomer(customerRes.data.customer);
 
-      const [salesRes, paymentsRes, ordersRes, notesRes, followupsRes, remindersRes] = await Promise.all([
+      const [salesRes, paymentsRes, ordersRes, notesRes, followupsRes, remindersRes, visitsRes, reviewsRes] = await Promise.all([
         customersApi.sales(cId),
         customersApi.payments(cId),
         ordersApi.list({ customerId: cId, limit: 150 }),
         customersApi.getNotes(cId),
         customersApi.getFollowUps(cId),
         customersApi.getReminders(cId),
+        sfaApi.getVisits({ customerId: cId }),
+        crmApi.getReviews()
       ]);
 
       setSalesHistory(salesRes.data.sales || []);
@@ -189,6 +193,8 @@ export default function Customers() {
       setNotesHistory(notesRes.data.notes || []);
       setFollowupsHistory(followupsRes.data.followUps || []);
       setRemindersHistory(remindersRes.data.reminders || []);
+      setCustomerVisitsHistory(visitsRes.data || []);
+      setCustomerReviewsHistory(reviewsRes.data?.reviews?.filter(r => r.customerId === cId) || []);
     } catch (err) {
       console.error('Failed to load CRM details', err);
     } finally {
@@ -1066,6 +1072,32 @@ export default function Customers() {
                 </div>
               </div>
 
+              <div className="card" style={{ padding: '1rem', backgroundColor: '#fffbeb', border: '1px solid #fef3c7' }}>
+                <h4 style={{ margin: '0 0 0.75rem 0', fontWeight: 800, fontSize: '0.85rem', color: '#b45309' }}>📍 Territory & Route Assignment</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.85rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#78350f' }}>Territory Name:</span>
+                    <strong>{selectedCustomer.territory || 'Unassigned'}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#78350f' }}>Route Zone / ID Prefix:</span>
+                    <strong style={{ fontFamily: 'monospace' }}>{selectedCustomer.routeZone || 'N/A'}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#78350f' }}>Assigned Salesman:</span>
+                    <strong>{selectedCustomer.salesman?.name || 'Auto Assigned'}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#78350f' }}>GPS Coordinates:</span>
+                    <strong style={{ fontSize: '0.75rem' }}>
+                      {selectedCustomer.latitude && selectedCustomer.longitude 
+                        ? `${Number(selectedCustomer.latitude).toFixed(4)}, ${Number(selectedCustomer.longitude).toFixed(4)}`
+                        : 'Not Mapped'}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
               <div className="card" style={{ padding: '1rem', backgroundColor: '#f8fafc' }}>
                 <h4 style={{ margin: '0 0 0.75rem 0', fontWeight: 800, fontSize: '0.85rem', color: '#334155' }}>💳 Credit Profiling & Cycle</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.85rem' }}>
@@ -1529,6 +1561,67 @@ export default function Customers() {
           </motion.div>
         );
 
+      case 'visits':
+        return (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card" style={{ padding: '1rem' }}>
+            <h4 style={{ margin: '0 0 0.75rem 0', fontWeight: 800, fontSize: '0.85rem', color: '#334155' }}>📍 Salesman Check-in Visits</h4>
+            <div className="table-wrap" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+              <table className="data-table" style={{ fontSize: '0.8rem' }}>
+                <thead>
+                  <tr><th>Date</th><th>Salesman</th><th>Check In</th><th>Check Out</th><th>Duration</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  {customerVisitsHistory.map((visit) => (
+                    <tr key={visit.id}>
+                      <td>{new Date(visit.checkInTime).toLocaleDateString()}</td>
+                      <td><strong>{visit.salesman?.name || 'Unassigned'}</strong></td>
+                      <td>{new Date(visit.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                      <td>{visit.checkOutTime ? new Date(visit.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                      <td>{visit.duration ? `${visit.duration} mins` : 'Active'}</td>
+                      <td>
+                        <span className={`badge ${visit.status === 'Visited' ? 'badge-success' : 'badge-warning'}`}>
+                          {visit.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {customerVisitsHistory.length === 0 && (
+                    <tr><td colSpan="6" style={{ textAlign: 'center', color: '#94a3b8' }}>No visit check-ins recorded for this customer.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        );
+
+      case 'reviews':
+        return (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card" style={{ padding: '1rem' }}>
+            <h4 style={{ margin: '0 0 0.75rem 0', fontWeight: 800, fontSize: '0.85rem', color: '#334155' }}>⭐ Customer Survey Reviews</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '250px', overflowY: 'auto' }}>
+              {customerReviewsHistory.map((rev) => (
+                <div key={rev.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 700 }}>
+                    <span>Survey on Invoice {rev.invoice?.invoiceNumber}</span>
+                    <span style={{ color: 'var(--warning)' }}>★ {rev.overallRating || 0}/5</span>
+                  </div>
+                  {rev.status === 'Submitted' ? (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                      <div>Product Quality: {rev.productRating}/5 | Delivery Speed: {rev.deliveryRating}/5 | Salesman: {rev.salesmanRating}/5</div>
+                      <p style={{ margin: '0.25rem 0 0 0', fontStyle: 'italic' }}>"{rev.comment || rev.reviewText || 'No comment'}"</p>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Waiting for submission</div>
+                  )}
+                </div>
+              ))}
+              {customerReviewsHistory.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8', fontSize: '0.8rem' }}>No reviews submitted yet.</div>
+              )}
+            </div>
+          </motion.div>
+        );
+
       case 'special_pricing':
         return (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card" style={{ padding: '1rem' }}>
@@ -1743,7 +1836,25 @@ export default function Customers() {
                       <div className="crm-avatar">{initials}</div>
                       <div className="crm-row-details">
                         <div className="crm-row-title-row">
-                          <span className="crm-row-name">{c.name}</span>
+                          <span className="crm-row-name" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                            {c.name}
+                            {c.customerCode && (
+                              <span style={{
+                                fontSize: '0.6rem',
+                                fontFamily: 'monospace',
+                                backgroundColor: '#fef3c7',
+                                color: '#b45309',
+                                border: '1px solid #fde68a',
+                                padding: '0.05rem 0.2rem',
+                                borderRadius: '3px',
+                                marginLeft: '0.35rem',
+                                fontWeight: 'bold',
+                                textTransform: 'uppercase'
+                              }}>
+                                {c.customerCode}
+                              </span>
+                            )}
+                          </span>
                           <span 
                             title={statusLabel}
                             style={{
@@ -1820,8 +1931,23 @@ export default function Customers() {
                       {selectedCustomer.name ? selectedCustomer.name[0].toUpperCase() : 'C'}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                      <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem' }}>
                         {selectedCustomer.name}
+                        {selectedCustomer.customerCode && (
+                          <span style={{
+                            fontSize: '0.65rem',
+                            fontFamily: 'monospace',
+                            backgroundColor: '#fff7ed',
+                            color: '#c2410c',
+                            border: '1px solid #ffedd5',
+                            padding: '0.05rem 0.25rem',
+                            borderRadius: '4px',
+                            fontWeight: 'bold',
+                            textTransform: 'uppercase'
+                          }}>
+                            {selectedCustomer.customerCode}
+                          </span>
+                        )}
                       </h2>
                       <p style={{ margin: '0.1rem 0 0 0', color: '#64748b', fontSize: '0.75rem', fontWeight: 600 }}>
                         🏢 {selectedCustomer.businessName || 'No Company'}
@@ -1996,6 +2122,8 @@ export default function Customers() {
                     { id: 'ledger', label: '📖 Ledger' },
                     { id: 'outstanding', label: '💳 Outstanding' },
                     { id: 'followup', label: '💬 Follow-up' },
+                    { id: 'visits', label: '📍 Visits' },
+                    { id: 'reviews', label: '⭐ Reviews' },
                     { id: 'special_pricing', label: '🏷️ Price overrides' },
                     { id: 'whatsapp', label: '🔌 WhatsApp' },
                   ].map(t => (
@@ -2246,6 +2374,18 @@ export default function Customers() {
           }
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {form.customerCode ? (
+              <div style={{ backgroundColor: '#fffbeb', padding: '0.65rem', borderRadius: '6px', border: '1px solid #fef3c7', fontSize: '0.8rem' }}>
+                <strong style={{ color: '#b45309', fontFamily: 'monospace', fontSize: '0.9rem' }}>Unique Customer ID: {form.customerCode}</strong>
+                <div style={{ color: '#78350f', marginTop: '0.15rem' }}>
+                  Zone: {form.territory || 'N/A'} ({form.routeZone || 'N/A'}) | Salesman: {form.salesman?.name || 'Field Salesman'}
+                </div>
+              </div>
+            ) : (
+              <div style={{ backgroundColor: '#f0fdf4', padding: '0.65rem', borderRadius: '6px', border: '1px solid #bbf7d0', fontSize: '0.8rem', color: '#166534' }}>
+                ℹ️ Unique Customer ID, Territory, and Salesman will be automatically allocated on save based on address geocoding or selected Territory.
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
               <div className="form-group">
                 <label>Customer Name *</label>
@@ -2259,6 +2399,20 @@ export default function Customers() {
                 <label>Customer Type</label>
                 <select className="form-control" value={form.customerType} onChange={(e) => setForm({ ...form, customerType: e.target.value })}>
                   {customerTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Territory (Auto Detect / Override)</label>
+                <select className="form-control" value={form.territory || ''} onChange={(e) => setForm({ ...form, territory: e.target.value })}>
+                  <option value="">-- Auto-Detect --</option>
+                  <option value="Madurai North">Madurai North</option>
+                  <option value="Madurai South">Madurai South</option>
+                  <option value="Trichy Central">Trichy Central</option>
+                  <option value="Chennai Central">Chennai Central</option>
+                  <option value="Coimbatore East">Coimbatore East</option>
+                  <option value="Kumbakonam Central">Kumbakonam Central</option>
+                  <option value="Perambalur Central">Perambalur Central</option>
+                  <option value="Thirunelveli Central">Thirunelveli Central</option>
                 </select>
               </div>
               <div className="form-group">

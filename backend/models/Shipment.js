@@ -79,12 +79,45 @@ const Shipment = sequelize.define('Shipment', {
     type: DataTypes.TEXT,
     allowNull: true,
   },
+  deliveryStaffId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  vehicleNumber: {
+    type: DataTypes.STRING,
+    defaultValue: '',
+  },
+  deliveryRoute: {
+    type: DataTypes.STRING,
+    defaultValue: '',
+  },
+  deliveryLatitude: {
+    type: DataTypes.DECIMAL(10, 8),
+    allowNull: true,
+  },
+  deliveryLongitude: {
+    type: DataTypes.DECIMAL(11, 8),
+    allowNull: true,
+  },
+  deliveryCommitment: {
+    type: DataTypes.ENUM('Same Day', 'Next Day'),
+    defaultValue: 'Same Day',
+  },
+  expectedArrivalTime: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  deliverySequence: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
 });
 
 // Associations
 Shipment.belongsTo(Invoice, { as: 'invoice', foreignKey: 'invoiceId', onDelete: 'CASCADE' });
 Invoice.hasMany(Shipment, { as: 'shipments', foreignKey: 'invoiceId', onDelete: 'CASCADE' });
 Shipment.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById' });
+Shipment.belongsTo(User, { as: 'deliveryStaff', foreignKey: 'deliveryStaffId' });
 
 // We define Courier relation inline to prevent circular references during module initialization
 const Courier = require('./Courier');
@@ -95,6 +128,7 @@ makeMongooseCompatible(Shipment, {
   invoice: 'invoiceId',
   createdBy: 'createdById',
   courierInfo: 'courierId',
+  deliveryStaff: 'deliveryStaffId',
 });
 
 const pushWooShipmentDetails = async (shipment) => {

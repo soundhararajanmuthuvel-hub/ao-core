@@ -762,6 +762,22 @@ export default function Sales() {
                     onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
                   >
                     {s.customer?.name || 'Walk-in Customer'}
+                    {s.customer?.customerCode && (
+                      <span style={{
+                        fontSize: '0.65rem',
+                        fontFamily: 'monospace',
+                        backgroundColor: '#fef3c7',
+                        color: '#b45309',
+                        border: '1px solid #fde68a',
+                        padding: '1px 4px',
+                        borderRadius: '3px',
+                        marginLeft: '0.35rem',
+                        fontWeight: 'bold',
+                        textTransform: 'uppercase'
+                      }}>
+                        {s.customer.customerCode}
+                      </span>
+                    )}
                   </span>
                   <span className={`status-badge-custom ${statusClass}`}>
                     {displayStatus}
@@ -894,7 +910,10 @@ export default function Sales() {
             <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: 0, fontWeight: 900, fontSize: '1.2rem', color: 'var(--text-primary)' }}>👥 Customer 360° Profile</h3>
-                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{selectedCustomer.name} ({selectedCustomer.customerType})</span>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.15rem' }}>
+                  {selectedCustomer.customerCode && <strong style={{ fontFamily: 'monospace', color: '#b45309', backgroundColor: '#fef3c7', padding: '0.05rem 0.2rem', borderRadius: '3px' }}>{selectedCustomer.customerCode}</strong>}
+                  <span>{selectedCustomer.name} ({selectedCustomer.customerType})</span>
+                </span>
               </div>
               <button 
                 type="button" 

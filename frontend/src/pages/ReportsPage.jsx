@@ -309,7 +309,7 @@ export default function ReportsPage() {
           rows: gstReportRows.map(r => [
             r.invoiceNumber,
             formatReportDate(r.date),
-            r.customerName,
+            r.customerCode ? `${r.customerName} (${r.customerCode})` : r.customerName,
             r.customerGstNumber || '—',
             formatCurrency(r.taxableAmount),
             formatCurrency(r.cgstAmount),
@@ -337,7 +337,7 @@ export default function ReportsPage() {
           rows: gstReportRows.map(r => [
             r.invoiceNumber,
             formatReportDate(r.date),
-            r.customerName,
+            r.customerCode ? `${r.customerName} (${r.customerCode})` : r.customerName,
             r.customerGstNumber,
             formatCurrency(r.taxableAmount),
             formatCurrency(r.cgstAmount),
@@ -363,7 +363,7 @@ export default function ReportsPage() {
           rows: gstReportRows.map(r => [
             r.invoiceNumber,
             formatReportDate(r.date),
-            r.customerName,
+            r.customerCode ? `${r.customerName} (${r.customerCode})` : r.customerName,
             formatCurrency(r.taxableAmount),
             formatCurrency(r.cgstAmount),
             formatCurrency(r.sgstAmount),
@@ -413,7 +413,7 @@ export default function ReportsPage() {
           rows: gstReportRows.map(r => [
             r.invoiceNumber,
             formatReportDate(r.date),
-            r.customerName,
+            r.customerCode ? `${r.customerName} (${r.customerCode})` : r.customerName,
             r.customerGstNumber || '—',
             formatCurrency(r.taxableAmount),
             formatCurrency(r.cgstAmount),
@@ -861,7 +861,27 @@ export default function ReportsPage() {
                         ) : shippingCostsData?.rows?.map((row, idx) => (
                           <tr key={idx}>
                             <td>{row.invoiceNumber}</td>
-                            <td>{row.customerName}</td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <span>{row.customerName}</span>
+                                {row.customerCode && (
+                                  <span style={{
+                                    fontSize: '0.65rem',
+                                    fontFamily: 'monospace',
+                                    backgroundColor: '#fef3c7',
+                                    color: '#b45309',
+                                    border: '1px solid #fde68a',
+                                    padding: '1px 4px',
+                                    borderRadius: '3px',
+                                    marginLeft: '0.35rem',
+                                    fontWeight: 'bold',
+                                    textTransform: 'uppercase'
+                                  }}>
+                                    {row.customerCode}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
                             <td>{row.date}</td>
                             <td style={{ fontWeight: 600, color: '#3b82f6' }}>₹{Number(row.shippingChargeCollected).toFixed(2)}</td>
                             <td>₹{Number(row.packingCost).toFixed(2)}</td>
@@ -1075,7 +1095,27 @@ export default function ReportsPage() {
                             <tr key={r.id}>
                               <td>{r.invoiceNumber}</td>
                               <td>{formatReportDate(r.date)}</td>
-                              <td>{r.customerName}</td>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                  <span>{r.customerName}</span>
+                                  {r.customerCode && (
+                                    <span style={{
+                                      fontSize: '0.65rem',
+                                      fontFamily: 'monospace',
+                                      backgroundColor: '#fef3c7',
+                                      color: '#b45309',
+                                      border: '1px solid #fde68a',
+                                      padding: '1px 4px',
+                                      borderRadius: '3px',
+                                      marginLeft: '0.35rem',
+                                      fontWeight: 'bold',
+                                      textTransform: 'uppercase'
+                                    }}>
+                                      {r.customerCode}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
                               <td style={{ fontFamily: 'monospace' }}>{r.customerGstNumber || '—'}</td>
                               <td style={{ textAlign: 'right' }}>{formatCurrency(r.taxableAmount)}</td>
                               <td style={{ textAlign: 'right' }}>{formatCurrency(r.cgstAmount)}</td>
@@ -1120,7 +1160,27 @@ export default function ReportsPage() {
                             <tr key={r.id}>
                               <td>{r.invoiceNumber}</td>
                               <td>{formatReportDate(r.date)}</td>
-                              <td>{r.customerName}</td>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                  <span>{r.customerName}</span>
+                                  {r.customerCode && (
+                                    <span style={{
+                                      fontSize: '0.65rem',
+                                      fontFamily: 'monospace',
+                                      backgroundColor: '#fef3c7',
+                                      color: '#b45309',
+                                      border: '1px solid #fde68a',
+                                      padding: '1px 4px',
+                                      borderRadius: '3px',
+                                      marginLeft: '0.35rem',
+                                      fontWeight: 'bold',
+                                      textTransform: 'uppercase'
+                                    }}>
+                                      {r.customerCode}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
                               <td style={{ fontFamily: 'monospace' }}>{r.customerGstNumber}</td>
                               <td style={{ textAlign: 'right' }}>{formatCurrency(r.taxableAmount)}</td>
                               <td style={{ textAlign: 'right' }}>{formatCurrency(r.cgstAmount)}</td>
@@ -1163,7 +1223,27 @@ export default function ReportsPage() {
                             <tr key={r.id}>
                               <td>{r.invoiceNumber}</td>
                               <td>{formatReportDate(r.date)}</td>
-                              <td>{r.customerName}</td>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                  <span>{r.customerName}</span>
+                                  {r.customerCode && (
+                                    <span style={{
+                                      fontSize: '0.65rem',
+                                      fontFamily: 'monospace',
+                                      backgroundColor: '#fef3c7',
+                                      color: '#b45309',
+                                      border: '1px solid #fde68a',
+                                      padding: '1px 4px',
+                                      borderRadius: '3px',
+                                      marginLeft: '0.35rem',
+                                      fontWeight: 'bold',
+                                      textTransform: 'uppercase'
+                                    }}>
+                                      {r.customerCode}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
                               <td style={{ textAlign: 'right' }}>{formatCurrency(r.taxableAmount)}</td>
                               <td style={{ textAlign: 'right' }}>{formatCurrency(r.cgstAmount)}</td>
                               <td style={{ textAlign: 'right' }}>{formatCurrency(r.sgstAmount)}</td>
@@ -1254,7 +1334,27 @@ export default function ReportsPage() {
                             <tr key={r.id}>
                               <td>{r.invoiceNumber}</td>
                               <td>{formatReportDate(r.date)}</td>
-                              <td>{r.customerName}</td>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                  <span>{r.customerName}</span>
+                                  {r.customerCode && (
+                                    <span style={{
+                                      fontSize: '0.65rem',
+                                      fontFamily: 'monospace',
+                                      backgroundColor: '#fef3c7',
+                                      color: '#b45309',
+                                      border: '1px solid #fde68a',
+                                      padding: '1px 4px',
+                                      borderRadius: '3px',
+                                      marginLeft: '0.35rem',
+                                      fontWeight: 'bold',
+                                      textTransform: 'uppercase'
+                                    }}>
+                                      {r.customerCode}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
                               <td style={{ fontFamily: 'monospace' }}>{r.customerGstNumber || '—'}</td>
                               <td style={{ textAlign: 'right' }}>{formatCurrency(r.taxableAmount)}</td>
                               <td style={{ textAlign: 'right' }}>{formatCurrency(r.cgstAmount)}</td>

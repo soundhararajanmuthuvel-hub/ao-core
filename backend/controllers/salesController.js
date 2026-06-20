@@ -27,7 +27,7 @@ exports.getSales = async (req, res, next) => {
         status: { [Op.ne]: 'Cancelled' },
         dueDate: { [Op.lt]: today }
       },
-      include: [{ model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'email'] }]
+      include: [{ model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'email', 'customerCode'] }]
     });
 
     const Notification = require('../models/Notification');
@@ -66,7 +66,7 @@ exports.getSales = async (req, res, next) => {
     }
 
     const include = [
-      { model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'email', 'gstNumber', 'balance', 'creditLimit', 'paymentTerms', 'paymentCycle', 'creditDays', 'businessName', 'customerType', 'address', 'state', 'pincode'] },
+      { model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'email', 'gstNumber', 'balance', 'creditLimit', 'paymentTerms', 'paymentCycle', 'creditDays', 'businessName', 'customerType', 'address', 'state', 'pincode', 'customerCode'] },
       { model: User, as: 'createdBy', attributes: ['name'] },
       { model: Shipment, as: 'shipments', attributes: ['id', 'shipmentNumber', 'status', 'trackingNumber'] }
     ];
@@ -160,9 +160,26 @@ exports.createSale = async (req, res, next) => {
       const stockAvailable = Number(product.stock || 0);
       const requestedQty = Number(item.qty);
 
+      // Tier pricing extraction
+      let tierPrice = product.sellingPrice;
+      if (customerRecord.tier === 'GREEN' && Number(product.greenPrice) > 0) {
+        tierPrice = product.greenPrice;
+      } else if (customerRecord.tier === 'YELLOW' && Number(product.yellowPrice) > 0) {
+        tierPrice = product.yellowPrice;
+      } else if (customerRecord.tier === 'RED' && Number(product.redPrice) > 0) {
+        tierPrice = product.redPrice;
+      }
+
       // Customer Special Pricing / Discount / Scheme Override
       const productOverride = specialPricing[product.id] || specialPricing[product.sku] || null;
-      let basePrice = Number(item.unitPrice);
+      let basePrice = Number(tierPrice);
+
+      if (req.user.role === 'Salesman' || req.user.role === 'Sales Executive') {
+        basePrice = Number(tierPrice); // Salesman cannot edit prices
+      } else if (item.unitPrice !== undefined) {
+        basePrice = Number(item.unitPrice);
+      }
+
       let itemDiscountPercent = Number(item.discountPercent || 0);
       let schemeApplied = item.schemeApplied || 'None';
 
@@ -308,26 +325,42 @@ exports.createSale = async (req, res, next) => {
     }
 
     const totals = calcInvoiceTotals(enrichedItems, discount, gstBillingMode, charges);
+
+    // Minimum Order Validation
+    const minGreen = Number(settings.minOrderGreen !== undefined ? settings.minOrderGreen : 10000.00);
+    const minYellow = Number(settings.minOrderYellow !== undefined ? settings.minOrderYellow : 5000.00);
+    const minRed = Number(settings.minOrderRed !== undefined ? settings.minOrderRed : 2000.00);
+    let requiredMin = minRed;
+    if (customerRecord.tier === 'GREEN') requiredMin = minGreen;
+    else if (customerRecord.tier === 'YELLOW') requiredMin = minYellow;
+
+    if (totals.grandTotal < requiredMin) {
+      if (req.user.role !== 'Super Admin' && req.user.role !== 'admin') {
+        throw new Error(`Invoice grand total (₹${totals.grandTotal.toFixed(2)}) is below the minimum required amount (₹${requiredMin.toFixed(2)}) for ${customerRecord.tier || 'RED'} Tier customers. Submission blocked.`);
+      }
+    }
+
     const invoiceNumber = await getNextInvoiceNumber({ transaction: t });
 
     const hasPendingItems = enrichedItems.some(item => item.pendingQty > 0);
     const resolvedStatus = hasPendingItems ? 'Waiting For Stock' : (req.body.status || 'Confirmed');
 
+    // Same-Day Delivery Cutoff Logic
+    const cutoffHour = settings.sameDayCutoffHour !== undefined ? settings.sameDayCutoffHour : 13;
+    const currentHour = new Date().getHours();
+    const resolvedCommitment = currentHour < cutoffHour ? 'Same Day' : 'Next Day';
+
     let expectedDispatchDate = req.body.expectedDispatchDate;
-    let commitment = req.body.commitment;
-    if (resolvedStatus === 'Waiting For Stock') {
-      const orderDate = date ? new Date(date) : new Date();
-      if (!expectedDispatchDate) {
-        const d = new Date(orderDate);
-        d.setDate(d.getDate() + 3);
-        expectedDispatchDate = d;
+    let commitment = req.body.commitment || (resolvedStatus === 'Waiting For Stock' ? 'Within 3 Days' : resolvedCommitment);
+
+    if (!expectedDispatchDate) {
+      const baseDate = date ? new Date(date) : new Date();
+      if (resolvedStatus === 'Waiting For Stock') {
+        baseDate.setDate(baseDate.getDate() + 3);
+      } else if (commitment === 'Next Day') {
+        baseDate.setDate(baseDate.getDate() + 1);
       }
-      if (!commitment) {
-        commitment = 'Within 3 Days';
-      }
-    } else {
-      expectedDispatchDate = req.body.expectedDispatchDate || null;
-      commitment = req.body.commitment || null;
+      expectedDispatchDate = baseDate;
     }
 
     // Auto-calculate dueDate based on paymentTerms
@@ -437,7 +470,7 @@ exports.createSale = async (req, res, next) => {
     
     const populated = await Invoice.findByPk(sale.id, {
       include: [
-        { model: Customer, as: 'customer', attributes: ['name', 'phone', 'email'] },
+        { model: Customer, as: 'customer', attributes: ['name', 'phone', 'email', 'customerCode'] },
       ],
     });
     res.status(201).json({ sale: populated });
@@ -549,14 +582,14 @@ exports.getOutstandingInvoices = async (req, res, next) => {
       grandTotal: { [Op.gt]: sequelize.col('amountPaid') }
     };
 
-    if (req.query.customerId) {
+    if (req.query?.customerId) {
       query.customerId = req.query.customerId;
     }
 
     const outstanding = await Invoice.findAll({
       where: query,
       include: [
-        { model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'email', 'paymentTerms'] }
+        { model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'email', 'paymentTerms', 'customerCode'] }
       ],
       order: [['date', 'ASC']]
     });
@@ -779,7 +812,7 @@ exports.getPayments = async (req, res, next) => {
     const payments = await Payment.findAll({
       where: query,
       include: [
-        { model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'email', 'customerType'] }
+        { model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'email', 'customerType', 'customerCode'] }
       ],
       order: [['date', 'DESC']]
     });
@@ -1376,7 +1409,7 @@ exports.updateSale = async (req, res, next) => {
 
     const populated = await Invoice.findByPk(sale.id, {
       include: [
-        { model: Customer, as: 'customer', attributes: ['name', 'phone', 'email'] },
+        { model: Customer, as: 'customer', attributes: ['name', 'phone', 'email', 'customerCode'] },
         { model: InvoiceItem, as: 'items', include: [{ model: Product, as: 'product' }] }
       ],
     });

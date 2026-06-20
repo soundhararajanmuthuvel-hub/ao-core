@@ -33,20 +33,33 @@ exports.createOrder = async (req, res, next) => {
       return res.status(400).json({ message: 'At least one product item is required' });
     }
 
+    // Load settings and customer details for validations
+    const settings = await getSettings();
+    let customerRecord = null;
+    if (customerId) {
+      customerRecord = await Customer.findByPk(customerId);
+    }
+    const customerTier = customerRecord?.tier || 'RED';
+
+    // Calculate delivery commitment and cutoff
+    const cutoffHour = settings.sameDayCutoffHour !== undefined ? settings.sameDayCutoffHour : 13;
+    const currentHour = new Date().getHours();
+    const commitment = currentHour < cutoffHour ? 'Same Day' : 'Next Day';
+    
     const resolvedOrderDate = orderDate ? new Date(orderDate) : new Date();
     let resolvedExpectedDispatchDate = expectedDispatchDate ? new Date(expectedDispatchDate) : null;
     if (!resolvedExpectedDispatchDate) {
       resolvedExpectedDispatchDate = new Date(resolvedOrderDate);
-      resolvedExpectedDispatchDate.setDate(resolvedExpectedDispatchDate.getDate() + 3);
+      if (commitment === 'Next Day') {
+        resolvedExpectedDispatchDate.setDate(resolvedExpectedDispatchDate.getDate() + 1);
+      }
     }
 
-    // Load settings to fetch default logistics charge if not provided
-    const settings = await getSettings();
     const resolvedLogisticsCharge = logisticsCharge !== undefined && logisticsCharge !== null 
       ? Number(logisticsCharge) 
       : Number(settings.logisticsCharge || 16.00);
 
-    // Compute initial totalAmount based on current product prices (Prepared stage just saves values)
+    // Compute initial totalAmount based on current product prices (using Tier Pricing)
     let totalAmount = resolvedLogisticsCharge;
     const orderItems = [];
     for (const item of items) {
@@ -54,11 +67,29 @@ exports.createOrder = async (req, res, next) => {
       if (!product) {
         return res.status(404).json({ message: `Product not found with ID: ${item.productId}` });
       }
-      
+
+      // Tier pricing extraction
+      let resolvedPrice = product.sellingPrice;
+      if (customerTier === 'GREEN' && Number(product.greenPrice) > 0) {
+        resolvedPrice = product.greenPrice;
+      } else if (customerTier === 'YELLOW' && Number(product.yellowPrice) > 0) {
+        resolvedPrice = product.yellowPrice;
+      } else if (customerTier === 'RED' && Number(product.redPrice) > 0) {
+        resolvedPrice = product.redPrice;
+      }
+
       const qty = Number(item.qty || 1);
-      const unitPrice = item.unitPrice !== undefined ? Number(item.unitPrice) : Number(product.sellingPrice);
+      let unitPrice = Number(resolvedPrice);
+
+      // Verify salesman role price edits blockage
+      if (req.user.role === 'Salesman' || req.user.role === 'Sales Executive') {
+        unitPrice = Number(resolvedPrice); // Salesman cannot edit prices
+      } else if (item.unitPrice !== undefined) {
+        unitPrice = Number(item.unitPrice);
+      }
+
       const gstPercent = Number(product.gstPercent || 0);
-      const lineTotal = qty * unitPrice; // exclusive default, or simple raw line total
+      const lineTotal = qty * unitPrice;
       
       totalAmount += lineTotal;
       orderItems.push({
@@ -69,6 +100,22 @@ exports.createOrder = async (req, res, next) => {
         gstPercent,
         lineTotal
       });
+    }
+
+    // Minimum Order Validation
+    const minGreen = Number(settings.minOrderGreen !== undefined ? settings.minOrderGreen : 10000.00);
+    const minYellow = Number(settings.minOrderYellow !== undefined ? settings.minOrderYellow : 5000.00);
+    const minRed = Number(settings.minOrderRed !== undefined ? settings.minOrderRed : 2000.00);
+    let requiredMin = minRed;
+    if (customerTier === 'GREEN') requiredMin = minGreen;
+    else if (customerTier === 'YELLOW') requiredMin = minYellow;
+
+    if (totalAmount < requiredMin) {
+      if (req.user.role !== 'Super Admin' && req.user.role !== 'admin' && req.user.role !== 'admin') {
+        return res.status(400).json({
+          message: `Order amount (₹${totalAmount.toFixed(2)}) is below the minimum required amount (₹${requiredMin.toFixed(2)}) for ${customerTier} Tier customers. Submission blocked.`
+        });
+      }
     }
 
     const orderNumber = await getNextOrderNumber();
@@ -87,7 +134,7 @@ exports.createOrder = async (req, res, next) => {
       totalAmount: Number(totalAmount.toFixed(2)),
       items: orderItems,
       source: req.body.source || 'ERP_Manual',
-      aiMetadata: req.body.aiMetadata || null
+      aiMetadata: req.body.aiMetadata || { commitment }
     });
 
     await logActivity(req.user.id, 'create', 'orders', `Noted order ${orderNumber} for ${customerName}`);
@@ -124,7 +171,7 @@ exports.listOrders = async (req, res, next) => {
     const { count: total, rows: orders } = await Order.findAndCountAll({
       where: query,
       include: [
-        { model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'customerType', 'paymentTerms', 'balance', 'paymentCycle', 'invoiceOutstandingCount', 'lastPaymentDate', 'averagePaymentDays'] },
+        { model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'customerType', 'paymentTerms', 'balance', 'paymentCycle', 'invoiceOutstandingCount', 'lastPaymentDate', 'averagePaymentDays', 'customerCode'] },
         { model: Invoice, as: 'invoice', attributes: ['id', 'invoiceNumber', 'grandTotal', 'status'] },
         { model: Shipment, as: 'shipment', attributes: ['id', 'shipmentNumber', 'status', 'trackingNumber', 'courier'] }
       ],

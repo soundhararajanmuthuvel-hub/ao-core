@@ -136,9 +136,11 @@ export const reportsApi = {
 };
 
 export const notificationsApi = {
-  list: () => client.get('/notifications'),
-  markRead: (id) => client.patch(`/notifications/${id}/read`),
+  list: (params) => client.get('/notifications', { params }),
+  markRead: (id, isRead = true) => client.patch(`/notifications/${id}/read`, { isRead }),
   markAllRead: () => client.patch('/notifications/read-all'),
+  remove: (id) => client.delete(`/notifications/${id}`),
+  clearAll: () => client.delete('/notifications'),
 };
 
 export const activityApi = {
@@ -246,6 +248,46 @@ export const migrationApi = {
   exportUrl: () => `${client.defaults.baseURL}/migration/export`,
   exportBackup: () => client.get('/migration/export', { responseType: 'blob' }),
   restore: (formData) => client.post('/migration/restore', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+};
+
+export const sfaApi = {
+  getRoutes: (params) => client.get('/sfa/routes', { params }),
+  createRoute: (data) => client.post('/sfa/routes', data),
+  updateRoute: (id, data) => client.put(`/sfa/routes/${id}`, data),
+  optimizeRoute: (data) => client.post('/sfa/routes/optimize', data),
+  checkIn: (data) => client.post('/sfa/visits/check-in', data),
+  checkOut: (data) => client.post('/sfa/visits/check-out', data),
+  getVisits: (params) => client.get('/sfa/visits', { params }),
+  pingLocation: (data) => client.post('/sfa/tracking/ping', data),
+  getLiveTracking: () => client.get('/sfa/tracking/live'),
+  getTrackingHistory: (salesmanId, date) => client.get(`/sfa/tracking/history/${salesmanId}/${date}`),
+  getReviewDetails: (token) => client.get(`/sfa/reviews/portal/${token}`),
+  submitReview: (token, data) => client.post(`/sfa/reviews/portal/${token}`, data),
+  getAnalytics: (params) => client.get('/sfa/analytics', { params }),
+};
+
+export const crmApi = {
+  getDashboard: () => client.get('/crm/dashboard'),
+  getLeads: (params) => client.get('/crm/leads', { params }),
+  getLead: (id) => client.get(`/crm/leads/${id}`),
+  createLead: (data) => client.post('/crm/leads', data),
+  updateLead: (id, data) => client.put(`/crm/leads/${id}`, data),
+  deleteLead: (id) => client.delete(`/crm/leads/${id}`),
+  findLeads: (params) => client.get('/crm/lead-finder', { params }),
+  convertLead: (id, data) => client.post(`/crm/leads/${id}/convert`, data),
+  
+  getOpportunities: (params) => client.get('/crm/opportunities', { params }),
+  createOpportunity: (data) => client.post('/crm/opportunities', data),
+  updateOpportunity: (id, data) => client.put(`/crm/opportunities/${id}`, data),
+  deleteOpportunity: (id) => client.delete(`/crm/opportunities/${id}`),
+  
+  getFollowUps: (params) => client.get('/crm/followups', { params }),
+  createFollowUp: (data) => client.post('/crm/followups', data),
+  updateFollowUp: (id, data) => client.put(`/crm/followups/${id}`, data),
+  deleteFollowUp: (id) => client.delete(`/crm/followups/${id}`),
+
+  getReviews: (params) => client.get('/crm/reviews', { params }),
+  sendReviewLink: (data) => client.post('/crm/reviews/send', data),
 };
 
 

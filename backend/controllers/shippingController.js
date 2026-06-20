@@ -255,7 +255,7 @@ exports.getShipments = async (req, res, next) => {
         {
           model: Invoice,
           as: 'invoice',
-          include: [{ model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'email', 'address'] }],
+          include: [{ model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'email', 'address', 'customerCode'] }],
         },
         { model: User, as: 'createdBy', attributes: ['name'] },
         { model: Courier, as: 'courierInfo', attributes: ['name', 'phone', 'website', 'trackingUrlFormat'] },
@@ -706,7 +706,7 @@ exports.getPublicShipmentStatus = async (req, res, next) => {
           model: Invoice,
           as: 'invoice',
           include: [
-            { model: Customer, as: 'customer', attributes: ['name', 'phone', 'email'] },
+            { model: Customer, as: 'customer', attributes: ['name', 'phone', 'email', 'customerCode'] },
             {
               model: InvoiceItem,
               as: 'items',

@@ -43,7 +43,10 @@ exports.getCustomers = async (req, res, next) => {
 
 exports.getCustomer = async (req, res, next) => {
   try {
-    const customer = await Customer.findByPk(req.params.id);
+    const User = require('../models/User');
+    const customer = await Customer.findByPk(req.params.id, {
+      include: [{ model: User, as: 'salesman', attributes: ['id', 'name'] }]
+    });
     if (!customer) return res.status(404).json({ message: 'Customer not found' });
     res.json({ customer });
   } catch (err) {

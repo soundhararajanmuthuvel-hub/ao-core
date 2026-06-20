@@ -564,6 +564,32 @@ export default function SettingsPage() {
             </div>
 
             <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem', marginTop: '1.25rem' }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '1rem', color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📍 SFA & CRM Beat Configurations</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label>GPS Check-In Radius Limit (meters)</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={form.checkInRadius ?? 100}
+                    onChange={(e) => setForm({ ...form, checkInRadius: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Same-Day Order Cutoff Hour (24h format)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="23"
+                    className="form-control"
+                    value={form.sameDayCutoffHour ?? 13}
+                    onChange={(e) => setForm({ ...form, sameDayCutoffHour: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem', marginTop: '1.25rem' }}>
               <button type="button" className="btn btn-primary" onClick={saveSettings}>Save Billing Rules</button>
             </div>
           </div>

@@ -526,23 +526,23 @@ export default function AppLayout() {
       <nav className="mobile-bottom-nav">
         <NavLink to="/" end className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
           <span className="bottom-nav-icon">🏠</span>
-          <span>Home</span>
+          <span>Dashboard</span>
         </NavLink>
-        <NavLink to="/inventory" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-          <span className="bottom-nav-icon">📦</span>
-          <span>Inventory</span>
-        </NavLink>
-        <NavLink to="/sales" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-          <span className="bottom-nav-icon">🧾</span>
-          <span>Sales</span>
-        </NavLink>
-        <NavLink to="/customers" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+        <NavLink to="/crm" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
           <span className="bottom-nav-icon">👥</span>
-          <span>Customers</span>
+          <span>CRM</span>
         </NavLink>
-        <NavLink to="/settings" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-          <span className="bottom-nav-icon">⚙️</span>
-          <span>Settings</span>
+        <NavLink to="/customer-visits" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <span className="bottom-nav-icon">📍</span>
+          <span>Visits</span>
+        </NavLink>
+        <NavLink to="/field-ordering" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <span className="bottom-nav-icon">🛒</span>
+          <span>Orders</span>
+        </NavLink>
+        <NavLink to="/delivery-tracking" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <span className="bottom-nav-icon">🚚</span>
+          <span>Delivery</span>
         </NavLink>
       </nav>
 
