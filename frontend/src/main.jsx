@@ -6,6 +6,7 @@ import { AuthProvider } from './context/AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
+import { PWAProvider } from './context/PWAContext';
 import './styles/variables.css';
 import './styles/global.css';
 import './styles/layout.css';
@@ -51,7 +52,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <ThemeProvider>
           <AuthProvider>
             <ToastProvider>
-              <App />
+              <PWAProvider>
+                <App />
+              </PWAProvider>
             </ToastProvider>
           </AuthProvider>
         </ThemeProvider>

@@ -7,6 +7,7 @@ import { useSettings } from '../context/SettingsContext';
 import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 import { motion, AnimatePresence } from 'framer-motion';
 import UserTour from '../components/UserTour';
+import { usePWA } from '../context/PWAContext';
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -18,6 +19,7 @@ export default function AppLayout() {
   const location = useLocation();
 
   const { settings } = useSettings();
+  const { isInstallable, isInstalled, installApp } = usePWA();
   const [showLaunch, setShowLaunch] = useState(false);
   const [launchProgress, setLaunchProgress] = useState(0);
   const [launchMessage, setLaunchMessage] = useState('Initializing AO Core...');
@@ -542,6 +544,51 @@ export default function AppLayout() {
           ➕
         </button>
       </div>
+
+      {isInstallable && !isInstalled && (
+        <div className="pwa-mobile-chip-container" style={{
+          position: 'fixed',
+          bottom: '76px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 9999,
+          width: 'auto',
+          display: 'flex',
+          justifyContent: 'center'
+        }}>
+          <button
+            type="button"
+            onClick={installApp}
+            style={{
+              backgroundColor: 'rgba(90, 45, 12, 0.95)',
+              color: '#ffffff',
+              border: '1px solid rgba(255, 255, 255, 0.25)',
+              backdropFilter: 'blur(12px)',
+              padding: '0.65rem 1.25rem',
+              borderRadius: '30px',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              boxShadow: '0 10px 20px rgba(90, 45, 12, 0.2), 0 4px 6px rgba(0, 0, 0, 0.1)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+              whiteSpace: 'nowrap'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#401e07';
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(90, 45, 12, 0.95)';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            📲 Install App
+          </button>
+        </div>
+      )}
 
       <nav className="mobile-bottom-nav">
         <NavLink to="/" end className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>

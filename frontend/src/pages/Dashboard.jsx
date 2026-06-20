@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { analyticsApi, productsApi, manufacturingApi, rawMaterialsApi, salesApi, customersApi, inventoryApi, shippingApi, integrationsApi, sfaApi } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { usePWA } from '../context/PWAContext';
 import { resolveAssetUrl } from '../utils/url';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { motion } from 'framer-motion';
@@ -173,6 +174,7 @@ function AiSuggestionsWidget() {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { isInstallable, isInstalled, installApp } = usePWA();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -377,6 +379,76 @@ export default function Dashboard() {
 
         {/* AI Suggestions Widget */}
         <AiSuggestionsWidget />
+
+        {/* PWA Install Promo Card */}
+        {isInstallable && !isInstalled && (
+          <div className="card pwa-install-promo-card" style={{
+            background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(245, 158, 11, 0.04))',
+            border: '1px solid rgba(37, 99, 235, 0.2)',
+            borderRadius: '12px',
+            padding: '1.5rem',
+            marginBottom: '1.5rem',
+            boxShadow: 'var(--shadow)',
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1.5rem',
+            flexWrap: 'wrap',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1 1 300px' }}>
+              <span style={{ fontSize: '3rem' }}>📲</span>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 0.5rem 0' }}>
+                  Install AO ERP
+                </h3>
+                <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  Install AO ERP for:
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem' }}>
+                  {[
+                    '✓ Offline Usage',
+                    '✓ Faster Loading',
+                    '✓ Mobile Experience',
+                    '✓ Push Notifications'
+                  ].map((benefit, idx) => (
+                    <div key={idx} style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: '700' }}>
+                      {benefit}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div style={{ flexShrink: 0 }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={installApp}
+                style={{
+                  backgroundColor: '#5a2d0c',
+                  borderColor: '#5a2d0c',
+                  color: '#fff',
+                  fontWeight: 700,
+                  padding: '0.6rem 1.5rem',
+                  borderRadius: '10px',
+                  boxShadow: '0 4px 6px rgba(90, 45, 12, 0.15)',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#401e07';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#5a2d0c';
+                }}
+              >
+                Install Now
+              </button>
+            </div>
+          </div>
+        )}
             {outstandingValue > 50000 && (
               <div className="card" style={{ borderLeft: '6px solid #ef4444', backgroundColor: '#fef2f2', padding: '1.25rem', borderRadius: '10px', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>

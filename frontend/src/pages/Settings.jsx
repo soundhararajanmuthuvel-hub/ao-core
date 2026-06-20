@@ -9,6 +9,7 @@ import Pagination from '../components/Pagination';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { usePWA } from '../context/PWAContext';
 
 const emptyUser = { name: '', email: '', password: '', role: 'Super Admin', isActive: true };
 
@@ -31,6 +32,7 @@ export default function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState(tabParam || 'profile');
+  const { isInstallable, isInstalled, installApp } = usePWA();
 
   // Database Management states
   const [dbModalOpen, setDbModalOpen] = useState(false);
@@ -592,6 +594,20 @@ export default function SettingsPage() {
             ⚙️ Database Management
           </button>
         )}
+        <button
+          type="button"
+          className={`rm-tab-btn ${activeTab === 'pwa_install' ? 'active' : ''}`}
+          onClick={() => handleTabChange('pwa_install')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            fontWeight: 600,
+            fontSize: '0.9rem',
+            borderBottom: activeTab === 'pwa_install' ? '3px solid #ff9800' : '3px solid transparent',
+            color: activeTab === 'pwa_install' ? '#ff9800' : '#64748b',
+          }}
+        >
+          📲 App Installation
+        </button>
         <button
           type="button"
           className={`rm-tab-btn ${activeTab === 'help' ? 'active' : ''}`}
@@ -1532,6 +1548,108 @@ export default function SettingsPage() {
         {/* Data Migration Tab */}
         {activeTab === 'migration' && (
           <MigrationCenter />
+        )}
+
+        {/* PWA App Installation Tab */}
+        {activeTab === 'pwa_install' && (
+          <div className="card" style={{ maxWidth: 650, padding: '2rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: 'var(--shadow)', boxSizing: 'border-box' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
+              <span style={{ fontSize: '2.5rem' }}>📲</span>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#5a2d0c' }}>App Installation</h3>
+                <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>Configure and track Progressive Web App (PWA) status.</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* Glassmorphic Diagnostics Status Block */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.6), rgba(241, 245, 249, 0.4))',
+                border: '1px solid rgba(226, 232, 240, 0.8)',
+                borderRadius: '12px',
+                padding: '1.25rem',
+                backdropFilter: 'blur(8px)',
+                boxShadow: 'var(--shadow-sm)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#475569' }}>PWA Status:</span>
+                  <span style={{
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    padding: '0.25rem 0.6rem',
+                    borderRadius: '6px',
+                    backgroundColor: isInstalled ? '#dcfce7' : '#fee2e2',
+                    color: isInstalled ? '#16a34a' : '#dc2626'
+                  }}>
+                    {isInstalled ? 'Installed ✅' : 'Not Installed ❌'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#475569' }}>App Version:</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>
+                    1.2.0 (PWA-Enabled)
+                  </span>
+                </div>
+
+                {isInstallable && !isInstalled && (
+                  <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={installApp}
+                      style={{
+                        backgroundColor: '#5a2d0c',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '0.6rem 1.5rem',
+                        fontWeight: 700,
+                        fontSize: '0.9rem',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 6px rgba(90, 45, 12, 0.15)',
+                        transition: 'background-color 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#401e07';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#5a2d0c';
+                      }}
+                    >
+                      Install AO ERP App
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Advantages List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
+                  PWA Key Advantages & Capabilities:
+                </h4>
+                {[
+                  { label: 'Offline Support', desc: 'Access product catalog, local cached dashboards, and record customer visits without internet.' },
+                  { label: 'Push Notifications', desc: 'Receive real-time alerts for low stock levels, new sales leads, and dispatch approvals.' },
+                  { label: 'Home Screen Icon', desc: 'Launches immediately from your home screen just like a native mobile application.' },
+                  { label: 'Full Screen App', desc: 'No browser tabs or URL address bars to clutter your viewing experience.' },
+                  { label: 'Auto Updates', desc: 'Updates automatically in the background to ensure you are always running version 1.2.0.' }
+                ].map((item, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', fontSize: '0.85rem', lineHeight: '1.4' }}>
+                    <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span>
+                    <div>
+                      <strong style={{ color: '#1e293b' }}>{item.label}:</strong>{' '}
+                      <span style={{ color: '#64748b' }}>{item.desc}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          </div>
         )}
 
         {/* Help & Support Tab */}
