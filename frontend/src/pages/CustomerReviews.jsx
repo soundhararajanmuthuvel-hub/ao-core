@@ -184,7 +184,7 @@ export default function CustomerReviews() {
                           </span>
                         </div>
                         <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-primary)', fontStyle: 'italic', background: 'var(--bg-page)', padding: '0.5rem 0.75rem', borderRadius: '6px' }}>
-                          "{rev.comment || 'No written comment recorded.'}"
+                          "{rev.reviewText || 'No written comment recorded.'}"
                         </p>
                       </div>
                     ) : (

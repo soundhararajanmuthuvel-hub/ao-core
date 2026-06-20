@@ -105,6 +105,21 @@ app.use('/api/crm', require('./routes/crmRoutes'));
 app.use('/api/migration', require('./routes/migrationRoutes'));
 
 /* =========================
+   PUBLIC REVIEW PORTAL ROUTES
+   ========================= */
+app.get('/reviews/portal/:token', (req, res, next) => {
+  // Redirect to frontend review portal if it's a browser navigation request
+  if (req.accepts('html') || !req.headers.accept?.includes('application/json')) {
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    return res.redirect(`${clientUrl.replace(/\/$/, '')}/reviews/portal/${req.params.token}`);
+  }
+  next();
+}, require('./controllers/sfaController').getReviewPortal);
+
+app.post('/reviews/portal/:token', require('./controllers/sfaController').submitReview);
+
+
+/* =========================
    404 HANDLER
 ========================= */
 app.use((req, res) => {
