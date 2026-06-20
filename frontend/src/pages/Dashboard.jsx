@@ -515,6 +515,39 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
+
+                {/* Mobile Touch-Friendly Bulk Stock & Packed Today Blocks */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🌾 Bulk Product Stock</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {adminData?.bulkProductsList && adminData.bulkProductsList.length > 0 ? (
+                      adminData.bulkProductsList.map((product) => (
+                        <div key={product.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{product.name}</span>
+                          <strong style={{ fontSize: '0.9rem', color: '#ff9800' }}>{Number(product.stock || 0).toFixed(2)} {product.unit || 'KG'}</strong>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textAlign: 'center', padding: '8px' }}>No bulk products registered.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📦 Variants Packed Today</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {adminData?.packedTodayList && adminData.packedTodayList.length > 0 ? (
+                      adminData.packedTodayList.map((pack, idx) => (
+                        <div key={idx} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pack.name} ({pack.packSize || 'Standard'})</span>
+                          <strong style={{ fontSize: '0.9rem', color: '#10b981' }}>{pack.qty} {pack.unit || 'PCS'}</strong>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textAlign: 'center', padding: '8px' }}>No packing runs executed today.</div>
+                    )}
+                  </div>
+                </div>
               </>
             ) : (
               <>
@@ -547,11 +580,52 @@ export default function Dashboard() {
                   <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.75rem', marginTop: '1.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     📦 Manufacturing & Packing Overview
                   </h3>
-                  <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                  <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                     <StatCard label="Bulk Stock Value" value={fmt(cards.bulkStockValue || 0)} />
                     <StatCard label="Retail Pack Stock" value={`${cards.retailPackStock || 0} Packs`} />
                     <StatCard label="Packing Done Today" value={`${cards.packingDoneToday || 0} Packs`} />
                     <StatCard label="Manufacturing Done Today" value={`${cards.mfgDoneToday || 0} KG`} />
+                  </div>
+
+                  {/* Detailed Bulk Stock & Packed Today KPIs */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                    {/* Bulk Stock Inventory Card */}
+                    <div className="card" style={{ padding: '1.25rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#475569', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        🌾 Bulk Product Stock
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {adminData?.bulkProductsList && adminData.bulkProductsList.length > 0 ? (
+                          adminData.bulkProductsList.map((product) => (
+                            <div key={product.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', fontSize: '0.875rem' }}>
+                              <span style={{ fontWeight: 600, color: '#1e293b' }}>{product.name}</span>
+                              <strong style={{ color: '#ff9800' }}>{Number(product.stock || 0).toFixed(2)} {product.unit || 'KG'}</strong>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>No bulk products registered.</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Packed Today KPI Card */}
+                    <div className="card" style={{ padding: '1.25rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#475569', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        📦 Variants Packed Today
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {adminData?.packedTodayList && adminData.packedTodayList.length > 0 ? (
+                          adminData.packedTodayList.map((pack, idx) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0.75rem', backgroundColor: '#f0fdf4', borderRadius: '6px', fontSize: '0.875rem' }}>
+                              <span style={{ fontWeight: 600, color: '#16a34a' }}>{pack.name} ({pack.packSize || 'Standard'})</span>
+                              <strong style={{ color: '#10b981' }}>{pack.qty} {pack.unit || 'PCS'}</strong>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>No packing runs executed today.</div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </>

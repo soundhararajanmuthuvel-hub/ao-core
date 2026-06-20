@@ -25,12 +25,34 @@ const ManufacturingRecipe = sequelize.define('ManufacturingRecipe', {
     type: DataTypes.ENUM('Active', 'Inactive'),
     defaultValue: 'Active',
   },
+  variantProductId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  packSize: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  yieldPacks: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+  packWeight: {
+    type: DataTypes.DECIMAL(10, 3),
+    allowNull: true,
+  },
+  wastagePercent: {
+    type: DataTypes.DECIMAL(5, 2),
+    defaultValue: 0.00,
+  },
 });
 
 ManufacturingRecipe.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
+ManufacturingRecipe.belongsTo(Product, { as: 'variantProduct', foreignKey: 'variantProductId' });
 
 makeMongooseCompatible(ManufacturingRecipe, {
   product: 'productId',
+  variantProduct: 'variantProductId',
 });
 
 module.exports = ManufacturingRecipe;

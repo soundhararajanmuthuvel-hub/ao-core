@@ -4,6 +4,8 @@ const Product = require('../models/Product');
 const Invoice = require('../models/Invoice');
 const Order = require('../models/Order');
 const Customer = require('../models/Customer');
+const PackingConversion = require('../models/PackingConversion');
+const PackingConversionItem = require('../models/PackingConversionItem');
 
 exports.getDashboard = async (req, res, next) => {
   try {
@@ -85,7 +87,7 @@ exports.getDashboard = async (req, res, next) => {
       }),
       Product.findAll({
         where: { productType: 'BULK_PRODUCT', isArchived: false },
-        attributes: ['stock', 'purchasePrice'],
+        attributes: ['id', 'name', 'stock', 'unit', 'purchasePrice'],
         raw: true
       }),
       Product.sum('stock', {
@@ -112,7 +114,29 @@ exports.getDashboard = async (req, res, next) => {
           replacements: { today, tomorrow },
           type: sequelize.QueryTypes.SELECT,
         }
-      )
+      ),
+      PackingConversion.findAll({
+        where: {
+          date: {
+            [Op.gte]: today,
+            [Op.lt]: tomorrow,
+          },
+          status: 'completed',
+        },
+        include: [
+          {
+            model: PackingConversionItem,
+            as: 'items',
+            include: [
+              {
+                model: Product,
+                as: 'targetProduct',
+                attributes: ['id', 'name', 'packSize', 'unit'],
+              },
+            ],
+          },
+        ],
+      })
     ]);
 
     // Calculate bulk stock value
@@ -312,6 +336,29 @@ exports.getDashboard = async (req, res, next) => {
 
     const salesTrend = await sequelize.query(trendQuery, { type: sequelize.QueryTypes.SELECT });
 
+    const packedTodayMap = {};
+    for (const pc of packingConversionsToday) {
+      if (pc.items) {
+        for (const item of pc.items) {
+          const target = item.targetProduct;
+          if (target) {
+            const key = target.packSize || target.name;
+            const qty = Number(item.qty || 0);
+            if (!packedTodayMap[key]) {
+              packedTodayMap[key] = {
+                name: target.name,
+                packSize: target.packSize || '',
+                qty: 0,
+                unit: target.unit || 'PCS'
+              };
+            }
+            packedTodayMap[key].qty += qty;
+          }
+        }
+      }
+    }
+    const packedTodayList = Object.values(packedTodayMap);
+
     res.json({
       cards: {
         totalProducts: productCount,
@@ -344,7 +391,9 @@ exports.getDashboard = async (req, res, next) => {
         salesTrend: salesTrend.map((s) => ({ date: s.date, total: Number(s.total), count: Number(s.count) })),
       },
       outstanding: outstandingMetrics,
-      outstandingTrend
+      outstandingTrend,
+      bulkProductsList: bulkProductsForValuation,
+      packedTodayList
     });
   } catch (err) {
     next(err);

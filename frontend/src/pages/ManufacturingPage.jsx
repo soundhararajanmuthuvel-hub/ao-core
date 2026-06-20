@@ -107,6 +107,37 @@ export default function ManufacturingPage() {
     loadSystemData();
   }, [loadSystemData]);
 
+  useEffect(() => {
+    const variantId = searchParams.get('createRecipeForVariant');
+    if (variantId && products.length > 0) {
+      const variant = products.find(p => String(p.id || p._id) === String(variantId));
+      if (variant) {
+        // Find the parent product
+        const parent = products.find(p => String(p.id || p._id) === String(variant.parentProductId));
+        if (parent) {
+          // Open recipe modal
+          setRecipeForm({
+            name: `${variant.name} Recipe`,
+            productId: parent.id || parent._id,
+            yieldQty: Number(variant.conversionFactor || 0.2) * 30,
+            notes: `Formula for ${variant.name}`,
+            variantProductId: variant.id || variant._id,
+            packSize: variant.packSize || '',
+            yieldPacks: 30,
+            packWeight: Number(variant.conversionFactor || 0.2),
+            wastagePercent: 0,
+            materials: [{ rawMaterialId: '', qty: '' }]
+          });
+          setRecipeSubTab('mfg');
+          setRecipeModal('create_mfg');
+          // Clear query param so it doesn't open again
+          searchParams.delete('createRecipeForVariant');
+          setSearchParams(searchParams);
+        }
+      }
+    }
+  }, [searchParams, products, setSearchParams]);
+
   const setTab = (tabName) => {
     setSearchParams({ tab: tabName });
   };
@@ -569,12 +600,22 @@ export default function ManufacturingPage() {
         productId: rec.productId,
         yieldQty: rec.yieldQty,
         notes: rec.notes,
+        variantProductId: rec.variantProductId || '',
+        packSize: rec.packSize || 'Bulk',
+        yieldPacks: rec.yieldPacks || '',
+        packWeight: rec.packWeight || '',
+        wastagePercent: rec.wastagePercent || 0,
         materials: rec.materials?.map(m => ({ rawMaterialId: m.rawMaterialId, qty: m.qty })) || [{ rawMaterialId: '', qty: '' }]
       } : {
         name: '',
         productId: '',
         yieldQty: 1.0,
         notes: '',
+        variantProductId: '',
+        packSize: 'Bulk',
+        yieldPacks: '',
+        packWeight: '',
+        wastagePercent: 0,
         materials: [{ rawMaterialId: '', qty: '' }]
       });
       setRecipeModal(rec ? 'edit_mfg' : 'create_mfg');
@@ -663,6 +704,8 @@ export default function ManufacturingPage() {
 function ProductionEntry({ products, rawMaterials, mfgRecipes, loadSystemData, setTab }) {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
+  const [recipeId, setRecipeId] = useState('');
+  const [workflowMode, setWorkflowMode] = useState('pack');
   const [productId, setProductId] = useState('');
   const [qty, setQty] = useState('');
   const [laborCost, setLaborCost] = useState(0);
@@ -673,6 +716,8 @@ function ProductionEntry({ products, rawMaterials, mfgRecipes, loadSystemData, s
 
   const resetEntry = () => {
     setStep(1);
+    setRecipeId('');
+    setWorkflowMode('pack');
     setProductId('');
     setQty('');
     setLaborCost(0);
@@ -682,81 +727,136 @@ function ProductionEntry({ products, rawMaterials, mfgRecipes, loadSystemData, s
     setMfgNumber('');
   };
 
+  const selectedRecipe = mfgRecipes.find(r => String(r.id) === String(recipeId));
   const selectedProduct = products.find(p => String(p.id || p._id) === String(productId));
-  const selectedRecipe = mfgRecipes.find(r => String(r.productId) === String(productId));
+
+  const handleRecipeChange = (rId) => {
+    setRecipeId(rId);
+    const rec = mfgRecipes.find(r => String(r.id) === String(rId));
+    if (rec) {
+      if (rec.variantProductId) {
+        setWorkflowMode('pack');
+        setProductId(rec.variantProductId);
+        setQty(rec.yieldPacks || '');
+      } else {
+        setWorkflowMode('bulk');
+        setProductId(rec.productId);
+        setQty(rec.yieldQty || '');
+      }
+    } else {
+      setProductId('');
+      setQty('');
+    }
+  };
+
+  const handleWorkflowModeChange = (mode) => {
+    setWorkflowMode(mode);
+    const rec = mfgRecipes.find(r => String(r.id) === String(recipeId));
+    if (rec) {
+      if (mode === 'pack') {
+        setProductId(rec.variantProductId);
+        setQty(rec.yieldPacks || '');
+      } else {
+        setProductId(rec.productId);
+        setQty(rec.yieldQty || '');
+      }
+    }
+  };
 
   // Auto-calculations
   const calculateRequirements = () => {
     if (!qty || qty <= 0 || !selectedRecipe) return null;
     const targetQty = Number(qty);
-    const weightMultiplier = targetQty / Number(selectedRecipe.yieldQty || 1);
+    const wastageMultiplier = 1 + (Number(selectedRecipe.wastagePercent || 0) / 100);
+
+    let totalOutputWeight = targetQty;
+    let ingredientMultiplier = 1;
+    let weightMultiplier = 1;
+
+    if (workflowMode === 'pack') {
+      const pWeight = Number(selectedRecipe.packWeight || 0.200);
+      totalOutputWeight = targetQty * pWeight;
+      ingredientMultiplier = (totalOutputWeight / Number(selectedRecipe.yieldQty || 1)) * wastageMultiplier;
+    } else {
+      totalOutputWeight = targetQty;
+      weightMultiplier = (targetQty / Number(selectedRecipe.yieldQty || 1)) * wastageMultiplier;
+    }
 
     // 1. Raw Materials from recipe
     const rawMaterialsList = (selectedRecipe.materials || []).map(m => {
-      const needed = Number(m.qty) * weightMultiplier;
+      const isPackaging = ['Packaging Materials', 'Labels', 'Pouches', 'Cartons', 'Bottles'].includes(m.rawMaterial?.category);
+      let needed;
+      if (workflowMode === 'pack') {
+        needed = isPackaging ? targetQty : (Number(m.qty) * ingredientMultiplier);
+      } else {
+        needed = isPackaging ? 0 : (Number(m.qty) * weightMultiplier);
+      }
       const available = Number(m.rawMaterial?.stock || 0);
       const unitCost = Number(m.rawMaterial?.purchasePrice || 0);
       return {
         id: m.rawMaterialId,
-        name: m.rawMaterial?.name,
-        category: m.rawMaterial?.category,
+        name: m.rawMaterial?.name || 'Unknown',
+        category: m.rawMaterial?.category || 'General',
         needed,
         available,
         unit: m.rawMaterial?.unit || 'Kg',
         unitCost,
         totalCost: needed * unitCost,
-        isShortage: needed > available
+        isShortage: needed > available,
+        isPackaging
       };
-    });
+    }).filter(m => m.needed > 0);
 
     // 2. Packaging Materials automatically parsed
     const packagingList = [];
-    const match = selectedProduct?.name.match(/(\d+\s*(?:g|kg|ml|litre|pcs|box|carton|l))/i);
-    const packName = match ? match[1].replace(/\s+/g, '').toLowerCase() : null;
-    if (packName) {
-      // Find matching pouch
-      const pouch = rawMaterials.find(rm => 
-        ['Pouches', 'Packaging Materials'].includes(rm.category) && 
-        rm.name.toLowerCase().includes(packName)
-      );
-      // Find matching label
-      const label = rawMaterials.find(rm => 
-        ['Labels'].includes(rm.category) && 
-        rm.name.toLowerCase().includes(packName)
-      );
+    if (workflowMode === 'pack') {
+      const match = selectedProduct?.name?.match(/(\d+\s*(?:g|kg|ml|litre|pcs|box|carton|l))/i);
+      const packName = match ? match[1].replace(/\s+/g, '').toLowerCase() : null;
+      if (packName) {
+        // Find matching pouch
+        const pouch = rawMaterials.find(rm => 
+          ['Pouches', 'Packaging Materials'].includes(rm.category) && 
+          rm.name.toLowerCase().includes(packName)
+        );
+        // Find matching label
+        const label = rawMaterials.find(rm => 
+          ['Labels'].includes(rm.category) && 
+          rm.name.toLowerCase().includes(packName)
+        );
 
-      if (pouch && !rawMaterialsList.some(m => m.id === pouch.id)) {
-        const needed = targetQty;
-        const available = Number(pouch.stock || 0);
-        const unitCost = Number(pouch.purchasePrice || 0);
-        packagingList.push({
-          id: pouch.id,
-          name: pouch.name,
-          category: pouch.category,
-          needed,
-          available,
-          unit: pouch.unit || 'pcs',
-          unitCost,
-          totalCost: needed * unitCost,
-          isShortage: needed > available
-        });
-      }
+        if (pouch && !rawMaterialsList.some(m => m.id === pouch.id)) {
+          const needed = targetQty;
+          const available = Number(pouch.stock || 0);
+          const unitCost = Number(pouch.purchasePrice || 0);
+          packagingList.push({
+            id: pouch.id,
+            name: pouch.name,
+            category: pouch.category,
+            needed,
+            available,
+            unit: pouch.unit || 'pcs',
+            unitCost,
+            totalCost: needed * unitCost,
+            isShortage: needed > available
+          });
+        }
 
-      if (label && !rawMaterialsList.some(m => m.id === label.id)) {
-        const needed = targetQty;
-        const available = Number(label.stock || 0);
-        const unitCost = Number(label.purchasePrice || 0);
-        packagingList.push({
-          id: label.id,
-          name: label.name,
-          category: label.category,
-          needed,
-          available,
-          unit: label.unit || 'pcs',
-          unitCost,
-          totalCost: needed * unitCost,
-          isShortage: needed > available
-        });
+        if (label && !rawMaterialsList.some(m => m.id === label.id)) {
+          const needed = targetQty;
+          const available = Number(label.stock || 0);
+          const unitCost = Number(label.purchasePrice || 0);
+          packagingList.push({
+            id: label.id,
+            name: label.name,
+            category: label.category,
+            needed,
+            available,
+            unit: label.unit || 'pcs',
+            unitCost,
+            totalCost: needed * unitCost,
+            isShortage: needed > available
+          });
+        }
       }
     }
 
@@ -776,7 +876,8 @@ function ProductionEntry({ products, rawMaterials, mfgRecipes, loadSystemData, s
       totalCost,
       costPerUnit,
       hasRawShortage,
-      hasPkgShortage
+      hasPkgShortage,
+      totalOutputWeight
     };
   };
 
@@ -791,12 +892,12 @@ function ProductionEntry({ products, rawMaterials, mfgRecipes, loadSystemData, s
       const payload = {
         recipeId: selectedRecipe.id,
         productId,
-        qtyToProduce: qty,
+        qtyToProduce: Number(qty),
         laborCost,
         otherCost,
         notes: notes || 'Started production run.',
         status: 'pending',
-        productionMode: 'weight'
+        productionMode: workflowMode === 'pack' ? 'pack' : 'weight'
       };
       const res = await manufacturingApi.create(payload);
       setMfgEntryId(res.data.id || res.data.entry?.id);
@@ -830,53 +931,79 @@ function ProductionEntry({ products, rawMaterials, mfgRecipes, loadSystemData, s
         </span>
       </div>
 
-      {/* STEP 1: Select Product */}
+      {/* STEP 1: Select Recipe */}
       {step === 1 && (
         <div>
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label style={{ fontWeight: 700, fontSize: '1rem', color: '#334155', display: 'block', marginBottom: '0.5rem' }}>Select Product to Manufacture</label>
+            <label style={{ fontWeight: 700, fontSize: '1rem', color: '#334155', display: 'block', marginBottom: '0.5rem' }}>Select Recipe to Manufacture</label>
             <select
               className="form-control"
               style={{ height: '52px', fontSize: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
+              value={recipeId}
+              onChange={(e) => handleRecipeChange(e.target.value)}
             >
-              <option value="">-- Choose Product --</option>
-              {products.map(p => {
-                const hasRecipe = mfgRecipes.some(r => String(r.productId) === String(p.id || p._id));
-                return hasRecipe && (
-                  <option key={p.id || p._id} value={p.id || p._id}>{p.name} ({p.sku})</option>
-                );
-              })}
+              <option value="">-- Choose Recipe --</option>
+              {mfgRecipes.map(r => (
+                <option key={r.id} value={r.id}>
+                  {r.name} ({r.product?.name || 'Bulk'}{r.variantProduct ? ` - ${r.variantProduct.packSize || r.variantProduct.name}` : ' - Bulk'})
+                </option>
+              ))}
             </select>
-            <small style={{ color: '#64748b', marginTop: '0.5rem', display: 'block' }}>Only products with mapped recipes in Recipe Master are shown.</small>
+            <small style={{ color: '#64748b', marginTop: '0.5rem', display: 'block' }}>Only active recipes from Recipe Master are shown.</small>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
-            <button type="button" className="btn btn-primary" style={{ backgroundColor: '#ff9800', borderColor: '#ff9800', height: '48px', padding: '0 2rem', fontWeight: 600, borderRadius: '10px' }} disabled={!productId} onClick={() => setStep(2)}>
+            <button type="button" className="btn btn-primary" style={{ backgroundColor: '#ff9800', borderColor: '#ff9800', height: '48px', padding: '0 2rem', fontWeight: 600, borderRadius: '10px' }} disabled={!recipeId} onClick={() => setStep(2)}>
               Next Step &rarr;
             </button>
           </div>
         </div>
       )}
 
-      {/* STEP 2: Enter Quantity */}
+      {/* STEP 2: Enter Quantity & Select Mode */}
       {step === 2 && (
         <div>
           <div style={{ marginBottom: '1.5rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase' }}>Selected Product:</span>
-            <strong style={{ color: '#0f172a', display: 'block', fontSize: '1.15rem', marginTop: '0.25rem' }}>{selectedProduct?.name}</strong>
-            <span style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem', display: 'block' }}>Recipe Yield Base: {selectedRecipe?.yieldQty} {selectedProduct?.unit}</span>
+            <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase' }}>Selected Recipe:</span>
+            <strong style={{ color: '#0f172a', display: 'block', fontSize: '1.15rem', marginTop: '0.25rem' }}>{selectedRecipe?.name}</strong>
+            <span style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem', display: 'block' }}>
+              Base Yield: {selectedRecipe?.variantProduct ? `${selectedRecipe?.yieldPacks} Packs` : `${selectedRecipe?.yieldQty} KG`}
+              {selectedRecipe?.variantProduct && ` (${selectedRecipe?.yieldQty} KG)`}
+            </span>
           </div>
 
+          {selectedRecipe?.variantProductId && (
+            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+              <label style={{ fontWeight: 700, fontSize: '1rem', color: '#334155', display: 'block', marginBottom: '0.5rem' }}>Workflow Mode</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', background: workflowMode === 'pack' ? '#f0f6ff' : '#fff', border: workflowMode === 'pack' ? '2px solid #2563eb' : '1px solid #cbd5e1', padding: '0.75rem 1.25rem', borderRadius: '10px', transition: 'all 0.2s', margin: 0 }}>
+                  <input type="radio" name="workflowMode" value="pack" checked={workflowMode === 'pack'} onChange={() => handleWorkflowModeChange('pack')} />
+                  <div>
+                    <strong style={{ display: 'block', fontSize: '0.9rem', color: '#1e293b' }}>Direct to Pack</strong>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Increases variant stock in PCS</span>
+                  </div>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', background: workflowMode === 'bulk' ? '#f0f6ff' : '#fff', border: workflowMode === 'bulk' ? '2px solid #2563eb' : '1px solid #cbd5e1', padding: '0.75rem 1.25rem', borderRadius: '10px', transition: 'all 0.2s', margin: 0 }}>
+                  <input type="radio" name="workflowMode" value="bulk" checked={workflowMode === 'bulk'} onChange={() => handleWorkflowModeChange('bulk')} />
+                  <div>
+                    <strong style={{ display: 'block', fontSize: '0.9rem', color: '#1e293b' }}>Manufacture Bulk</strong>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Increases bulk stock in KG</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+          )}
+
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label style={{ fontWeight: 700, fontSize: '1rem', color: '#334155', display: 'block', marginBottom: '0.5rem' }}>Enter Production Quantity ({selectedProduct?.unit || 'Kg'})</label>
+            <label style={{ fontWeight: 700, fontSize: '1rem', color: '#334155', display: 'block', marginBottom: '0.5rem' }}>
+              Enter Production Quantity ({workflowMode === 'pack' ? 'Packs' : 'KG'})
+            </label>
             <input
               type="number"
               min="0.01"
               step="0.01"
               className="form-control"
               style={{ height: '52px', fontSize: '1.1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}
-              placeholder={`e.g. ${selectedRecipe?.yieldQty}`}
+              placeholder={workflowMode === 'pack' ? `e.g. ${selectedRecipe?.yieldPacks || 30}` : `e.g. ${selectedRecipe?.yieldQty || 6.0}`}
               value={qty}
               onChange={(e) => setQty(e.target.value)}
             />
@@ -911,7 +1038,8 @@ function ProductionEntry({ products, rawMaterials, mfgRecipes, loadSystemData, s
           <div style={{ marginBottom: '1.5rem' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.75rem' }}>Expected Output</h3>
             <div style={{ padding: '0.75rem 1rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', color: '#166534', fontWeight: 700 }}>
-              {qty} {selectedProduct?.unit} of {selectedProduct?.name}
+              {qty} {workflowMode === 'pack' ? 'Packs' : 'KG'} of {selectedProduct?.name} 
+              {workflowMode === 'pack' && ` (Total Weight: ${calc.totalOutputWeight.toFixed(2)} KG)`}
             </div>
           </div>
 
@@ -980,12 +1108,12 @@ function ProductionEntry({ products, rawMaterials, mfgRecipes, loadSystemData, s
           )}
 
           {/* Cost overheads */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div className="form-group">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div className="form-group" style={{ margin: 0 }}>
               <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Labor Costs (₹)</label>
               <input type="number" min="0" step="1" className="form-control" style={{ borderRadius: '8px' }} value={laborCost} onChange={(e) => setLaborCost(Number(e.target.value))} />
             </div>
-            <div className="form-group">
+            <div className="form-group" style={{ margin: 0 }}>
               <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Overhead Costs (₹)</label>
               <input type="number" min="0" step="1" className="form-control" style={{ borderRadius: '8px' }} value={otherCost} onChange={(e) => setOtherCost(Number(e.target.value))} />
             </div>
@@ -998,7 +1126,9 @@ function ProductionEntry({ products, rawMaterials, mfgRecipes, loadSystemData, s
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ff9800' }}>{fmt(calc.totalCost)}</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Cost Per Pack</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                {workflowMode === 'pack' ? 'Cost Per Pack' : 'Cost Per KG'}
+              </span>
               <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>{fmt(calc.costPerUnit)}</div>
             </div>
           </div>
@@ -1835,8 +1965,60 @@ function RecipeFormModal({ type, form, setForm, products, rawMaterials, onClose,
     return total;
   };
 
+  const selectedProduct = products.find(p => String(p.id || p._id) === String(form.productId));
+  const variants = selectedProduct 
+    ? products.filter(p => String(p.parentProductId) === String(selectedProduct.id || selectedProduct._id) && !p.isArchived)
+    : [];
+
+  const handleProductChange = (val) => {
+    setForm({
+      ...form,
+      productId: val,
+      variantProductId: '',
+      packSize: 'Bulk',
+      yieldQty: 1.0,
+      yieldPacks: '',
+      packWeight: '',
+    });
+  };
+
+  const handleVariantChange = (val) => {
+    if (val === 'Bulk' || !val) {
+      setForm({
+        ...form,
+        variantProductId: '',
+        packSize: 'Bulk',
+        packWeight: '',
+        yieldQty: 1.0,
+        yieldPacks: '',
+      });
+    } else {
+      const selectedVariant = variants.find(v => String(v.id || v._id) === String(val));
+      const weight = selectedVariant ? Number(selectedVariant.conversionFactor || 0.2) : 0.2;
+      const packs = Number(form.yieldPacks) || 30;
+      setForm({
+        ...form,
+        variantProductId: val,
+        packSize: selectedVariant?.packSize || '',
+        packWeight: weight,
+        yieldPacks: packs,
+        yieldQty: packs * weight,
+      });
+    }
+  };
+
+  const handlePacksChange = (packsVal) => {
+    const packs = Number(packsVal) || 0;
+    const weight = Number(form.packWeight) || 0.2;
+    setForm({
+      ...form,
+      yieldPacks: packs,
+      yieldQty: packs * weight,
+    });
+  };
+
   const modalCost = getModalRecipeCost();
-  const yieldQuantityVal = isMfg ? (Number(form.yieldQty) || 1) : (Number(form.finishedQty) || 1);
+  const yieldQuantityVal = Number(form.yieldQty) || 1;
   const modalCostPerUnit = yieldQuantityVal > 0 ? (modalCost / yieldQuantityVal) : 0;
 
   return (
@@ -1851,36 +2033,178 @@ function RecipeFormModal({ type, form, setForm, products, rawMaterials, onClose,
         </>
       )}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
         <div className="form-group">
           <label>Recipe Name *</label>
           <input className="form-control" value={isMfg ? form.name : form.recipeName} onChange={(e) => setForm(isMfg ? { ...form, name: e.target.value } : { ...form, recipeName: e.target.value })} required />
         </div>
         <div className="form-group">
           <label>Target Yield Product *</label>
-          <select className="form-control" value={isMfg ? form.productId : form.finishedProductId} onChange={(e) => setForm(isMfg ? { ...form, productId: e.target.value } : { ...form, finishedProductId: e.target.value })} required>
-            <option value="">Choose Product...</option>
-            {products.map(p => (
-              <option key={p.id || p._id} value={p.id || p._id}>{p.name} ({p.sku})</option>
-            ))}
-          </select>
+          {isMfg ? (
+            <select className="form-control" value={form.productId} onChange={(e) => handleProductChange(e.target.value)} required>
+              <option value="">Choose Target Product...</option>
+              {products.filter(p => p.productType === 'BULK_PRODUCT').map(p => (
+                <option key={p.id || p._id} value={p.id || p._id}>{p.name} ({p.sku})</option>
+              ))}
+            </select>
+          ) : (
+            <select className="form-control" value={form.finishedProductId} onChange={(e) => setForm({ ...form, finishedProductId: e.target.value })} required>
+              <option value="">Choose Finished Product...</option>
+              {products.map(p => (
+                <option key={p.id || p._id} value={p.id || p._id}>{p.name} ({p.sku})</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-        <div className="form-group">
-          <label>Yield Output Quantity *</label>
-          <input type="number" step="0.01" className="form-control" value={isMfg ? form.yieldQty : form.finishedQty} onChange={(e) => setForm(isMfg ? { ...form, yieldQty: Number(e.target.value) } : { ...form, finishedQty: Number(e.target.value) })} required />
+      {isMfg ? (
+        /* Enhanced fields for Production Recipe */
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+          <div className="form-group">
+            <label>Pack Size *</label>
+            <select className="form-control" value={form.variantProductId || 'Bulk'} onChange={(e) => handleVariantChange(e.target.value)} required>
+              <option value="Bulk">○ Bulk</option>
+              {variants.map(v => (
+                <option key={v.id || v._id} value={v.id || v._id}>○ {v.packSize || v.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>{form.variantProductId ? 'Yield Packs *' : 'Yield Quantity (KG) *'}</label>
+            {form.variantProductId ? (
+              <input type="number" className="form-control" value={form.yieldPacks || ''} onChange={(e) => handlePacksChange(e.target.value)} required />
+            ) : (
+              <input type="number" step="0.01" className="form-control" value={form.yieldQty} onChange={(e) => setForm({ ...form, yieldQty: Number(e.target.value) })} required />
+            )}
+          </div>
+          <div className="form-group">
+            <label>Wastage Allowance %</label>
+            <input type="number" step="0.1" className="form-control" placeholder="0.0" value={form.wastagePercent} onChange={(e) => setForm({ ...form, wastagePercent: Number(e.target.value) })} />
+          </div>
         </div>
-        <div className="form-group">
-          <label>Unit</label>
-          <input className="form-control" value={isMfg ? '' : form.unit} disabled={isMfg} placeholder={isMfg ? 'Auto-loaded from product' : 'e.g. packs'} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+      ) : (
+        /* Repacking recipe legacy fields */
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+          <div className="form-group">
+            <label>Yield Output Quantity *</label>
+            <input type="number" step="0.01" className="form-control" value={form.finishedQty} onChange={(e) => setForm({ ...form, finishedQty: Number(e.target.value) })} required />
+          </div>
+          <div className="form-group">
+            <label>Unit</label>
+            <input className="form-control" value={form.unit} placeholder="e.g. packs" onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label>Wastage Allowance %</label>
+            <input type="number" step="0.1" className="form-control" placeholder="0.0" value={form.wastagePercent} onChange={(e) => setForm({ ...form, wastagePercent: Number(e.target.value) })} />
+          </div>
         </div>
-        <div className="form-group">
-          <label>Wastage Allowance %</label>
-          <input type="number" step="0.1" className="form-control" value={isMfg ? 0 : form.wastagePercent} disabled={isMfg} placeholder={isMfg ? 'N/A' : '0.0'} onChange={(e) => setForm({ ...form, wastagePercent: Number(e.target.value) })} />
+      )}
+
+      {isMfg && form.variantProductId && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+          <div className="form-group">
+            <label>Pack Weight</label>
+            <input className="form-control" value={form.packWeight ? `${Number(form.packWeight) * 1000}g (${form.packWeight} KG)` : ''} disabled />
+          </div>
+          <div className="form-group">
+            <label>Calculated Output Weight</label>
+            <input className="form-control" value={`${(Number(form.yieldQty) || 0).toFixed(2)} KG`} disabled />
+          </div>
+        </div>
+      )}
+
+      {/* Live Manufacturing Preview Card */}
+      {isMfg && (
+        <div style={{
+          background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
+          border: '1px solid #e2e8f0',
+          borderRadius: '12px',
+          padding: '1.25rem',
+          marginBottom: '1rem',
+          boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.02)',
+        }}>
+          <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            📊 Recipe Output Preview
+          </h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem', fontSize: '0.9rem' }}>
+            <div>
+              <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b' }}>Target Product</span>
+              <strong style={{ color: '#0f172a' }}>{selectedProduct?.name || 'None'}</strong>
+            </div>
+            <div>
+              <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b' }}>Pack Size</span>
+              <strong style={{ color: '#0f172a' }}>
+                {form.variantProductId ? (variants.find(v => String(v.id || v._id) === String(form.variantProductId))?.packSize || 'Variant') : 'Bulk'}
+              </strong>
+            </div>
+            <div>
+              <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b' }}>Yield Quantity</span>
+              <strong style={{ color: '#0f172a' }}>
+                {form.variantProductId ? `${form.yieldPacks || 0} Packs` : `${form.yieldQty || 0} KG`}
+              </strong>
+            </div>
+            <div>
+              <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b' }}>Total Weight</span>
+              <strong style={{ color: '#10b981', fontSize: '1.05rem' }}>
+                {Number(form.yieldQty || 0).toFixed(2)} KG
+              </strong>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="form-group">
+        <label>Formulation Notes / Instructions</label>
+        <textarea className="form-control" rows={2} value={form.notes || ''} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+      </div>
+
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <strong>📝 Recipe Components (Ingredients)</strong>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={addIngredient}>+ Add Ingredient</button>
+        </div>
+        
+        <div style={{ maxHeight: '220px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+          {form.materials?.map((mat, idx) => (
+            <div key={idx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              {isMfg ? (
+                /* Mfg raw material ingredients list */
+                <select style={{ flex: 2 }} className="form-control form-control-sm" value={mat.rawMaterialId} onChange={(e) => handleIngredientChange(idx, 'rawMaterialId', e.target.value)} required>
+                  <option value="">Select Raw Material / Ingredient...</option>
+                  {rawMaterials.map(rm => (
+                    <option key={rm.id} value={rm.id}>{rm.name} ({rm.materialCode}) [Stock: {rm.stock} {rm.unit} | Cost: ₹{Number(rm.purchasePrice || 0).toFixed(1)}/{rm.unit}]</option>
+                  ))}
+                </select>
+              ) : (
+                /* Repack bulk finished product input */
+                <select style={{ flex: 2 }} className="form-control form-control-sm" value={mat.productId} onChange={(e) => handleIngredientChange(idx, 'productId', e.target.value)} required>
+                  <option value="">Select Bulk Source Product...</option>
+                  {products.map(p => (
+                    <option key={p.id || p._id} value={p.id || p._id}>{p.name} ({p.sku}) [Stock: {p.stock} {p.unit} | Cost: ₹{Number(p.purchasePrice || 0).toFixed(1)}/{p.unit}]</option>
+                  ))}
+                </select>
+              )}
+              <input style={{ flex: 1 }} type="number" step="0.0001" className="form-control form-control-sm" placeholder="Quantity needed" value={mat.qty} onChange={(e) => handleIngredientChange(idx, 'qty', Number(e.target.value))} required />
+              <button type="button" className="btn btn-danger btn-sm" style={{ padding: '0.1rem 0.4rem', fontSize: '1rem' }} onClick={() => removeIngredient(idx)} disabled={form.materials.length <= 1}>&times;</button>
+            </div>
+          ))}
         </div>
       </div>
+
+      <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginTop: '1rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+        <div>
+          <span>Estimated Recipe Cost:</span>
+          <strong style={{ display: 'block', color: '#ff9800', fontSize: '1.1rem', fontWeight: 800 }}>{fmt(modalCost)}</strong>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <span>Cost Per Yield Unit:</span>
+          <strong style={{ display: 'block', color: '#0f172a', fontSize: '1.1rem', fontWeight: 800 }}>{fmt(modalCostPerUnit)}</strong>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
       <div className="form-group">
         <label>Formulation Notes / Instructions</label>

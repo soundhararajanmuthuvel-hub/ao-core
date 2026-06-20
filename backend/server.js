@@ -139,6 +139,14 @@ const startServer = async () => {
   try {
     await connectDB();
     
+    // Auto-seed ABC Malt data
+    try {
+      const seedAbcMalt = require('./utils/seedAbcMalt');
+      await seedAbcMalt();
+    } catch (seedErr) {
+      console.error('ABC Malt seeding failed:', seedErr);
+    }
+    
     // Initialize background WooCommerce auto-sync scheduler
     const { startScheduler } = require('./utils/scheduler');
     startScheduler();

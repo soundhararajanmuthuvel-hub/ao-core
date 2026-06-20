@@ -17,7 +17,8 @@ exports.getRecipes = async (req, res, next) => {
   try {
     const recipes = await ManufacturingRecipe.findAll({
       include: [
-        { model: Product, as: 'product', attributes: ['name', 'sku', 'unit', 'purchasePrice', 'sellingPrice'] },
+        { model: Product, as: 'product', attributes: ['id', 'name', 'sku', 'unit', 'purchasePrice', 'sellingPrice'] },
+        { model: Product, as: 'variantProduct', attributes: ['id', 'name', 'sku', 'unit', 'purchasePrice', 'sellingPrice', 'conversionFactor', 'wholesalePrice', 'gstPercent', 'mrp'] },
         {
           model: ManufacturingRecipeMaterial,
           as: 'materials',
@@ -35,7 +36,7 @@ exports.getRecipes = async (req, res, next) => {
 exports.createRecipe = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
-    const { name, productId, yieldQty = 1.00, notes, materials } = req.body;
+    const { name, productId, yieldQty = 1.00, notes, materials, variantProductId, packSize, yieldPacks, packWeight, wastagePercent } = req.body;
     
     // Filter out materials that have empty/missing rawMaterialId
     const validMaterials = (materials || []).filter(mat => mat.rawMaterialId && mat.rawMaterialId !== '');
@@ -45,12 +46,23 @@ exports.createRecipe = async (req, res, next) => {
       return res.status(400).json({ message: 'Name, finished product, and at least one valid raw material are required.' });
     }
 
+    // Auto-calculate yieldQty in KG for variant recipes
+    let calculatedYieldQty = Number(yieldQty);
+    if (variantProductId && yieldPacks && packWeight) {
+      calculatedYieldQty = Number(yieldPacks) * Number(packWeight);
+    }
+
     const recipe = await ManufacturingRecipe.create({
       name,
       productId,
-      yieldQty,
+      yieldQty: calculatedYieldQty,
       notes,
       status: 'Active',
+      variantProductId: variantProductId || null,
+      packSize: packSize || null,
+      yieldPacks: yieldPacks || null,
+      packWeight: packWeight || null,
+      wastagePercent: wastagePercent || 0.00,
     }, { transaction: t });
 
     for (const mat of validMaterials) {
@@ -68,6 +80,7 @@ exports.createRecipe = async (req, res, next) => {
     const populated = await ManufacturingRecipe.findByPk(recipe.id, {
       include: [
         { model: Product, as: 'product', attributes: ['name', 'sku'] },
+        { model: Product, as: 'variantProduct', attributes: ['id', 'name', 'sku'] },
         {
           model: ManufacturingRecipeMaterial,
           as: 'materials',
@@ -92,8 +105,26 @@ exports.updateRecipe = async (req, res, next) => {
       return res.status(404).json({ message: 'Recipe not found' });
     }
 
-    const { name, productId, yieldQty, notes, status, materials } = req.body;
-    await recipe.update({ name, productId, yieldQty, notes, status }, { transaction: t });
+    const { name, productId, yieldQty, notes, status, materials, variantProductId, packSize, yieldPacks, packWeight, wastagePercent } = req.body;
+    
+    // Auto-calculate yieldQty in KG for variant recipes
+    let calculatedYieldQty = Number(yieldQty);
+    if (variantProductId && yieldPacks && packWeight) {
+      calculatedYieldQty = Number(yieldPacks) * Number(packWeight);
+    }
+
+    await recipe.update({
+      name,
+      productId,
+      yieldQty: calculatedYieldQty,
+      notes,
+      status,
+      variantProductId: variantProductId || null,
+      packSize: packSize || null,
+      yieldPacks: yieldPacks || null,
+      packWeight: packWeight || null,
+      wastagePercent: wastagePercent || 0.00,
+    }, { transaction: t });
 
     if (materials) {
       // Re-create ingredients mapping
@@ -115,6 +146,7 @@ exports.updateRecipe = async (req, res, next) => {
     const populated = await ManufacturingRecipe.findByPk(recipe.id, {
       include: [
         { model: Product, as: 'product', attributes: ['name', 'sku'] },
+        { model: Product, as: 'variantProduct', attributes: ['id', 'name', 'sku'] },
         {
           model: ManufacturingRecipeMaterial,
           as: 'materials',
@@ -190,16 +222,21 @@ exports.createEntry = async (req, res, next) => {
     let totalOutputWeight = targetQty; // Default weight mode output in Kg
 
     if (productionMode === 'pack') {
-      if (!packSizeId) {
+      if (packSizeId) {
+        // Legacy ProductPackSize path
+        packSize = await ProductPackSize.findByPk(packSizeId, { transaction: t });
+        if (!packSize) {
+          await t.rollback();
+          return res.status(404).json({ message: 'Pack size not found.' });
+        }
+        totalOutputWeight = (Number(packSize.weightInGrams) * targetQty) / 1000;
+      } else if (product.parentProductId) {
+        // New Product Variant path: conversionFactor represents pack weight in KG
+        totalOutputWeight = Number(product.conversionFactor || 1.0) * targetQty;
+      } else {
         await t.rollback();
         return res.status(400).json({ message: 'Pack size must be selected in Pack Count mode.' });
       }
-      packSize = await ProductPackSize.findByPk(packSizeId, { transaction: t });
-      if (!packSize) {
-        await t.rollback();
-        return res.status(404).json({ message: 'Pack size not found.' });
-      }
-      totalOutputWeight = (Number(packSize.weightInGrams) * targetQty) / 1000;
     }
     
     // Resolve materials from the recipe
@@ -214,8 +251,9 @@ exports.createEntry = async (req, res, next) => {
         return res.status(404).json({ message: 'Manufacturing recipe not found.' });
       }
       
-      const ingredientMultiplier = totalOutputWeight / Number(recipe.yieldQty || 1);
-      const weightMultiplier = targetQty / Number(recipe.yieldQty || 1);
+      const wastageMultiplier = 1 + (Number(recipe.wastagePercent || 0) / 100);
+      const ingredientMultiplier = (totalOutputWeight / Number(recipe.yieldQty || 1)) * wastageMultiplier;
+      const weightMultiplier = (targetQty / Number(recipe.yieldQty || 1)) * wastageMultiplier;
 
       for (const item of recipe.materials) {
         let qtyNeeded;
@@ -380,20 +418,33 @@ exports.createEntry = async (req, res, next) => {
 
     if (status === 'completed') {
       if (productionMode === 'pack') {
-        // Update pack stock
-        packSize.stock = Number(packSize.stock || 0) + targetQty;
-        await packSize.save({ transaction: t });
+        if (packSize) {
+          // Legacy ProductPackSize path
+          packSize.stock = Number(packSize.stock || 0) + targetQty;
+          await packSize.save({ transaction: t });
 
-        // Update bulk stock using updateStock
-        await updateStock(productId, totalOutputWeight, {
-          type: 'manufacturing',
-          referenceId: entry.id,
-          referenceModel: 'ManufacturingEntry',
-          userId: req.user.id,
-          transaction: t,
-          batchNumber: calculatedBatchNumber,
-          expiryDate: calculatedExpiryDate,
-        });
+          // Update bulk stock using updateStock
+          await updateStock(productId, totalOutputWeight, {
+            type: 'manufacturing',
+            referenceId: entry.id,
+            referenceModel: 'ManufacturingEntry',
+            userId: req.user.id,
+            transaction: t,
+            batchNumber: calculatedBatchNumber,
+            expiryDate: calculatedExpiryDate,
+          });
+        } else {
+          // New Product Variant path: increment variant product stock directly
+          await updateStock(productId, targetQty, {
+            type: 'manufacturing',
+            referenceId: entry.id,
+            referenceModel: 'ManufacturingEntry',
+            userId: req.user.id,
+            transaction: t,
+            batchNumber: calculatedBatchNumber,
+            expiryDate: calculatedExpiryDate,
+          });
+        }
       } else {
         // Update produced product stock
         await updateStock(productId, targetQty, {
@@ -523,18 +574,29 @@ exports.reverseEntry = async (req, res, next) => {
 
     // 1. Invert produced goods
     if (entry.productionMode === 'pack') {
-      const packSize = await ProductPackSize.findByPk(entry.packSizeId, { transaction: t });
-      if (packSize) {
-        packSize.stock = Number(packSize.stock || 0) - Number(entry.qtyToProduce);
-        await packSize.save({ transaction: t });
+      if (entry.packSizeId) {
+        // Legacy ProductPackSize path
+        const packSize = await ProductPackSize.findByPk(entry.packSizeId, { transaction: t });
+        if (packSize) {
+          packSize.stock = Number(packSize.stock || 0) - Number(entry.qtyToProduce);
+          await packSize.save({ transaction: t });
+        }
+        const totalOutputWeight = (Number(packSize.weightInGrams) * Number(entry.qtyToProduce)) / 1000;
+        await updateStock(entry.productId, -totalOutputWeight, {
+          type: 'adjustment',
+          notes: `Reversal of pack run ${entry.mfgNumber}`,
+          userId: req.user.id,
+          transaction: t,
+        });
+      } else {
+        // New Product Variant path: decrement variant product stock directly
+        await updateStock(entry.productId, -Number(entry.qtyToProduce), {
+          type: 'adjustment',
+          notes: `Reversal of pack run ${entry.mfgNumber}`,
+          userId: req.user.id,
+          transaction: t,
+        });
       }
-      const totalOutputWeight = (Number(packSize.weightInGrams) * Number(entry.qtyToProduce)) / 1000;
-      await updateStock(entry.productId, -totalOutputWeight, {
-        type: 'adjustment',
-        notes: `Reversal of pack run ${entry.mfgNumber}`,
-        userId: req.user.id,
-        transaction: t,
-      });
     } else {
       await updateStock(entry.productId, -Number(entry.qtyToProduce), {
         type: 'adjustment',

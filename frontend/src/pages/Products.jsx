@@ -399,6 +399,23 @@ export default function Products() {
         >
           📂 Archived Products
         </button>
+        <button
+          type="button"
+          onClick={() => { setActiveTab('variants'); setPage(1); }}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '0.5rem 1rem',
+            fontSize: '0.9rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            color: activeTab === 'variants' ? '#3b82f6' : '#64748b',
+            borderBottom: activeTab === 'variants' ? '3px solid #3b82f6' : '3px solid transparent',
+            outline: 'none'
+          }}
+        >
+          📦 Variant Management
+        </button>
       </div>
 
       {products.some(p => !p.productType) && (
@@ -409,74 +426,84 @@ export default function Products() {
           </div>
         </div>
       )}
-      <div className="filters-bar">
-        <input className="form-control" style={{ maxWidth: 240 }} placeholder="Search..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
-        <select className="form-control" style={{ maxWidth: 180 }} value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}>
-          <option value="">All Categories</option>
-          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-      {loading ? <LoadingSpinner /> : (
-        <div className="card table-wrap">
-          <table className="data-table products-table">
-            <thead>
-              <tr><th>Image</th><th>Name</th><th>SKU</th><th>Category</th><th>Type</th><th>Stock</th><th>Price</th><th>Actions</th></tr>
-            </thead>
-            <tbody>
-              {products.map((p) => (
-                <tr key={p._id}>
-                  <td>{p.image ? <img src={resolveAssetUrl(p.image)} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} /> : '—'}</td>
-                  <td>
-                    <div>
-                      <strong>{p.name}</strong> {p.stock <= p.lowStockThreshold && <span className="badge badge-warning">Low</span>}
-                    </div>
-                    {p.productType === 'BULK_PRODUCT' && (
-                      <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '6px', paddingLeft: '8px', borderLeft: '2px solid #ff9800' }}>
-                        <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 'bold', display: 'block', marginBottom: '2px' }}>Variants</span>
-                        {allProducts.filter(v => String(v.parentProductId) === String(p._id || p.id)).map(v => (
-                          <div key={v._id || v.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '1px' }}>
-                            <span style={{ fontSize: '0.75rem' }}>📦 {v.packSize || v.name}</span>
-                            <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.75rem' }}>Stock: {v.stock} {v.unit || 'pcs'}</span>
+      {activeTab === 'variants' ? (
+        <ProductVariantManagement
+          allProducts={allProducts}
+          loadProducts={load}
+          toast={toast}
+        />
+      ) : (
+        <>
+          <div className="filters-bar">
+            <input className="form-control" style={{ maxWidth: 240 }} placeholder="Search..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+            <select className="form-control" style={{ maxWidth: 180 }} value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}>
+              <option value="">All Categories</option>
+              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          {loading ? <LoadingSpinner /> : (
+            <div className="card table-wrap">
+              <table className="data-table products-table">
+                <thead>
+                  <tr><th>Image</th><th>Name</th><th>SKU</th><th>Category</th><th>Type</th><th>Stock</th><th>Price</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {products.map((p) => (
+                    <tr key={p._id}>
+                      <td>{p.image ? <img src={resolveAssetUrl(p.image)} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} /> : '—'}</td>
+                      <td>
+                        <div>
+                          <strong>{p.name}</strong> {p.stock <= p.lowStockThreshold && <span className="badge badge-warning">Low</span>}
+                        </div>
+                        {p.productType === 'BULK_PRODUCT' && (
+                          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '6px', paddingLeft: '8px', borderLeft: '2px solid #ff9800' }}>
+                            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 'bold', display: 'block', marginBottom: '2px' }}>Variants</span>
+                            {allProducts.filter(v => String(v.parentProductId) === String(p._id || p.id)).map(v => (
+                              <div key={v._id || v.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '1px' }}>
+                                <span style={{ fontSize: '0.75rem' }}>📦 {v.packSize || v.name}</span>
+                                <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.75rem' }}>Stock: {v.stock} {v.unit || 'pcs'}</span>
+                              </div>
+                            ))}
+                            {allProducts.filter(v => String(v.parentProductId) === String(p._id || p.id)).length === 0 && (
+                              <span style={{ fontStyle: 'italic', fontSize: '0.7rem', color: '#94a3b8' }}>No variants configured</span>
+                            )}
                           </div>
-                        ))}
-                        {allProducts.filter(v => String(v.parentProductId) === String(p._id || p.id)).length === 0 && (
-                          <span style={{ fontStyle: 'italic', fontSize: '0.7rem', color: '#94a3b8' }}>No variants configured</span>
                         )}
-                      </div>
-                    )}
-                  </td>
-                  <td>{p.sku}</td>
-                  <td>{p.category}</td>
-                  <td>
-                    <span style={getProductTypeStyle(p.productType)}>
-                      {PRODUCT_TYPE_LABELS[p.productType] || 'Manufactured Product'}
-                    </span>
-                  </td>
-                  <td>{p.stock} {p.unit}</td>
-                  <td>₹{p.sellingPrice}</td>
-                  <td>
-                    {activeTab === 'active' ? (
-                      <>
-                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => openModal(p)}>Edit</button>{' '}
-                        <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => triggerDelete(p)}>Del</button>
-                      </>
-                    ) : (
-                      <>
-                        <button type="button" className="btn btn-success btn-sm" onClick={() => handleRestore(p._id || p.id)} disabled={isRestoring}>
-                          {isRestoring ? 'Restoring...' : '🔄 Restore'}
-                        </button>{' '}
-                        <button type="button" className="btn btn-danger btn-sm" onClick={() => triggerDelete(p)}>
-                          🗑️ Permanent Delete
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <Pagination page={page} pages={pages} onPageChange={setPage} />
-        </div>
+                      </td>
+                      <td>{p.sku}</td>
+                      <td>{p.category}</td>
+                      <td>
+                        <span style={getProductTypeStyle(p.productType)}>
+                          {PRODUCT_TYPE_LABELS[p.productType] || 'Manufactured Product'}
+                        </span>
+                      </td>
+                      <td>{p.stock} {p.unit}</td>
+                      <td>₹{p.sellingPrice}</td>
+                      <td>
+                        {activeTab === 'active' ? (
+                          <>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => openModal(p)}>Edit</button>{' '}
+                            <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => triggerDelete(p)}>Del</button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" className="btn btn-success btn-sm" onClick={() => handleRestore(p._id || p.id)} disabled={isRestoring}>
+                              {isRestoring ? 'Restoring...' : '🔄 Restore'}
+                            </button>{' '}
+                            <button type="button" className="btn btn-danger btn-sm" onClick={() => triggerDelete(p)}>
+                              🗑️ Permanent Delete
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <Pagination page={page} pages={pages} onPageChange={setPage} />
+            </div>
+          )}
+        </>
       )}
       {modal && (
         <Modal title={modal === 'edit' ? 'Edit Product' : 'Add Product'} className="modal-lg" onClose={() => setModal(null)} footer={<><button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>Cancel</button><button type="button" className="btn btn-primary" onClick={save}>Save</button></>}>
@@ -1139,6 +1166,339 @@ export default function Products() {
           </Modal>
         );
       })()}
+    </div>
+  );
+}
+
+function ProductVariantManagement({ allProducts, loadProducts, toast }) {
+  const [parentProductId, setParentProductId] = React.useState('');
+  const [showModal, setShowModal] = React.useState(null); // 'create' or 'edit'
+  const [selectedVariant, setSelectedVariant] = React.useState(null);
+  const [form, setForm] = React.useState({
+    packSize: '',
+    sku: '',
+    conversionFactor: 0.200,
+    barcode: '',
+    mrp: 0,
+    wholesalePrice: 0,
+    sellingPrice: 0,
+    gstPercent: 0,
+  });
+
+  const parentProducts = allProducts.filter(p => p.productType === 'BULK_PRODUCT');
+  const selectedParent = parentProducts.find(p => String(p.id || p._id) === String(parentProductId));
+  const variants = selectedParent 
+    ? allProducts.filter(p => String(p.parentProductId) === String(selectedParent.id || selectedParent._id) && !p.isArchived) 
+    : [];
+
+  const openForm = (variant = null) => {
+    if (variant) {
+      setSelectedVariant(variant);
+      setForm({
+        packSize: variant.packSize || '',
+        sku: variant.sku || '',
+        conversionFactor: Number(variant.conversionFactor || 0),
+        barcode: variant.barcode || '',
+        mrp: Number(variant.mrp || 0),
+        wholesalePrice: Number(variant.wholesalePrice || 0),
+        sellingPrice: Number(variant.sellingPrice || 0),
+        gstPercent: Number(variant.gstPercent || 0),
+      });
+      setShowModal('edit');
+    } else {
+      setSelectedVariant(null);
+      setForm({
+        packSize: '',
+        sku: '',
+        conversionFactor: 0.200,
+        barcode: '',
+        mrp: 0,
+        wholesalePrice: 0,
+        sellingPrice: 0,
+        gstPercent: selectedParent ? Number(selectedParent.gstPercent || 0) : 0,
+      });
+      setShowModal('create');
+    }
+  };
+
+  const handleSave = async () => {
+    if (!form.packSize || !form.sku) {
+      toast('Please enter Variant Name/Size and SKU', 'warning');
+      return;
+    }
+    try {
+      const payload = {
+        name: `${selectedParent.name} ${form.packSize}`,
+        sku: form.sku,
+        barcode: form.barcode,
+        conversionFactor: Number(form.conversionFactor),
+        weight: Number(form.conversionFactor),
+        mrp: Number(form.mrp),
+        wholesalePrice: Number(form.wholesalePrice),
+        sellingPrice: Number(form.sellingPrice),
+        gstPercent: Number(form.gstPercent),
+        parentProductId: Number(selectedParent.id || selectedParent._id),
+        productType: 'RETAIL_PACK',
+        unit: 'pcs',
+        supplier: selectedParent.supplier,
+        category: selectedParent.category,
+      };
+
+      const fd = new FormData();
+      Object.entries(payload).forEach(([k, v]) => {
+        fd.append(k, v);
+      });
+      fd.append('packSizes', JSON.stringify([]));
+
+      if (showModal === 'edit') {
+        await productsApi.update(selectedVariant._id || selectedVariant.id, fd);
+        toast('Variant saved successfully', 'success');
+      } else {
+        await productsApi.create(fd);
+        toast('Variant created successfully', 'success');
+      }
+      setShowModal(null);
+      loadProducts();
+    } catch (err) {
+      toast(err.response?.data?.message || 'Failed to save variant', 'error');
+    }
+  };
+
+  const handleDelete = async (v) => {
+    if (!confirm(`Are you sure you want to delete/archive variant ${v.name}?`)) return;
+    try {
+      await productsApi.remove(v._id || v.id, 'erp_only');
+      toast('Variant archived successfully', 'success');
+      loadProducts();
+    } catch (err) {
+      toast('Failed to archive variant', 'error');
+    }
+  };
+
+  return (
+    <div style={{ fontFamily: 'Inter, sans-serif' }}>
+      <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem', borderRadius: '16px', background: '#fff' }}>
+        <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
+          Select Parent Bulk Product
+        </h3>
+        <select
+          className="form-control"
+          style={{ height: '50px', borderRadius: '12px', fontSize: '0.95rem' }}
+          value={parentProductId}
+          onChange={(e) => setParentProductId(e.target.value)}
+        >
+          <option value="">-- Select Product --</option>
+          {parentProducts.map(p => (
+            <option key={p.id || p._id} value={p.id || p._id}>{p.name} ({p.sku})</option>
+          ))}
+        </select>
+      </div>
+
+      {selectedParent && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="card" style={{ borderRadius: '16px', padding: '1.5rem', background: '#fff' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>
+                  🌳 Variant Hierarchy for {selectedParent.name}
+                </h4>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                  Manage individual pack configurations and pricing tiers.
+                </p>
+              </div>
+              <button type="button" className="btn btn-primary" onClick={() => openForm(null)}>
+                + Add Variant
+              </button>
+            </div>
+
+            {/* Tree View representation */}
+            <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>
+                <span style={{ fontSize: '1.2rem' }}>📦</span>
+                {selectedParent.name} <span style={{ fontWeight: 400, color: '#64748b', fontSize: '0.8rem' }}>(Base Bulk Powder)</span>
+              </div>
+              
+              <div style={{ marginLeft: '1.5rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', borderLeft: '2px dashed #cbd5e1', paddingLeft: '1rem' }}>
+                {/* Default Bulk item */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: '#475569' }}>
+                  <span>├─ ⚪</span>
+                  <strong>Bulk</strong>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    (Stock: {selectedParent.stock} {selectedParent.unit} | SKU: {selectedParent.sku})
+                  </span>
+                </div>
+
+                {variants.map((v, i) => (
+                  <div key={v.id || v._id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: '#475569' }}>
+                    <span>{i === variants.length - 1 ? '└─' : '├─'} 📦</span>
+                    <strong>{v.packSize || v.name}</strong>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      (Stock: {v.stock} {v.unit} | SKU: {v.sku} | Retail: ₹{v.sellingPrice} | Wholesale: ₹{v.wholesalePrice})
+                    </span>
+                  </div>
+                ))}
+
+                {variants.length === 0 && (
+                  <div style={{ fontSize: '0.8rem', fontStyle: 'italic', color: '#94a3b8', marginLeft: '1.25rem' }}>
+                    No pack size variants added yet.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Variants table */}
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Variant Pack Size</th>
+                    <th>SKU</th>
+                    <th>Pack Weight</th>
+                    <th>Barcode</th>
+                    <th>MRP</th>
+                    <th>Wholesale Price</th>
+                    <th>Retail Price</th>
+                    <th>GST %</th>
+                    <th style={{ textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Bulk line */}
+                  <tr style={{ background: '#f8fafc' }}>
+                    <td><strong>Bulk</strong> <span className="badge badge-secondary" style={{ fontSize: '0.7rem' }}>Parent Base</span></td>
+                    <td>{selectedParent.sku}</td>
+                    <td>1.000 KG</td>
+                    <td>{selectedParent.barcode || '—'}</td>
+                    <td>₹{selectedParent.mrp || '—'}</td>
+                    <td>—</td>
+                    <td>₹{selectedParent.sellingPrice}</td>
+                    <td>{selectedParent.gstPercent}%</td>
+                    <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic' }}>Parent Record</td>
+                  </tr>
+
+                  {/* Child variants */}
+                  {variants.map(v => (
+                    <tr key={v.id || v._id}>
+                      <td><strong style={{ color: '#2563eb' }}>{v.packSize || v.name}</strong></td>
+                      <td>{v.sku}</td>
+                      <td>{v.conversionFactor} KG</td>
+                      <td>{v.barcode || '—'}</td>
+                      <td>₹{v.mrp || 0}</td>
+                      <td>₹{v.wholesalePrice || 0}</td>
+                      <td>₹{v.sellingPrice || 0}</td>
+                      <td>{v.gstPercent}%</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center' }}>
+                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => openForm(v)}>Edit</button>
+                          <button type="button" className="btn btn-secondary btn-sm" style={{ color: '#ff9800', borderColor: '#ffe8cc' }} onClick={() => {
+                            window.location.href = `/manufacturing?tab=recipes&createRecipeForVariant=${v.id || v._id}`;
+                          }}>
+                            Link Recipe
+                          </button>
+                          <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => handleDelete(v)}>Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showModal && (
+        <Modal
+          title={showModal === 'create' ? '➕ Add Product Variant' : '✏️ Edit Product Variant'}
+          onClose={() => setShowModal(null)}
+          footer={(
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowModal(null)}>Cancel</button>
+              <button type="button" className="btn btn-primary" onClick={handleSave}>Save Variant</button>
+            </>
+          )}
+        >
+          <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label>Variant Name / Size *</label>
+              <input
+                className="form-control"
+                placeholder="e.g. 200g, 500g, 1kg"
+                value={form.packSize}
+                onChange={(e) => setForm({ ...form, packSize: e.target.value })}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>SKU *</label>
+              <input
+                className="form-control"
+                placeholder="e.g. ABC-MALT-200G"
+                value={form.sku}
+                onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Pack Weight (Kg per Pack) *</label>
+              <input
+                type="number"
+                step="0.001"
+                className="form-control"
+                placeholder="e.g. 0.200"
+                value={form.conversionFactor}
+                onChange={(e) => setForm({ ...form, conversionFactor: Number(e.target.value) })}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Barcode</label>
+              <input
+                className="form-control"
+                placeholder="e.g. 890123456"
+                value={form.barcode}
+                onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>MRP (₹)</label>
+              <input
+                type="number"
+                className="form-control"
+                value={form.mrp}
+                onChange={(e) => setForm({ ...form, mrp: Number(e.target.value) })}
+              />
+            </div>
+            <div className="form-group">
+              <label>Wholesale Price (₹)</label>
+              <input
+                type="number"
+                className="form-control"
+                value={form.wholesalePrice}
+                onChange={(e) => setForm({ ...form, wholesalePrice: Number(e.target.value) })}
+              />
+            </div>
+            <div className="form-group">
+              <label>Retail Price (₹)</label>
+              <input
+                type="number"
+                className="form-control"
+                value={form.sellingPrice}
+                onChange={(e) => setForm({ ...form, sellingPrice: Number(e.target.value) })}
+              />
+            </div>
+            <div className="form-group">
+              <label>GST Percent (%)</label>
+              <input
+                type="number"
+                className="form-control"
+                value={form.gstPercent}
+                onChange={(e) => setForm({ ...form, gstPercent: Number(e.target.value) })}
+              />
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

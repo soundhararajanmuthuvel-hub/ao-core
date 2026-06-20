@@ -186,6 +186,10 @@ const Product = sequelize.define('Product', {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0.00,
   },
+  wholesalePrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0.00,
+  },
   isLowStock: {
     type: DataTypes.VIRTUAL,
     get() {

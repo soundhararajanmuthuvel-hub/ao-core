@@ -277,6 +277,12 @@ const connectDB = async () => {
   await addColumnIfNotExist('Products', 'parentProductId', "INTEGER NULL");
   await addColumnIfNotExist('Products', 'packSize', "VARCHAR(255) NULL");
   await addColumnIfNotExist('Products', 'conversionFactor', "DECIMAL(10, 4) DEFAULT 1.0000");
+  await addColumnIfNotExist('Products', 'wholesalePrice', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('ManufacturingRecipes', 'variantProductId', "INTEGER NULL");
+  await addColumnIfNotExist('ManufacturingRecipes', 'packSize', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('ManufacturingRecipes', 'yieldPacks', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('ManufacturingRecipes', 'packWeight', "DECIMAL(10, 3) DEFAULT 0.000");
+  await addColumnIfNotExist('ManufacturingRecipes', 'wastagePercent', "DECIMAL(5, 2) DEFAULT 0.00");
 
   try {
     if (dialect === 'mysql') {
