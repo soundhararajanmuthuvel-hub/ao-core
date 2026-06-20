@@ -73,7 +73,7 @@ const Lead = sequelize.define('Lead', {
     allowNull: true,
   },
   status: {
-    type: DataTypes.ENUM('New', 'Assigned', 'Visited', 'Interested', 'Customer', 'Rejected'),
+    type: DataTypes.ENUM('New', 'Contacted', 'Assigned', 'Visited', 'Interested', 'Customer', 'Rejected'),
     defaultValue: 'New',
   },
   assignedSalesmanId: {

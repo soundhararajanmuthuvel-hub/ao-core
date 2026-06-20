@@ -9,10 +9,12 @@ const {
   salesAssistant,
   inventoryIntelligence,
   accountsAssistant,
-  manufacturingAssistant
+  manufacturingAssistant,
+  getDashboardSuggestions
 } = require('../controllers/aiController');
 
 router.get('/insights', auth, getAIInsights);
+router.get('/suggestions', auth, getDashboardSuggestions);
 router.post('/chat', auth, chatAI);
 router.post('/analyze-leads', auth, analyzeLeads);
 router.post('/customer-intelligence', auth, customerIntelligence);

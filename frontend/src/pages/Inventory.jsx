@@ -133,9 +133,6 @@ export default function Inventory({ defaultTab }) {
           <p className="page-subtitle">Repack & manufacturing with supplier tracking</p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button type="button" className="btn btn-secondary" onClick={handleInventoryIntelligence} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Brain size={16} /> AI Inventory Intelligence
-          </button>
           <Link to="/suppliers" className="btn btn-secondary">Manage Suppliers</Link>
         </div>
       </div>
@@ -273,14 +270,6 @@ export default function Inventory({ defaultTab }) {
           )}
         </>
       )}
-      <AIInsightsModal
-        isOpen={aiModalOpen}
-        onClose={() => setAiModalOpen(false)}
-        title="AI Inventory Intelligence Report"
-        insightsText={aiInsights}
-        loading={aiLoading}
-        onRetry={handleInventoryIntelligence}
-      />
     </div>
   );
 }

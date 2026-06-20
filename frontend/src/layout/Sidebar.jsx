@@ -41,29 +41,11 @@ const menuStructure = [
     label: 'CRM',
     roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'],
     children: [
-      { to: '/crm', label: 'Dashboard', roles: ['Super Admin', 'admin', 'Sales Manager'] },
       { to: '/crm/leads', label: 'Leads', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/crm/lead-finder', label: 'Lead Finder', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
+      { to: '/crm/ai-lead-importer', label: 'AI Lead Importer', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
       { to: '/customers', label: 'Customers', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/crm/opportunities', label: 'Opportunities', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/crm/followups', label: 'Follow Ups', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/crm/reviews', label: 'Customer Reviews', roles: ['Super Admin', 'admin', 'Sales Manager'] }
-    ]
-  },
-  {
-    type: 'group',
-    id: 'fieldSales',
-    icon: MapPinned,
-    label: 'Field Sales',
-    roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive', 'Delivery Staff', 'Dispatch Executive'],
-    children: [
-      { to: '/field-sales', label: 'Dashboard', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/route-planner', label: 'Route Planner', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/customer-visits', label: 'Customer Visits', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/mobile-catalog', label: 'Product Catalog', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/field-ordering', label: 'Field Orders', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/delivery-tracking', label: 'Delivery Tracking', roles: ['Super Admin', 'admin', 'Sales Manager', 'Delivery Staff', 'Dispatch Executive'] },
-      { to: '/field-sales/analytics', label: 'Performance Analytics', roles: ['Super Admin', 'admin', 'Sales Manager'] }
+      { to: '/crm/customer-map', label: 'Customer Map', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
+      { to: '/crm/followups', label: 'Follow Ups', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] }
     ]
   },
   {
@@ -170,30 +152,15 @@ export default function Sidebar({ collapsed, open, onClose }) {
     const fetchCounts = async () => {
       try {
         const [
-          routesRes, 
-          visitsRes, 
-          ordersRes, 
-          shipmentsRes,
           productsRes,
           customersRes,
           ordersDashboardRes
         ] = await Promise.allSettled([
-          sfaApi.getRoutes(),
-          sfaApi.getVisits(),
-          ordersApi.list({ limit: 100 }),
-          shippingApi.list({ limit: 100 }),
           productsApi.list({ limit: 1 }),
           customersApi.list({ limit: 1 }),
           ordersApi.dashboard()
         ]);
         
-        setCounts({
-          routes: routesRes.status === 'fulfilled' ? routesRes.value.data?.length || 0 : 0,
-          visits: visitsRes.status === 'fulfilled' ? visitsRes.value.data?.length || 0 : 0,
-          orders: ordersRes.status === 'fulfilled' ? ordersRes.value.data?.orders?.length || 0 : 0,
-          deliveries: shipmentsRes.status === 'fulfilled' ? shipmentsRes.value.data?.shipments?.filter(s => s.status !== 'Delivered').length || 0 : 0
-        });
-
         setStats({
           products: productsRes.status === 'fulfilled' ? productsRes.value.data?.total || 0 : 0,
           customers: customersRes.status === 'fulfilled' ? customersRes.value.data?.total || 0 : 0,

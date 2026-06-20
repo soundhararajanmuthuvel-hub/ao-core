@@ -28,10 +28,11 @@ import ReviewPortal from '../pages/ReviewPortal';
 // CRM Pages
 import CrmDashboard from '../pages/CrmDashboard';
 import Leads from '../pages/Leads';
-import LeadFinder from '../pages/LeadFinder';
+import AiLeadImporter from '../pages/AiLeadImporter';
 import Opportunities from '../pages/Opportunities';
 import FollowUps from '../pages/FollowUps';
 import CustomerReviews from '../pages/CustomerReviews';
+import CustomerMap from '../pages/CustomerMap';
 
 // SFA Pages
 import FieldSalesDashboard from '../pages/FieldSalesDashboard';
@@ -72,10 +73,18 @@ export default function AppRoutes() {
           }
         />
         <Route
-          path="crm/lead-finder"
+          path="crm/ai-lead-importer"
           element={
             <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
-              <LeadFinder />
+              <AiLeadImporter />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="crm/customer-map"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+              <CustomerMap />
             </RoleRoute>
           }
         />

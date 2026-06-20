@@ -399,12 +399,6 @@ export default function Sales() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button type="button" className="btn btn-secondary" onClick={handleSalesAssistant} style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Brain size={16} /> AI Sales Assistant
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={handleAccountsAssistant} style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Brain size={16} /> AI Accounts Auditor
-          </button>
           <Link to="/sales/create" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
             + Create Invoice
           </Link>
@@ -1350,15 +1344,6 @@ export default function Sales() {
           onClose={() => setReminderModalInvoice(null)}
         />
       )}
-
-      <AIInsightsModal
-        isOpen={aiModalOpen}
-        onClose={() => setAiModalOpen(false)}
-        title={aiTitle}
-        insightsText={aiInsights}
-        loading={aiLoading}
-        onRetry={aiTitle === 'AI Sales Assistant' ? handleSalesAssistant : handleAccountsAssistant}
-      />
 
     </div>
   );

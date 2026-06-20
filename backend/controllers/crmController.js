@@ -748,3 +748,498 @@ exports.sendReviewInvite = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.extractTextFromLeadFile = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const fileBuffer = req.file.buffer;
+    const originalName = req.file.originalname || '';
+    const isXlsx = originalName.endsWith('.xlsx') || req.file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+    let text = '';
+
+    if (isXlsx) {
+      const ExcelJS = require('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(fileBuffer);
+
+      workbook.eachSheet((sheet) => {
+        sheet.eachRow((row) => {
+          const rowValues = [];
+          row.eachCell({ includeEmpty: true }, (cell) => {
+            const val = cell.text || (cell.value !== null && cell.value !== undefined ? String(cell.value) : '');
+            rowValues.push(val.trim());
+          });
+          // Filter out empty rows
+          if (rowValues.filter(Boolean).length > 0) {
+            text += rowValues.join(' - ') + '\n';
+          }
+        });
+      });
+    } else {
+      // Handle CSV or TXT
+      text = fileBuffer.toString('utf-8');
+    }
+
+    res.json({
+      success: true,
+      text: text.trim()
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.analyzeLeadsText = async (req, res, next) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ message: 'Text content is empty' });
+    }
+
+    const { callGemini } = require('./aiController');
+
+    const prompt = `
+You are an expert business lead analyzer. Your task is to extract clean, structured lead records from the following raw text list of retailer shops (which may contain messy WhatsApp messages, copied listings, etc.):
+---
+${text}
+---
+
+Please follow these AI ANALYSIS RULES:
+1. Read and analyze the entire text block first. Do not split lines blindly. Group related lines describing a single business together.
+2. Identify: Shop Name, Mobile Number, Address, Area, City, and Category for each business.
+3. SHOP NAME DETECTION:
+   - Identify shop names. Use these keywords to help detect them: Store, Stores, Bazaar, Market, Mart, Super Market, Organic, Foods, Traders, Agency, Agencies, Medical, Pharmacy, Wellness, Naturals, Ayurvedic, Herbal. (e.g., "Kurinji Express Bazaar", "Anandam Grand", "Sangam Super Market", "Green Organic Foods").
+   - NEVER use a phone number as a shop name.
+4. PHONE DETECTION:
+   - Extract mobile numbers (like +91XXXXXXXXXX, 91XXXXXXXXXX, XXXXXXXXXX).
+   - Clean the numbers: remove spaces, remove any leading "+91", "91" (if it makes the number 12 digits), or leading "0" (if it makes it 11 digits) to normalize them to a standard 10-digit format (e.g. "8110000734").
+5. ADDRESS DETECTION:
+   - Detect streets, roads, nagars, main roads, directions (West, East, North, South), colonies, or cities in the address lines. (e.g. "Nageswaran North Street").
+   - Do NOT create separate lead records for address lines; group them under the main shop.
+6. CITY DETECTION:
+   - Auto-identify the city if mentioned: Madurai, Chennai, Trichy, Coimbatore, Salem, Kumbakonam.
+   - Assign the correct city. If city is not explicitly separate but mentioned in the address, infer it.
+7. CATEGORY DETECTION:
+   - Auto-classify category using these rules (case-insensitive):
+     - Contains "Organic", "Naturals", "Green", or "Bio" -> "Organic Store"
+     - Contains "Super Market", "Market", or "Mart" -> "Supermarket"
+     - Contains "Medical" or "Pharmacy" -> "Medical Shop"
+     - Contains "Ayurvedic", "Herbal", or "Siddha" -> "Nattu Marundhu Kadai"
+     - Contains "Millet" -> "Millet Store"
+     - Contains "Dry Fruit" -> "Dry Fruit Shop"
+     - Contains "Wholesale", "Agency", or "Distributor" -> "Wholesale Dealer"
+     - Else -> "General Retail Store"
+8. CONFIDENCE SCORE:
+   - Calculate a match confidence score for each lead:
+     - Base score is 70% if Shop Name + Mobile are present.
+     - Add +15% if Address is present.
+     - Add +10% if City is present.
+     - Add +5% if a specific Category (anything other than "General Retail Store") is detected.
+     - Format as "XX% Match" (e.g., "95% Match", "85% Match", "70% Match").
+
+Ensure your response is a valid JSON array of objects.
+Return ONLY the raw JSON list, no markdown wrapper or explanation.
+Example Output Format:
+[
+  {
+    "shopName": "Kurinji Express Bazaar",
+    "mobileNumber": "8110000734",
+    "address": "Nageswaran North Street",
+    "city": "Kumbakonam",
+    "category": "General Retail Store",
+    "confidenceScore": "95% Match"
+  }
+]
+`;
+
+    let parsedLeads = [];
+    let useHeuristics = false;
+    let reply = "";
+    
+    try {
+      reply = await callGemini(prompt);
+      if (typeof reply === 'string' && reply.includes("AI Assistant Error")) {
+        useHeuristics = true;
+      } else {
+        reply = reply.replace(/```json/gi, '').replace(/```/gi, '').trim();
+        parsedLeads = JSON.parse(reply);
+        if (!Array.isArray(parsedLeads)) {
+          parsedLeads = [parsedLeads];
+        }
+      }
+    } catch (err) {
+      console.warn("Gemini lead analysis failed, falling back to heuristics:", err.message);
+      useHeuristics = true;
+    }
+
+    if (useHeuristics) {
+      console.log("Applying block-grouping heuristic parser fallback...");
+      const rawLines = text.split('\n').map(line => line.trim());
+      const groups = [];
+      let currentGroup = [];
+
+      const shopKeywords = [
+        'store', 'stores', 'bazaar', 'market', 'mart', 'super market', 
+        'organic', 'foods', 'traders', 'agency', 'agencies', 
+        'medical', 'pharmacy', 'wellness', 'naturals', 'ayurvedic', 'herbal'
+      ];
+      const addressKeywords = [
+        'street', 'road', 'nagar', 'main road', 'west', 'east', 'north', 'south', 'colony'
+      ];
+      const cityKeywords = [
+        'madurai', 'chennai', 'trichy', 'coimbatore', 'salem', 'kumbakonam'
+      ];
+
+      function isPhoneLine(line) {
+        const digits = line.replace(/[^0-9]/g, '');
+        if (digits.length >= 8 && digits.length <= 15) {
+          const nonDigits = line.replace(/[0-9\s+\-()]/g, '');
+          if (nonDigits.length === 0) return true;
+        }
+        return false;
+      }
+
+      function hasShopKeyword(line) {
+        const lower = line.toLowerCase();
+        return shopKeywords.some(kw => lower.includes(kw));
+      }
+
+      function hasAddressKeyword(line) {
+        const lower = line.toLowerCase();
+        return addressKeywords.some(kw => lower.includes(kw));
+      }
+
+      function hasCityKeyword(line) {
+        const lower = line.toLowerCase();
+        return cityKeywords.some(kw => lower.includes(kw));
+      }
+
+      // Group lines together
+      for (const line of rawLines) {
+        if (line === '') {
+          if (currentGroup.length > 0) {
+            groups.push(currentGroup);
+            currentGroup = [];
+          }
+          continue;
+        }
+
+        const isPhone = isPhoneLine(line);
+        const hasShop = hasShopKeyword(line);
+        const hasAddr = hasAddressKeyword(line);
+        const hasCity = hasCityKeyword(line);
+
+        // Does currentGroup already have a shop name line?
+        const currentHasShopName = currentGroup.some(gl => {
+          return !isPhoneLine(gl) && (hasShopKeyword(gl) || (!hasAddressKeyword(gl) && !hasCityKeyword(gl)));
+        });
+
+        const isNewShopNameLine = !isPhone && (hasShop || (!hasAddr && !hasCity));
+
+        if (currentHasShopName && isNewShopNameLine) {
+          groups.push(currentGroup);
+          currentGroup = [line];
+        } else {
+          currentGroup.push(line);
+        }
+      }
+      if (currentGroup.length > 0) {
+        groups.push(currentGroup);
+      }
+
+      // Process each group into a lead record
+      for (const group of groups) {
+        // If it's a single line and contains separators like '-' or ',' or '|', split it first to help parser
+        let tempGroup = [...group];
+        if (group.length === 1 && (group[0].includes('-') || group[0].includes(',') || group[0].includes('|'))) {
+          // If it matches a phone number pattern, don't split blindly if it breaks the format
+          const parts = group[0].split(/[\-|]/).map(p => p.trim()).filter(Boolean);
+          if (parts.length > 1) {
+            tempGroup = parts;
+          }
+        }
+
+        let shopName = '';
+        let mobileNumber = '';
+        let address = '';
+        let city = '';
+        let category = 'General Retail Store';
+        let addressParts = [];
+
+        // 1. Phone detection and extraction from all lines in group
+        for (let i = 0; i < tempGroup.length; i++) {
+          const rawLine = tempGroup[i];
+          const phoneRegex = /(?:\+91|91)?[-\s]?[6789]\d{4}[-\s]?\d{5}/;
+          const match = rawLine.match(phoneRegex);
+          if (match) {
+            const extracted = match[0].replace(/\D/g, '');
+            mobileNumber = extracted.slice(-10);
+            tempGroup[i] = rawLine.replace(match[0], '').trim();
+          } else {
+            const digits = rawLine.replace(/[^0-9]/g, '');
+            if (digits.length >= 10 && digits.length <= 12) {
+              mobileNumber = digits.slice(-10);
+              tempGroup[i] = '';
+            }
+          }
+        }
+
+        // 2. City detection
+        for (let i = 0; i < tempGroup.length; i++) {
+          const rawLine = tempGroup[i].trim();
+          if (!rawLine) continue;
+
+          for (const cKw of cityKeywords) {
+            const regex = new RegExp(`\\b${cKw}\\b`, 'i');
+            if (regex.test(rawLine)) {
+              city = cKw.charAt(0).toUpperCase() + cKw.slice(1);
+              const cleanLine = rawLine.replace(/[\s,]/g, '').toLowerCase();
+              if (cleanLine === cKw) {
+                tempGroup[i] = '';
+              }
+              break;
+            }
+          }
+        }
+
+        // 3. Shop name detection
+        let shopNameIndex = -1;
+        for (let i = 0; i < tempGroup.length; i++) {
+          const rawLine = tempGroup[i].trim();
+          if (!rawLine) continue;
+
+          if (hasShopKeyword(rawLine)) {
+            shopName = rawLine;
+            shopNameIndex = i;
+            break;
+          }
+        }
+
+        if (!shopName) {
+          for (let i = 0; i < tempGroup.length; i++) {
+            const rawLine = tempGroup[i].trim();
+            if (!rawLine) continue;
+            if (!hasAddressKeyword(rawLine)) {
+              shopName = rawLine;
+              shopNameIndex = i;
+              break;
+            }
+          }
+        }
+
+        if (!shopName) {
+          for (let i = 0; i < tempGroup.length; i++) {
+            const rawLine = tempGroup[i].trim();
+            if (rawLine) {
+              shopName = rawLine;
+              shopNameIndex = i;
+              break;
+            }
+          }
+        }
+
+        // 4. Address detection
+        for (let i = 0; i < tempGroup.length; i++) {
+          const rawLine = tempGroup[i].trim();
+          if (rawLine && i !== shopNameIndex) {
+            addressParts.push(rawLine);
+          }
+        }
+        address = addressParts.join(', ').replace(/^[\s,]+|[\s,]+$/g, '').trim();
+
+        // 5. Clean shopName
+        shopName = shopName.replace(/^[\s\-,;]+|[\s\-,;]+$/g, '').trim();
+
+        // 6. Category classification
+        const lowerShop = shopName.toLowerCase();
+        const lowerGroup = tempGroup.join(' ').toLowerCase();
+        const checkText = (lowerShop + ' ' + lowerGroup);
+        if (checkText.includes('organic') || checkText.includes('naturals') || checkText.includes('green') || checkText.includes('bio')) {
+          category = 'Organic Store';
+        } else if (checkText.includes('super market') || checkText.includes('supermarket') || checkText.includes('market') || checkText.includes('mart')) {
+          category = 'Supermarket';
+        } else if (checkText.includes('medical') || checkText.includes('pharmacy')) {
+          category = 'Medical Shop';
+        } else if (checkText.includes('ayurvedic') || checkText.includes('herbal') || checkText.includes('siddha')) {
+          category = 'Nattu Marundhu Kadai';
+        } else if (checkText.includes('millet')) {
+          category = 'Millet Store';
+        } else if (checkText.includes('dry fruit')) {
+          category = 'Dry Fruit Shop';
+        } else if (checkText.includes('wholesale') || checkText.includes('agency') || checkText.includes('distributor')) {
+          category = 'Wholesale Dealer';
+        }
+
+        if (!city && address) {
+          for (const cKw of cityKeywords) {
+            const regex = new RegExp(`\\b${cKw}\\b`, 'i');
+            if (regex.test(address)) {
+              city = cKw.charAt(0).toUpperCase() + cKw.slice(1);
+              break;
+            }
+          }
+        }
+
+        let confidenceVal = 70;
+        if (address) confidenceVal += 15;
+        if (city) confidenceVal += 10;
+        if (category !== 'General Retail Store') confidenceVal += 5;
+        const confidenceScore = `${confidenceVal}% Match`;
+
+        parsedLeads.push({
+          shopName,
+          mobileNumber,
+          address,
+          city,
+          category,
+          confidenceScore
+        });
+      }
+    }
+
+    const verifiedLeads = [];
+    let validCount = 0;
+    let duplicateCount = 0;
+    let incompleteCount = 0;
+    let invalidCount = 0;
+
+    for (const lead of parsedLeads) {
+      const shopName = (lead.shopName || '').trim();
+      let mobileNumber = (lead.mobileNumber || '').trim();
+      const address = (lead.address || '').trim();
+      const city = (lead.city || '').trim();
+      const category = lead.category || 'General Retail Store';
+
+      // Standardize phone representation to 10 digits
+      mobileNumber = mobileNumber.replace(/\D/g, '');
+      if (mobileNumber.length > 10) {
+        mobileNumber = mobileNumber.slice(-10);
+      }
+
+      // Compute or recalculate confidence score to guarantee strict logic consistency
+      let confidenceVal = 70;
+      if (address) confidenceVal += 15;
+      if (city) confidenceVal += 10;
+      if (category !== 'General Retail Store') confidenceVal += 5;
+      const confidenceScore = `${confidenceVal}% Match`;
+
+      let isInvalid = false;
+      let isDuplicate = false;
+      let statusText = 'New Lead';
+      let reason = '';
+
+      if (!shopName || !mobileNumber) {
+        isInvalid = true;
+        reason = 'Missing shop name or mobile number';
+        statusText = 'Invalid';
+        invalidCount++;
+      } else if (mobileNumber.length < 9) {
+        isInvalid = true;
+        reason = 'Mobile number is too short or invalid';
+        statusText = 'Invalid';
+        invalidCount++;
+      } else {
+        const duplicateLead = await Lead.findOne({
+          where: {
+            [Op.or]: [
+              { mobileNumber: mobileNumber },
+              { shopName: { [Op.like]: shopName } }
+            ]
+          }
+        });
+
+        const duplicateCustomer = await Customer.findOne({
+          where: {
+            [Op.or]: [
+              { phone: mobileNumber },
+              { name: { [Op.like]: shopName } }
+            ]
+          }
+        });
+
+        if (duplicateLead) {
+          isDuplicate = true;
+          reason = `Duplicate: Shop or phone already exists in CRM Leads (Lead #${duplicateLead.id})`;
+          statusText = 'Duplicate Lead';
+          duplicateCount++;
+        } else if (duplicateCustomer) {
+          isDuplicate = true;
+          reason = `Duplicate: Shop or phone already exists in Customers (Customer #${duplicateCustomer.id})`;
+          statusText = 'Existing Customer';
+          duplicateCount++;
+        } else {
+          statusText = 'New Lead';
+          validCount++;
+
+          if (!address || !city) {
+            incompleteCount++;
+          }
+        }
+      }
+
+      verifiedLeads.push({
+        shopName,
+        mobileNumber,
+        address,
+        city,
+        category,
+        confidenceScore,
+        isInvalid,
+        isDuplicate,
+        statusText,
+        reason
+      });
+    }
+
+    res.json({
+      success: true,
+      summary: {
+        total: verifiedLeads.length,
+        valid: validCount,
+        duplicates: duplicateCount,
+        incomplete: incompleteCount,
+        invalid: invalidCount
+      },
+      leads: verifiedLeads
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.importLeadsList = async (req, res, next) => {
+  try {
+    const { leads } = req.body;
+    if (!leads || !Array.isArray(leads) || leads.length === 0) {
+      return res.status(400).json({ message: 'No leads provided for import' });
+    }
+
+    const createdLeads = [];
+    for (const item of leads) {
+      const newLead = await Lead.create({
+        shopName: item.shopName,
+        mobileNumber: item.mobileNumber,
+        address: item.address || '',
+        city: item.city || '',
+        area: item.address || '',
+        category: item.category || 'General Retail Store',
+        status: 'New',
+        source: 'AI Lead Importer'
+      });
+      createdLeads.push(newLead);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `Successfully imported ${createdLeads.length} leads.`,
+      leadsCount: createdLeads.length
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

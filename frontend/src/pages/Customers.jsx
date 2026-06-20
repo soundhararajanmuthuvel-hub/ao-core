@@ -1730,9 +1730,6 @@ export default function Customers() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button type="button" className="btn btn-secondary" onClick={handleCustomerIntelligence} style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Brain size={16} /> AI Customer Intelligence
-          </button>
           <button type="button" className="btn btn-primary" onClick={() => openFormModal()} style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem' }}>
             + Add Customer
           </button>
@@ -2703,15 +2700,6 @@ export default function Customers() {
           onClose={() => setReminderModalInvoice(null)}
         />
       )}
-
-      <AIInsightsModal
-        isOpen={aiModalOpen}
-        onClose={() => setAiModalOpen(false)}
-        title="CRM Customer Intelligence Audit"
-        insightsText={aiInsights}
-        loading={aiLoading}
-        onRetry={handleCustomerIntelligence}
-      />
 
     </div>
   );

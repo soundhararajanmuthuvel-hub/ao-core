@@ -19,6 +19,7 @@ router.post('/routes/optimize', sfaController.optimizeRoute);
 // Customer Visits
 router.post('/visits/check-in', sfaController.checkInVisit);
 router.post('/visits/check-out', sfaController.checkOutVisit);
+router.post('/visits/manual', sfaController.logManualVisit);
 router.get('/visits', sfaController.getVisits);
 
 // GPS Live Tracking

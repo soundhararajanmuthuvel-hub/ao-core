@@ -895,3 +895,146 @@ exports.chatAI = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getDashboardSuggestions = async (req, res, next) => {
+  try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    const AiSuggestion = require('../models/AiSuggestion');
+
+    if (!forceRefresh) {
+      const cached = await AiSuggestion.findOne({ where: { generatedDate: todayStr } });
+      if (cached) {
+        return res.json({ success: true, suggestions: cached.suggestions, cached: true });
+      }
+    }
+
+    // Gather context from DB
+    const [products, rawMaterials, customers, unpaidInvoices] = await Promise.all([
+      Product.findAll({ attributes: ['name', 'stock', 'lowStockThreshold', 'unit'] }),
+      RawMaterial.findAll({ attributes: ['name', 'stock', 'minStock', 'unit'] }),
+      Customer.findAll({ attributes: ['name', 'businessName', 'balance', 'lastOrderDate', 'territory'] }),
+      Invoice.findAll({ where: { paymentStatus: ['Unpaid', 'Partial'] } })
+    ]);
+
+    // Heuristics calculations for fallback OR context
+    const lowStockItems = [];
+    products.forEach(p => {
+      if (Number(p.stock) <= Number(p.lowStockThreshold)) {
+        lowStockItems.push(`${p.name} stock (${Math.round(p.stock)} ${p.unit}) is below reorder level`);
+      }
+    });
+    rawMaterials.forEach(r => {
+      if (Number(r.stock) <= Number(r.minStock)) {
+        lowStockItems.push(`${r.name} stock (${Math.round(r.stock)} ${r.unit}) is below minimum stock level`);
+      }
+    });
+
+    const outstandingBalance = unpaidInvoices.reduce((sum, inv) => sum + Number(inv.grandTotal - (inv.paidAmount || 0)), 0);
+    
+    // Inactive customers (no order in last 30 days)
+    const inactiveCustomers = [];
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    customers.forEach(c => {
+      if (c.lastOrderDate && new Date(c.lastOrderDate) < thirtyDaysAgo) {
+        inactiveCustomers.push(`${c.name} (${c.businessName || 'Store'}) has not ordered for over 30 days`);
+      }
+    });
+
+    // Pending collections list
+    const pendingCollections = unpaidInvoices.map(inv => {
+      const remaining = Number(inv.grandTotal - (inv.paidAmount || 0));
+      return `Outstanding balance of ₹${remaining.toLocaleString('en-IN')} pending for Invoice #${inv.invoiceNumber}`;
+    }).slice(0, 3);
+
+    // Call Gemini if API Key exists
+    if (process.env.GEMINI_API_KEY) {
+      const erpContext = {
+        lowStockCount: lowStockItems.length,
+        lowStockSample: lowStockItems.slice(0, 5),
+        totalOutstandingBalance: outstandingBalance,
+        inactiveCustomersCount: inactiveCustomers.length,
+        inactiveCustomersSample: inactiveCustomers.slice(0, 5),
+        pendingCollectionsSample: pendingCollections,
+        territories: [...new Set(customers.map(c => c.territory).filter(Boolean))]
+      };
+
+      const prompt = `
+        You are the business intelligence engine for Amudhasurabiy Organics (AO ERP).
+        Here is the current operational context of the business database:
+        ${JSON.stringify(erpContext)}
+
+        Please generate exactly 5 bullet-point business recommendations or insights.
+        - Ensure they are extremely short, action-oriented, one-sentence lines.
+        - Follow the tone and style of these examples:
+          • Murugan Stores has not ordered for 45 days.
+          • ABC Malt stock is below reorder level.
+          • Outstanding collection of ₹25,000 pending.
+          • Visit 5 customers in Madurai today.
+          • Beetroot Malt sales increased 15% this month.
+        
+        Return ONLY a JSON array of strings, with no markdown code blocks, backticks, formatting, or extra text.
+        Example output format:
+        ["Murugan Stores has not ordered for 45 days.", "ABC Malt stock is below reorder level."]
+      `;
+
+      try {
+        const rawReply = await callGemini(prompt);
+        // Clean reply from backticks in case Gemini returned markdown
+        let cleanedReply = rawReply.replace(/```json/g, '').replace(/```/g, '').trim();
+        const suggestions = JSON.parse(cleanedReply);
+
+        if (Array.isArray(suggestions) && suggestions.length > 0) {
+          // Store in DB
+          await AiSuggestion.upsert({
+            generatedDate: todayStr,
+            suggestions
+          });
+
+          return res.json({ success: true, suggestions, cached: false });
+        }
+      } catch (geminiErr) {
+        console.error('Error generating suggestions with Gemini, falling back to heuristics:', geminiErr);
+      }
+    }
+
+    // Heuristics Fallback Mode
+    const fallbackSuggestions = [];
+    if (lowStockItems.length > 0) {
+      fallbackSuggestions.push(lowStockItems[0]);
+      if (lowStockItems[1]) fallbackSuggestions.push(lowStockItems[1]);
+    } else {
+      fallbackSuggestions.push("Finished goods stock levels are currently healthy.");
+    }
+
+    if (outstandingBalance > 0) {
+      fallbackSuggestions.push(`Outstanding collection of ₹${Math.round(outstandingBalance).toLocaleString('en-IN')} pending.`);
+    }
+
+    if (inactiveCustomers.length > 0) {
+      fallbackSuggestions.push(inactiveCustomers[0]);
+    }
+
+    fallbackSuggestions.push("Review raw material levels to plan weekly production runs.");
+    if (fallbackSuggestions.length < 5) {
+      fallbackSuggestions.push("Schedule follow-up calls with customers showing outstanding balances.");
+    }
+
+    const suggestions = fallbackSuggestions.slice(0, 5);
+
+    // Store in DB
+    await AiSuggestion.upsert({
+      generatedDate: todayStr,
+      suggestions
+    });
+
+    res.json({ success: true, suggestions, cached: false });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.callGemini = callGemini;
+

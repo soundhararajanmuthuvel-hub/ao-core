@@ -91,6 +91,86 @@ const StatCard = ({ label, value, subtext, className = '', style = {}, onClick }
   </motion.div>
 );
 
+function AiSuggestionsWidget() {
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [isCached, setIsCached] = useState(false);
+
+  const fetchSuggestions = async (force = false) => {
+    setLoading(true);
+    try {
+      const res = await analyticsApi.dashboard(); // trigger normal stats reload
+      const sugRes = await aiApi.suggestions({ forceRefresh: force });
+      if (sugRes.data?.success) {
+        setSuggestions(sugRes.data.suggestions || []);
+        setIsCached(!!sugRes.data.cached);
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard AI suggestions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSuggestions(false);
+  }, []);
+
+  return (
+    <div className="card" style={{ 
+      background: 'linear-gradient(135deg, rgba(90, 45, 12, 0.08), rgba(245, 158, 11, 0.04))', 
+      border: '1px solid rgba(90, 45, 12, 0.2)', 
+      borderRadius: '12px', 
+      padding: '1.25rem', 
+      marginBottom: '1.5rem',
+      position: 'relative',
+      boxShadow: 'var(--shadow)'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#5a2d0c', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          🤖 Centralized AI Business Suggestions
+        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {isCached && (
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', background: 'var(--border)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+              Cached Daily
+            </span>
+          )}
+          <button 
+            onClick={() => fetchSuggestions(true)} 
+            disabled={loading}
+            style={{ 
+              background: 'transparent', 
+              border: 'none', 
+              color: '#5a2d0c', 
+              fontSize: '0.8rem', 
+              fontWeight: 700, 
+              cursor: 'pointer',
+              textDecoration: 'underline'
+            }}
+          >
+            {loading ? 'Refreshing...' : 'Refresh On-Demand'}
+          </button>
+        </div>
+      </div>
+
+      {loading && suggestions.length === 0 ? (
+        <div style={{ padding: '0.5rem 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Analyzing ERP database and generating insights...</div>
+      ) : suggestions.length > 0 ? (
+        <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 550 }}>
+          {suggestions.map((item, idx) => (
+            <li key={idx} style={{ lineHeight: '1.4' }}>
+              {item}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div style={{ padding: '0.5rem 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No suggestions generated for today.</div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -295,48 +375,8 @@ export default function Dashboard() {
           <Link to="/sales?tab=new" className="btn btn-primary" style={{ padding: '0.6rem 1.25rem', fontWeight: 600 }}>+ New Invoice</Link>
         </div>
 
-        {/* Dashboard View Switcher */}
-        <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1.5rem' }}>
-          <button
-            type="button"
-            onClick={() => setActiveDashboardView('erp')}
-            style={{
-              padding: '0.5rem 1rem',
-              fontSize: '0.9rem',
-              fontWeight: 700,
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: activeDashboardView === 'erp' ? '#5a2d0c' : '#64748b',
-              borderBottom: activeDashboardView === 'erp' ? '3px solid #5a2d0c' : '3px solid transparent',
-              marginBottom: '-10px',
-              transition: 'all 0.2s'
-            }}
-          >
-            📊 ERP Operations Dashboard
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveDashboardView('sfa')}
-            style={{
-              padding: '0.5rem 1rem',
-              fontSize: '0.9rem',
-              fontWeight: 700,
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: activeDashboardView === 'sfa' ? '#5a2d0c' : '#64748b',
-              borderBottom: activeDashboardView === 'sfa' ? '3px solid #5a2d0c' : '3px solid transparent',
-              marginBottom: '-10px',
-              transition: 'all 0.2s'
-            }}
-          >
-            🗺️ SFA Manager Command Center
-          </button>
-        </div>
-
-        {activeDashboardView === 'erp' ? (
-          <>
+        {/* AI Suggestions Widget */}
+        <AiSuggestionsWidget />
             {outstandingValue > 50000 && (
               <div className="card" style={{ borderLeft: '6px solid #ef4444', backgroundColor: '#fef2f2', padding: '1.25rem', borderRadius: '10px', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
@@ -718,140 +758,6 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-          </>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {/* SFA Metrics Row */}
-            <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-              <StatCard label="Assigned Customers" value={sfaAnalytics?.assignedCustomers || 0} />
-              <StatCard label="Visited Today" value={sfaAnalytics?.visitedCustomers || 0} />
-              <StatCard label="Orders Generated" value={sfaAnalytics?.ordersGenerated || 0} className="success" />
-              <StatCard label="Route Conversion Rate" value={`${sfaAnalytics?.orderConversionRate || 0}%`} className="success" />
-              <StatCard label="Field Time" value={`${sfaAnalytics?.timeSpentInFieldMin || 0} mins`} />
-            </div>
-
-            {/* Map & Beats Tracker Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 450px), 1fr))', gap: '1.5rem' }}>
-              {/* Sales Team Live Map */}
-              <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>🗺️ Live Sales Team Tracking Map</h3>
-                <div style={{ width: '100%', height: '300px', backgroundColor: '#0f172a', borderRadius: '8px', overflow: 'hidden' }}>
-                  <svg width="100%" height="100%">
-                    <rect width="100%" height="100%" fill="#020617" />
-                    {/* Draw grid */}
-                    <pattern id="live-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.02)" strokeWidth="1"/>
-                    </pattern>
-                    <rect width="100%" height="100%" fill="url(#live-grid)" />
-                    
-                    {/* Plot Salesmen last positions */}
-                    {sfaTracking.map((t, idx) => {
-                      if (!t.lastKnownLocation) return null;
-                      // Mock visual offset plotting
-                      const x = 50 + (idx * 140) % 400;
-                      const y = 80 + (idx * 70) % 200;
-                      return (
-                        <g key={t.salesman.id} style={{ cursor: 'pointer' }}>
-                          <circle cx={x} cy={y} r="15" fill="rgba(245, 158, 11, 0.2)">
-                            <animate attributeName="r" values="10;22;10" dur="2.5s" repeatCount="indefinite" />
-                          </circle>
-                          <circle cx={x} cy={y} r="6" fill="#f59e0b" stroke="#fff" strokeWidth="2" />
-                          <text x={x + 10} y={y + 4} fill="#e2e8f0" fontSize="10" fontWeight="bold">{t.salesman.name}</text>
-                          <text x={x + 10} y={y + 16} fill="#94a3b8" fontSize="8">Today: {t.visitsToday} visits</text>
-                        </g>
-                      );
-                    })}
-
-                    {sfaTracking.length === 0 && (
-                      <text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle" fill="#64748b" fontSize="12">No active salesmen logged.</text>
-                    )}
-                  </svg>
-                </div>
-              </div>
-
-              {/* Today's Route Activity logs */}
-              <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '1rem', color: '#0f172a' }}>📋 Salesman Field Visit Timeline</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '300px', overflowY: 'auto' }}>
-                  {sfaVisits.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '3rem 0', color: '#64748b' }}>No field visits logged today.</div>
-                  ) : (
-                    sfaVisits.slice(0, 5).map(v => (
-                      <div key={v.id} style={{ padding: '0.6rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                          <span>{v.customer?.name}</span>
-                          <span style={{ fontSize: '0.75rem', padding: '0.1rem 0.4rem', borderRadius: '4px', backgroundColor: '#ecfdf5', color: '#065f46' }}>{v.status}</span>
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
-                          Visited by <strong>{v.salesman?.name}</strong> at {new Date(v.checkInTime).toLocaleTimeString()}
-                        </div>
-                        {v.notes && (
-                          <div style={{ fontStyle: 'italic', fontSize: '0.8rem', color: '#475569', marginTop: '0.35rem', borderLeft: '3px solid #e2e8f0', paddingLeft: '0.5rem' }}>
-                            &ldquo;{v.notes}&rdquo;
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Inactive Retailers and Ratings Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 450px), 1fr))', gap: '1.5rem' }}>
-              
-              {/* Inactive Customers Alert */}
-              <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '0.75rem', color: '#0f172a' }}>⚠️ Inactive Distributor Accounts (No visits in 14 days)</h3>
-                <div className="table-wrap">
-                  <table className="data-table" style={{ fontSize: '0.85rem' }}>
-                    <thead>
-                      <tr><th>Client Name</th><th>Territory</th><th>Assigned Rep</th><th>Action</th></tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td><strong>Classic Organics</strong></td>
-                        <td>West Zone</td>
-                        <td>Muralidharan</td>
-                        <td><button type="button" className="btn btn-secondary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}>Schedule beat</button></td>
-                      </tr>
-                      <tr>
-                        <td><strong>Nellai Organics Store</strong></td>
-                        <td>South Zone</td>
-                        <td>Venkatesh</td>
-                        <td><button type="button" className="btn btn-secondary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}>Schedule beat</button></td>
-                      </tr>
-                      <tr>
-                        <td><strong>Heritage Mart</strong></td>
-                        <td>North Zone</td>
-                        <td>Muralidharan</td>
-                        <td><button type="button" className="btn btn-secondary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}>Schedule beat</button></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* CSAT Rating summary */}
-              <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>🌟 Customer Satisfaction (CSAT) ratings</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', flex: 1, alignItems: 'center' }}>
-                  <div style={{ textAlign: 'center', padding: '1rem', backgroundColor: '#fffbeb', borderRadius: '8px', border: '1px solid #fef3c7' }}>
-                    <span style={{ fontSize: '1.5rem', color: '#fbbf24' }}>★★★★★</span>
-                    <h4 style={{ margin: '0.5rem 0 0.25rem 0', fontSize: '1.5rem', fontWeight: 800 }}>4.8 / 5.0</h4>
-                    <span style={{ fontSize: '0.75rem', color: '#b45309' }}>Product Quality Average</span>
-                  </div>
-                  <div style={{ textAlign: 'center', padding: '1rem', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #d1fae5' }}>
-                    <span style={{ fontSize: '1.5rem', color: '#10b981' }}>★★★★★</span>
-                    <h4 style={{ margin: '0.5rem 0 0.25rem 0', fontSize: '1.5rem', fontWeight: 800 }}>4.6 / 5.0</h4>
-                    <span style={{ fontSize: '0.75rem', color: '#15803d' }}>Delivery Experience Average</span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        )}
       </div>
     );
   }

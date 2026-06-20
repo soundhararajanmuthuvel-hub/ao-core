@@ -251,6 +251,42 @@ exports.checkOutVisit = async (req, res, next) => {
   }
 };
 
+exports.logManualVisit = async (req, res, next) => {
+  try {
+    const { customerId, visitDate, notes } = req.body;
+    if (!customerId) {
+      return res.status(400).json({ message: 'Customer ID is required' });
+    }
+
+    const customer = await Customer.findByPk(customerId);
+    if (!customer) {
+      return res.status(404).json({ message: 'Customer not found' });
+    }
+
+    const parsedDate = visitDate ? new Date(visitDate) : new Date();
+
+    const visit = await Visit.create({
+      salesmanId: req.user.id,
+      customerId,
+      checkInTime: parsedDate,
+      checkOutTime: parsedDate,
+      duration: 0,
+      latitude: customer.latitude !== null ? Number(customer.latitude) : 0,
+      longitude: customer.longitude !== null ? Number(customer.longitude) : 0,
+      status: 'Visited',
+      notes: notes || '',
+      distanceFromCustomer: 0
+    });
+
+    customer.lastVisitDate = parsedDate;
+    await customer.save();
+
+    res.status(201).json(visit);
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.getVisits = async (req, res, next) => {
   try {
     const query = {};

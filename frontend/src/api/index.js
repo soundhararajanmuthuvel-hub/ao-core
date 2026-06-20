@@ -210,6 +210,7 @@ export const courierApi = {
 
 export const aiApi = {
   insights: () => client.get('/ai/insights'),
+  suggestions: (params) => client.get('/ai/suggestions', { params }),
   chat: (data) => client.post('/ai/chat', data),
   analyzeLeads: () => client.post('/ai/analyze-leads'),
   customerIntelligence: () => client.post('/ai/customer-intelligence'),
@@ -264,6 +265,7 @@ export const sfaApi = {
   optimizeRoute: (data) => client.post('/sfa/routes/optimize', data),
   checkIn: (data) => client.post('/sfa/visits/check-in', data),
   checkOut: (data) => client.post('/sfa/visits/check-out', data),
+  logManualVisit: (data) => client.post('/sfa/visits/manual', data),
   getVisits: (params) => client.get('/sfa/visits', { params }),
   pingLocation: (data) => client.post('/sfa/tracking/ping', data),
   getLiveTracking: () => client.get('/sfa/tracking/live'),
@@ -282,6 +284,10 @@ export const crmApi = {
   deleteLead: (id) => client.delete(`/crm/leads/${id}`),
   findLeads: (params) => client.get('/crm/lead-finder', { params }),
   convertLead: (id, data) => client.post(`/crm/leads/${id}/convert`, data),
+  
+  extractText: (formData) => client.post('/crm/leads/import/extract-text', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  analyzeLeadsText: (data) => client.post('/crm/leads/import/analyze', data),
+  importLeadsList: (data) => client.post('/crm/leads/import/execute', data),
   
   getOpportunities: (params) => client.get('/crm/opportunities', { params }),
   createOpportunity: (data) => client.post('/crm/opportunities', data),

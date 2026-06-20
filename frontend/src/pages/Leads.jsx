@@ -1,10 +1,27 @@
-import { useState, useEffect } from 'react';
-import { crmApi, usersApi, aiApi } from '../api';
-import { Plus, Search, Filter, Phone, Mail, MapPin, CheckSquare, FileText, UserPlus, Trash, Edit, RefreshCw, Brain } from 'lucide-react';
-import AIInsightsModal from '../components/AIInsightsModal';
+const LEAD_CATEGORIES = [
+  'Organic Store',
+  'Nattu Marundhu Kadai',
+  'Health Food Store',
+  'Ayurvedic Shop',
+  'Millet Store',
+  'Dry Fruit Shop',
+  'Supermarket',
+  'Mini Supermarket',
+  'Department Store',
+  'Provision Store',
+  'General Retail Store',
+  'Medical Shop',
+  'Baby Store',
+  'Nutrition Store',
+  'Wellness Store',
+  'Wholesale Dealer',
+  'Distributor',
+  'Organic Farm'
+];
 
 export default function Leads() {
   const [leads, setLeads] = useState([]);
+  const [allLeads, setAllLeads] = useState([]);
   const [salesmen, setSalesmen] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -30,7 +47,7 @@ export default function Leads() {
   // Lead Form State
   const [formData, setFormData] = useState({
     shopName: '',
-    category: 'Organic Stores',
+    category: 'Organic Store',
     ownerName: '',
     mobileNumber: '',
     address: '',
@@ -67,6 +84,10 @@ export default function Leads() {
       };
       const res = await crmApi.getLeads(params);
       setLeads(res.data);
+
+      // Load all leads to compute dashboard statistics cards
+      const allRes = await crmApi.getLeads({});
+      setAllLeads(allRes.data || []);
     } catch (err) {
       console.error('Error fetching leads:', err);
     } finally {
@@ -184,7 +205,7 @@ export default function Leads() {
   const resetForm = () => {
     setFormData({
       shopName: '',
-      category: 'Organic Stores',
+      category: 'Organic Store',
       ownerName: '',
       mobileNumber: '',
       address: '',
@@ -203,7 +224,7 @@ export default function Leads() {
   const openEditModal = (lead) => {
     setFormData({
       shopName: lead.shopName || '',
-      category: lead.category || 'Organic Stores',
+      category: lead.category || 'Organic Store',
       ownerName: lead.ownerName || '',
       mobileNumber: lead.mobileNumber || '',
       address: lead.address || '',
@@ -253,12 +274,62 @@ export default function Leads() {
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>Manage contacts, check-ins, followups, and conversion flow.</p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button className="btn btn-secondary" onClick={handleAnalyzeLeads} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Brain size={18} /> AI Lead Analyst
-          </button>
           <button className="btn btn-primary" onClick={() => { resetForm(); setAddModalOpen(true); }}>
             <Plus size={18} /> New Lead
           </button>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: '1rem',
+        marginBottom: '1.5rem'
+      }}>
+        {/* Total Leads Card */}
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.25rem', borderLeft: '5px solid #3b82f6', margin: 0 }}>
+          <div style={{ fontSize: '1.75rem' }}>📊</div>
+          <div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{allLeads.length}</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Leads</div>
+          </div>
+        </div>
+
+        {/* Organic Stores Card */}
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.25rem', borderLeft: '5px solid #22c55e', margin: 0 }}>
+          <div style={{ fontSize: '1.75rem' }}>🌱</div>
+          <div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{allLeads.filter(l => l.category === 'Organic Store').length}</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Organic Stores</div>
+          </div>
+        </div>
+
+        {/* Supermarkets Card */}
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.25rem', borderLeft: '5px solid #eab308', margin: 0 }}>
+          <div style={{ fontSize: '1.75rem' }}>🛒</div>
+          <div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{allLeads.filter(l => l.category === 'Supermarket').length}</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Supermarkets</div>
+          </div>
+        </div>
+
+        {/* Medical Shops Card */}
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.25rem', borderLeft: '5px solid #ec4899', margin: 0 }}>
+          <div style={{ fontSize: '1.75rem' }}>💊</div>
+          <div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{allLeads.filter(l => l.category === 'Medical Shop').length}</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Medical Shops</div>
+          </div>
+        </div>
+
+        {/* Converted Customers Card */}
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.25rem', borderLeft: '5px solid #a855f7', margin: 0 }}>
+          <div style={{ fontSize: '1.75rem' }}>👤</div>
+          <div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{allLeads.filter(l => l.status === 'Customer').length}</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Converted Customers</div>
+          </div>
         </div>
       </div>
 
@@ -290,7 +361,7 @@ export default function Leads() {
           >
             <option value="">All Statuses</option>
             <option value="New">New</option>
-            <option value="Assigned">Assigned</option>
+            <option value="Contacted">Contacted</option>
             <option value="Visited">Visited</option>
             <option value="Interested">Interested</option>
             <option value="Customer">Converted Customer</option>
@@ -302,13 +373,10 @@ export default function Leads() {
             onChange={(e) => setCategoryFilter(e.target.value)}
             style={{ padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-page)', color: 'var(--text-primary)' }}
           >
-            <option value="">All Segments</option>
-            <option value="Organic Stores">Organic Stores</option>
-            <option value="Millet Stores">Millet Stores</option>
-            <option value="Ayurvedic Shops">Ayurvedic Shops</option>
-            <option value="Supermarkets">Supermarkets</option>
-            <option value="Nattu Marundhu Kadai">Nattu Marundhu Kadai</option>
-            <option value="Dry Fruit Shops">Dry Fruit Shops</option>
+            <option value="">All Categories</option>
+            {LEAD_CATEGORIES.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
           </select>
 
           <select 
@@ -344,12 +412,10 @@ export default function Leads() {
             <thead>
               <tr>
                 <th>Shop Name</th>
-                <th>Segment</th>
-                <th>Owner Name</th>
-                <th>Mobile Number</th>
-                <th>Location</th>
+                <th>Category</th>
+                <th>Mobile</th>
+                <th>City</th>
                 <th>Status</th>
-                <th>Salesman</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
@@ -357,30 +423,36 @@ export default function Leads() {
               {leads.map((lead) => {
                 let badgeColor = 'badge-warning';
                 if (lead.status === 'New') badgeColor = 'badge-warning';
+                if (lead.status === 'Contacted') badgeColor = 'badge-info';
+                if (lead.status === 'Visited') badgeColor = 'badge-info';
+                if (lead.status === 'Interested') badgeColor = 'badge-success';
                 if (lead.status === 'Customer') badgeColor = 'badge-success';
                 if (lead.status === 'Rejected') badgeColor = 'badge-danger';
-                if (lead.status === 'Interested') badgeColor = 'badge-success';
 
                 return (
                   <tr key={lead.id} style={{ cursor: 'pointer' }} onClick={() => selectLeadForDetails(lead)}>
                     <td style={{ fontWeight: 700, color: 'var(--brand-primary)' }}>{lead.shopName}</td>
                     <td>{lead.category}</td>
-                    <td>{lead.ownerName || '—'}</td>
                     <td>{lead.mobileNumber || '—'}</td>
-                    <td>{lead.city ? `${lead.city}, TN` : '—'}</td>
+                    <td>{lead.city || '—'}</td>
                     <td>
                       <span className={`badge ${badgeColor}`}>{lead.status}</span>
                     </td>
-                    <td>{lead.salesman?.name || 'Unassigned'}</td>
                     <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                      <button className="btn btn-icon btn-sm" onClick={() => openEditModal(lead)} style={{ marginRight: '0.25rem' }}>
-                        <Edit size={14} />
+                      <button className="btn btn-outline-primary btn-sm" onClick={() => selectLeadForDetails(lead)} title="View Details" style={{ marginRight: '0.25rem' }}>
+                        <FileText size={14} /> View
+                      </button>
+                      <button className="btn btn-icon btn-sm" onClick={() => openEditModal(lead)} title="Edit Lead" style={{ marginRight: '0.25rem' }}>
+                        <Edit size={14} /> Edit
                       </button>
                       {lead.status !== 'Customer' && (
-                        <button className="btn btn-success btn-sm" onClick={() => handleConvertLead(lead.id)} title="Convert to Customer">
-                          <UserPlus size={14} />
+                        <button className="btn btn-success btn-sm" onClick={() => handleConvertLead(lead.id)} title="Convert to Customer" style={{ marginRight: '0.25rem' }}>
+                          <UserPlus size={14} /> Convert
                         </button>
                       )}
+                      <button className="btn btn-outline-danger btn-sm" onClick={() => handleDeleteLead(lead.id)} title="Delete Lead">
+                        <Trash size={14} /> Delete
+                      </button>
                     </td>
                   </tr>
                 );
@@ -528,14 +600,11 @@ export default function Leads() {
                     <input type="tel" className="form-control" required value={formData.mobileNumber} onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label>Segment Segment *</label>
+                    <label>Category *</label>
                     <select className="form-control" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
-                      <option value="Organic Stores">Organic Stores</option>
-                      <option value="Millet Stores">Millet Stores</option>
-                      <option value="Ayurvedic Shops">Ayurvedic Shops</option>
-                      <option value="Supermarkets">Supermarkets</option>
-                      <option value="Nattu Marundhu Kadai">Nattu Marundhu Kadai</option>
-                      <option value="Dry Fruit Shops">Dry Fruit Shops</option>
+                      {LEAD_CATEGORIES.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -626,14 +695,11 @@ export default function Leads() {
                     <input type="tel" className="form-control" required value={formData.mobileNumber} onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label>Segment Segment *</label>
+                    <label>Category *</label>
                     <select className="form-control" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
-                      <option value="Organic Stores">Organic Stores</option>
-                      <option value="Millet Stores">Millet Stores</option>
-                      <option value="Ayurvedic Shops">Ayurvedic Shops</option>
-                      <option value="Supermarkets">Supermarkets</option>
-                      <option value="Nattu Marundhu Kadai">Nattu Marundhu Kadai</option>
-                      <option value="Dry Fruit Shops">Dry Fruit Shops</option>
+                      {LEAD_CATEGORIES.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -679,7 +745,7 @@ export default function Leads() {
                     <label>Lead Status</label>
                     <select className="form-control" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
                       <option value="New">New</option>
-                      <option value="Assigned">Assigned</option>
+                      <option value="Contacted">Contacted</option>
                       <option value="Visited">Visited</option>
                       <option value="Interested">Interested</option>
                       <option value="Customer" disabled>Converted Customer (Use Convert Action)</option>
@@ -696,15 +762,6 @@ export default function Leads() {
           </div>
         </div>
       )}
-
-      <AIInsightsModal
-        isOpen={aiModalOpen}
-        onClose={() => setAiModalOpen(false)}
-        title="CRM AI Lead Analyst"
-        insightsText={aiInsights}
-        loading={aiLoading}
-        onRetry={handleAnalyzeLeads}
-      />
     </div>
   );
 }

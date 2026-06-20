@@ -213,9 +213,6 @@ export default function ManufacturingPage() {
             Formulate Recipes, execute Production Wizards, repack Bulk Goods, and inspect Batch logs.
           </p>
         </div>
-        <button type="button" className="btn btn-secondary" onClick={handleManufacturingAssistant} style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Brain size={16} /> AI Manufacturing Planner
-        </button>
       </div>
 
       {/* Dashboard Statistics Cards */}
@@ -515,15 +512,6 @@ export default function ManufacturingPage() {
           onSave={saveRecipe}
         />
       )}
-
-      <AIInsightsModal
-        isOpen={aiModalOpen}
-        onClose={() => setAiModalOpen(false)}
-        title="AI Manufacturing Planner"
-        insightsText={aiInsights}
-        loading={aiLoading}
-        onRetry={handleManufacturingAssistant}
-      />
     </div>
   );
 
