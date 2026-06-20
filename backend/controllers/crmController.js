@@ -167,7 +167,7 @@ exports.getLead = async (req, res, next) => {
   try {
     const lead = await Lead.findByPk(req.params.id, {
       include: [
-        { model: User, as: 'salesman', attributes: ['id', 'name', 'phone'] },
+        { model: User, as: 'salesman', attributes: ['id', 'name'] },
         { model: Customer, as: 'customer', attributes: ['id', 'name', 'customerCode'] }
       ]
     });
