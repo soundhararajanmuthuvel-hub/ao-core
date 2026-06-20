@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>AO Core ERP</title>
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="manifest" href="/manifest.json" />
@@ -10,35 +10,79 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <script>
+      function logErrorToServer(data) {
+        fetch('/api/client-error', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        }).catch(err => console.error('Failed to log to server', err));
+      }
+
+      function showFatalErrorOverlay(msg) {
+        const root = document.getElementById('root');
+        if (root) {
+          root.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #fef2f2; color: #b91c1c; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 2rem; box-sizing: border-box; text-align: center;">
+              <span style="font-size: 3.5rem; margin-bottom: 1rem;">⚠️</span>
+              <h1 style="margin: 0; font-size: 1.6rem; font-weight: 800; color: #991b1b;">Oops! Something went wrong</h1>
+              <p style="margin: 0.5rem 0 1.5rem 0; font-size: 0.95rem; color: #7f1d1d; max-width: 450px; line-height: 1.5; word-break: break-all;">
+                ${msg}
+              </p>
+              <div style="display: flex; gap: 1rem;">
+                <button onclick="window.location.reload(true)" style="background-color: #b91c1c; color: #fff; border: none; border-radius: 8px; padding: 0.65rem 1.5rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 6px rgba(185, 28, 28, 0.15); font-size: 0.9rem;">
+                  Reload App
+                </button>
+                <button onclick="localStorage.clear(); sessionStorage.clear(); window.location.href='/'" style="background-color: rgba(0,0,0,0.05); color: #4b5563; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.65rem 1.5rem; font-weight: 600; cursor: pointer; font-size: 0.9rem;">
+                  Reset Cache
+                </button>
+              </div>
+            </div>
+          `;
+        }
+      }
+
       window.addEventListener('error', function(event) {
-        fetch('/api/client-error', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: event.message,
-            source: event.filename,
-            lineno: event.lineno,
-            colno: event.colno,
-            stack: event.error ? event.error.stack : null,
-            type: 'error'
-          })
-        }).catch(err => console.error('Failed to log to server', err));
+        console.error('PWA: Fatal unhandled error:', event.message);
+        logErrorToServer({
+          message: event.message,
+          source: event.filename,
+          lineno: event.lineno,
+          colno: event.colno,
+          stack: event.error ? event.error.stack : null,
+          type: 'error'
+        });
+        showFatalErrorOverlay(event.message || 'Fatal script execution error');
       });
+
       window.addEventListener('unhandledrejection', function(event) {
-        fetch('/api/client-error', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: event.reason ? event.reason.message || String(event.reason) : 'Unhandled promise rejection',
-            stack: event.reason && event.reason.stack ? event.reason.stack : null,
-            type: 'unhandledrejection'
-          })
-        }).catch(err => console.error('Failed to log to server', err));
+        console.error('PWA: Unhandled promise rejection:', event.reason);
+        const reasonMsg = event.reason ? event.reason.message || String(event.reason) : 'Unhandled promise rejection';
+        logErrorToServer({
+          message: reasonMsg,
+          stack: event.reason && event.reason.stack ? event.reason.stack : null,
+          type: 'unhandledrejection'
+        });
+        // Render fallback crash screen if it happens during loading
+        if (document.getElementById('pwa-fallback-loading')) {
+          showFatalErrorOverlay(reasonMsg);
+        }
       });
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="pwa-fallback-loading" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #5a2d0c; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center;">
+        <div style="font-size: 3rem; margin-bottom: 1rem; animation: pulse 1.5s infinite ease-in-out;">📲</div>
+        <h1 style="margin: 0; font-size: 1.6rem; font-weight: 800; letter-spacing: 0.5px;">AO Core ERP</h1>
+        <p style="margin: 0.5rem 0 0 0; font-size: 0.95rem; opacity: 0.8; font-weight: 500;">Loading application...</p>
+        <style>
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+          }
+        </style>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

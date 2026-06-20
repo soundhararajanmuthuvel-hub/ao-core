@@ -35,15 +35,17 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
   const { width: exportWidth, height: exportHeight } = getExportDimensions();
 
   // Constants
-  const balance = Number(invoice.grandTotal || 0) - Number(invoice.amountPaid || 0);
-  const invoiceDate = new Date(invoice.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  const dueDate = invoice.dueDate 
+  const balance = Number(invoice?.grandTotal || 0) - Number(invoice?.amountPaid || 0);
+  const invoiceDate = invoice?.date 
+    ? new Date(invoice.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    : 'N/A';
+  const dueDate = invoice?.dueDate 
     ? new Date(invoice.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
     : invoiceDate;
 
   // Calculate Overdue Days
   const getDaysOverdue = () => {
-    if (!invoice.dueDate) return 0;
+    if (!invoice?.dueDate) return 0;
     const due = new Date(invoice.dueDate);
     due.setHours(0,0,0,0);
     const today = new Date();
@@ -111,7 +113,7 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
       // 2. QR Code (UPI Payment URL)
       const payeeName = settings?.payeeName || "AMUDHASURABIY ORGANICS";
       const upiId = settings?.upiId || "7010602115@iob";
-      const qrData = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${balance}&cu=INR&tn=Invoice%20${invoice.invoiceNumber}`;
+      const qrData = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${balance}&cu=INR&tn=Invoice%20${invoice?.invoiceNumber || ''}`;
       const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrData)}`;
       const qrB64 = await getBase64Image(qrApiUrl);
       setQrBase64(qrB64);
@@ -181,7 +183,7 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
     if (!imgUrl) return;
     const link = document.createElement('a');
     link.href = imgUrl;
-    link.download = `Reminder-${invoice.invoiceNumber}.jpg`;
+    link.download = `Reminder-${invoice?.invoiceNumber || 'Reminder'}.jpg`;
     link.click();
     toast('Branded payment reminder JPG downloaded', 'success');
   };
@@ -195,7 +197,7 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
       format: [1080, 1350]
     });
     doc.addImage(imgUrl, 'JPEG', 0, 0, 1080, 1350);
-    doc.save(`Reminder-${invoice.invoiceNumber}.pdf`);
+    doc.save(`Reminder-${invoice?.invoiceNumber || 'Reminder'}.pdf`);
     toast('Reminder PDF downloaded successfully', 'success');
   };
 
@@ -208,13 +210,13 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
       try {
         const response = await fetch(imgUrl);
         const blob = await response.blob();
-        const file = new File([blob], `Reminder-${invoice.invoiceNumber}.jpg`, { type: 'image/jpeg' });
+        const file = new File([blob], `Reminder-${invoice?.invoiceNumber || 'Reminder'}.jpg`, { type: 'image/jpeg' });
 
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
-            title: `Payment Reminder - ${invoice.invoiceNumber}`,
-            text: `Dear ${customer.name},\n\nKindly find the payment reminder attached.\n\nThank you,\nAmudhasurabiy Organics`
+            title: `Payment Reminder - ${invoice?.invoiceNumber || ''}`,
+            text: `Dear ${customer?.name || 'Customer'},\n\nKindly find the payment reminder attached.\n\nThank you,\nAmudhasurabiy Organics`
           });
           toast('Shared successfully', 'success');
           return;
@@ -225,8 +227,8 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
     }
 
     // Fallback to standard WhatsApp wa.me redirect
-    const textMsg = `Dear ${customer.name},\n\nKindly find the payment reminder attached.\n\nThank you,\nAmudhasurabiy Organics`;
-    let rawPhone = customer.phone || '';
+    const textMsg = `Dear ${customer?.name || 'Customer'},\n\nKindly find the payment reminder attached.\n\nThank you,\nAmudhasurabiy Organics`;
+    let rawPhone = customer?.phone || '';
     let cleanPhone = rawPhone.replace(/\D/g, '');
     if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
 
@@ -564,7 +566,7 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                 {/* Customer greeting */}
                 <div style={{ color: '#ffffff', textAlign: 'center', padding: '0 20px' }}>
                   <p className="customer-name" style={{ margin: '0 0 15px 0', fontSize: '42px', fontWeight: 800, wordBreak: 'break-word', lineHeight: 1.3 }}>
-                    Dear {customer.name},
+                    Dear {customer?.name || 'Customer'},
                   </p>
                   <p style={{ margin: 0, color: '#cbd5e1', fontSize: '24px', lineHeight: 1.5 }}>
                     We hope you are doing well. This is a friendly reminder regarding the outstanding balance for the following invoice.
@@ -622,7 +624,7 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%', textAlign: 'left' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px dashed rgba(0,0,0,0.05)', borderBottomColor: template === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)' }}>
                       <span style={{ fontSize: '22px', color: currentStyles.lightTextColor, fontWeight: 700 }}>Invoice Number</span>
-                      <strong style={{ fontSize: '24px', color: currentStyles.textColor, fontWeight: 800 }}>{invoice.invoiceNumber}</strong>
+                      <strong style={{ fontSize: '24px', color: currentStyles.textColor, fontWeight: 800 }}>{invoice?.invoiceNumber || ''}</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px dashed rgba(0,0,0,0.05)', borderBottomColor: template === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)' }}>
                       <span style={{ fontSize: '22px', color: currentStyles.lightTextColor, fontWeight: 700 }}>Invoice Date</span>
@@ -702,10 +704,10 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                         {settings?.companyName || 'Amudhasurabiy Organics'}
                       </strong>
                       <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '5px' }}>
-                        {hasPhone && <span>📞 {settings.phone}</span>}
-                        {hasEmail && <span>✉️ {settings.email}</span>}
-                        {hasGst && <span>📋 GSTIN: {settings.gstNumber || settings.gstin}</span>}
-                        {hasWebsite && <span>🌐 {settings.website}</span>}
+                        {hasPhone && <span>📞 {settings?.phone}</span>}
+                        {hasEmail && <span>✉️ {settings?.email}</span>}
+                        {hasGst && <span>📋 GSTIN: {settings?.gstNumber || settings?.gstin}</span>}
+                        {hasWebsite && <span>🌐 {settings?.website}</span>}
                       </div>
                     </div>
                   )}
@@ -768,7 +770,7 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                 {/* Customer greeting */}
                 <div style={{ color: '#ffffff', fontSize: '24px', lineHeight: 1.5 }}>
                   <p className="customer-name" style={{ margin: '0 0 8px 0', fontSize: '36px', fontWeight: 800, wordBreak: 'break-word', textAlign: 'left' }}>
-                    Dear {customer.name},
+                    Dear {customer?.name || 'Customer'},
                   </p>
                   <p style={{ margin: 0, color: '#e2e8f0' }}>
                     We hope you are doing well. This is a friendly reminder regarding the outstanding balance for the following invoice.
@@ -793,7 +795,7 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                   <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: '20px' }}>
                     <div>
                       <span style={{ fontSize: '18px', color: currentStyles.lightTextColor, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', display: 'block', marginBottom: '5px' }}>Invoice Number</span>
-                      <strong style={{ fontSize: '24px', color: currentStyles.textColor, fontWeight: 800 }}>{invoice.invoiceNumber}</strong>
+                      <strong style={{ fontSize: '24px', color: currentStyles.textColor, fontWeight: 800 }}>{invoice?.invoiceNumber || ''}</strong>
                     </div>
                     <div>
                       <span style={{ fontSize: '18px', color: currentStyles.lightTextColor, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', display: 'block', marginBottom: '5px' }}>Invoice Date</span>
@@ -865,9 +867,9 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                       <strong style={{ fontSize: '22px', color: '#ffffff', fontWeight: 800 }}>
                         {settings?.companyName || 'Amudhasurabiy Organics'}
                       </strong>
-                      {hasPhone && <span>📞 Phone: {settings.phone}</span>}
-                      {hasEmail && <span>✉️ Email: {settings.email}</span>}
-                      {hasGst && <span>📋 GSTIN: {settings.gstNumber || settings.gstin}</span>}
+                      {hasPhone && <span>📞 Phone: {settings?.phone}</span>}
+                      {hasEmail && <span>✉️ Email: {settings?.email}</span>}
+                      {hasGst && <span>📋 GSTIN: {settings?.gstNumber || settings?.gstin}</span>}
                     </div>
                   )}
 

@@ -54,6 +54,11 @@ client.interceptors.response.use(
       window.dispatchEvent(new CustomEvent('ao-loading-end', {
         detail: { url: err.config?.url || '', success: false, error: err }
       }));
+      if (!err.response) {
+        window.dispatchEvent(new CustomEvent('ao-connection-error', {
+          detail: { error: err }
+        }));
+      }
     }
     if (err.response?.status === 401 && !err.config?.url?.includes('/auth/login')) {
       localStorage.removeItem('token');

@@ -7,6 +7,7 @@ import { SettingsProvider } from './context/SettingsContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { PWAProvider } from './context/PWAContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import './styles/variables.css';
 import './styles/global.css';
 import './styles/layout.css';
@@ -23,7 +24,22 @@ if ('serviceWorker' in navigator) {
   if (import.meta.env.PROD) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js')
-        .then((reg) => console.log('Service worker registered:', reg))
+        .then((reg) => {
+          console.log('Service worker registered:', reg);
+          reg.onupdatefound = () => {
+            const installingWorker = reg.installing;
+            if (installingWorker) {
+              installingWorker.onstatechange = () => {
+                if (installingWorker.state === 'installed') {
+                  if (navigator.serviceWorker.controller) {
+                    console.log('New service worker installed; auto-reloading page.');
+                    window.location.reload();
+                  }
+                }
+              };
+            }
+          };
+        })
         .catch((err) => console.error('Service worker registration failed:', err));
     });
   } else {
@@ -47,18 +63,20 @@ if ('serviceWorker' in navigator) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <SettingsProvider>
-        <ThemeProvider>
-          <AuthProvider>
-            <ToastProvider>
-              <PWAProvider>
-                <App />
-              </PWAProvider>
-            </ToastProvider>
-          </AuthProvider>
-        </ThemeProvider>
-      </SettingsProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <SettingsProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <ToastProvider>
+                <PWAProvider>
+                  <App />
+                </PWAProvider>
+              </ToastProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </SettingsProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>
 );

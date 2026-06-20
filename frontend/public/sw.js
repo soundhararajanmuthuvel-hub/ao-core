@@ -39,7 +39,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-First for API requests, Cache-First for static assets
+  // 1. Navigation requests (HTML pages) - Network-First, fallback to Cache
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
+          return response;
+        })
+        .catch(() => {
+          return caches.match('/index.html') || caches.match(event.request);
+        })
+    );
+    return;
+  }
+
+  // 2. API requests - Network-First
   if (event.request.url.includes('/api/')) {
     event.respondWith(
       fetch(event.request)
@@ -47,21 +65,24 @@ self.addEventListener('fetch', (event) => {
           return caches.match(event.request);
         })
     );
-  } else {
-    event.respondWith(
-      caches.match(event.request).then((response) => {
-        return response || fetch(event.request).then((fetchResponse) => {
-          return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, fetchResponse.clone());
-            return fetchResponse;
-          });
-        });
-      }).catch(() => {
-        // Fallback for index.html on navigation requests
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
-      })
-    );
+    return;
   }
+
+  // 3. Static assets - Cache-First, fallback to Network
+  event.respondWith(
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request).then((fetchResponse) => {
+        const responseClone = fetchResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseClone);
+        });
+        return fetchResponse;
+      });
+    }).catch(() => {
+      // Fallback for navigation if other resource errors
+      if (event.request.mode === 'navigate') {
+        return caches.match('/index.html');
+      }
+    })
+  );
 });
