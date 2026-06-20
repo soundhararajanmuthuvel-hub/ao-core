@@ -18,11 +18,29 @@ import { startOfflineSync } from './utils/OfflineSync';
 startOfflineSync();
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((reg) => console.log('Service worker registered:', reg))
-      .catch((err) => console.error('Service worker registration failed:', err));
-  });
+  if (import.meta.env.PROD) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => console.log('Service worker registered:', reg))
+        .catch((err) => console.error('Service worker registration failed:', err));
+    });
+  } else {
+    // Unregister service worker in development mode to avoid caching/WebSocket conflicts
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      let unregisteredAny = false;
+      for (const registration of registrations) {
+        registration.unregister().then((success) => {
+          if (success) {
+            console.log('Stale dev service worker unregistered.');
+            unregisteredAny = true;
+          }
+        });
+      }
+      if (unregisteredAny) {
+        window.location.reload();
+      }
+    });
+  }
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
