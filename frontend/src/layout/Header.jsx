@@ -28,6 +28,46 @@ export default function Header({ onMenuToggle }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showDebugInstall, setShowDebugInstall] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    const handleAppInstalled = () => {
+      setDeferredPrompt(null);
+      console.log('PWA installed successfully');
+    };
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    if (window.location.search.includes('pwa-debug=true')) {
+      setShowDebugInstall(true);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (showDebugInstall && !deferredPrompt) {
+      alert('PWA Install Triggered (Debug Mode Simulated)');
+      return;
+    }
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`PWA Install Choice: ${outcome}`);
+    setDeferredPrompt(null);
+  };
+
+  const showInstallBtn = deferredPrompt || showDebugInstall;
+
   const fetchNotifications = () => {
     notificationsApi.list({ status: activeFilter }).then(({ data }) => {
       setNotifications(data.notifications);
@@ -356,6 +396,41 @@ export default function Header({ onMenuToggle }) {
             <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>AO Core ERP</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {showInstallBtn && (
+              <button
+                type="button"
+                className="btn btn-primary install-app-btn-mobile"
+                onClick={handleInstallClick}
+                title="Install App"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.25rem',
+                  padding: '0.35rem 0.6rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  borderRadius: '20px',
+                  backgroundColor: 'var(--brand-primary)',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  minHeight: '36px',
+                  marginRight: '0.25rem',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--brand-primary-hover)';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--brand-primary)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                📲 <span style={{ display: 'inline', whiteSpace: 'nowrap' }}>Install</span>
+              </button>
+            )}
             <div className="notifications-panel" style={{ position: 'relative' }}>
               <button type="button" className="btn-icon" onClick={() => setShowNotif(!showNotif)} style={{ minHeight: '44px', minWidth: '44px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 🔔{unread > 0 && <span className="badge badge-danger" style={{ marginLeft: '4px', padding: '0.15rem 0.4rem', fontSize: '0.7rem' }}>{unread}</span>}
@@ -564,6 +639,40 @@ export default function Header({ onMenuToggle }) {
             </div>
           </div>
           <div className="header-right">
+            {showInstallBtn && (
+              <button
+                type="button"
+                className="btn btn-primary install-app-btn"
+                onClick={handleInstallClick}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.4rem 0.8rem',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  borderRadius: '20px',
+                  backgroundColor: 'var(--brand-primary)',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  marginRight: '0.5rem',
+                  transition: 'all 0.2s ease',
+                  minHeight: '36px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--brand-primary-hover)';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--brand-primary)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                📲 <span style={{ whiteSpace: 'nowrap' }}>Install App</span>
+              </button>
+            )}
             <button 
               type="button" 
               className="btn-icon mobile-search-trigger" 

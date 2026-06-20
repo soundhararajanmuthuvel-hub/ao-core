@@ -204,6 +204,8 @@ const connectDB = async () => {
   await addColumnIfNotExist('RawMaterials', 'bagSize', "DECIMAL(10, 2) DEFAULT 1.00");
   await addColumnIfNotExist('Invoices', 'dueDate', "DATETIME NULL");
   await addColumnIfNotExist('Invoices', 'type', "VARCHAR(255) DEFAULT 'invoice'");
+  await addColumnIfNotExist('Invoices', 'is_historical_data', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('Orders', 'is_historical_data', "TINYINT DEFAULT 0");
   await addColumnIfNotExist('Settings', 'shippingZoneRates', "TEXT NULL");
   await addColumnIfNotExist('InvoiceItems', 'offerCost', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('InvoiceItems', 'actualProfit', "DECIMAL(10, 2) DEFAULT 0.00");

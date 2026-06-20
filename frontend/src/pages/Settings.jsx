@@ -1921,6 +1921,7 @@ function MigrationCenter() {
   const [migrationReport, setMigrationReport] = useState(null);
   const [migrationTotals, setMigrationTotals] = useState(null);
   const [authorizeMigration, setAuthorizeMigration] = useState(false);
+  const [importType, setImportType] = useState('live_transaction'); // live_transaction or historical_import
 
   // Backup Export/Restore states
   const [exporting, setExporting] = useState(false);
@@ -2046,7 +2047,8 @@ function MigrationCenter() {
         tempFileId,
         duplicatePolicy,
         customerDuplicatePolicy,
-        productDuplicatePolicy
+        productDuplicatePolicy,
+        is_historical_data: importType === 'historical_import'
       });
       if (data.success) {
         setMigrationReport(data.report || {});
@@ -2566,12 +2568,50 @@ function MigrationCenter() {
             {/* Wizard Step 4: Duplicate Policy Configuration */}
             {step === 4 && (
               <div>
-                <h4 style={{ fontWeight: 700, color: '#1e293b', marginBottom: '1rem' }}>Configure Deduplication Policies</h4>
+                <h4 style={{ fontWeight: 700, color: '#1e293b', marginBottom: '1rem' }}>Configure Deduplication Policies & Import Type</h4>
                 <p style={{ fontSize: '0.9rem', color: '#475569', marginBottom: '1.5rem' }}>
-                  Define individual conflict resolution rules for Customers and Products if matching records are detected in the database.
+                  Define individual conflict resolution rules and identify record classification types before executing data imports.
                 </p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '2rem' }}>
+                  {/* Import Settings */}
+                  <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '1.5rem', marginBottom: '0.5rem' }}>
+                    <h5 style={{ fontWeight: 700, fontSize: '0.95rem', color: '#334155', marginBottom: '0.75rem' }}>⚙️ Import Type</h5>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                      {[
+                        { id: 'live_transaction', title: 'Business Transaction (GST Applicable)', desc: 'Standard business sales that will be included in statutory GST reports, GSTR sheets, and tax summaries.' },
+                        { id: 'historical_import', title: 'Historical Analytics Data (GST Excluded)', desc: 'Historical ERP migration records that will populate analytics charts but will be excluded from GST returns.' }
+                      ].map(opt => (
+                        <label
+                          key={opt.id}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            padding: '1rem',
+                            border: importType === opt.id ? '2px solid #ff9800' : '1px solid #cbd5e1',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            backgroundColor: importType === opt.id ? '#fffbeb' : '#ffffff',
+                            transition: 'all 0.15s ease-in-out'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <input
+                              type="radio"
+                              name="importType"
+                              value={opt.id}
+                              checked={importType === opt.id}
+                              onChange={() => setImportType(opt.id)}
+                              style={{ marginRight: '0.5rem', accentColor: '#ff9800' }}
+                            />
+                            <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{opt.title}</strong>
+                          </div>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: '1.3' }}>{opt.desc}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Customer Policy */}
                   <div>
                     <h5 style={{ fontWeight: 700, fontSize: '0.95rem', color: '#334155', marginBottom: '0.75rem' }}>👥 Customers Duplicate Policy</h5>

@@ -832,9 +832,27 @@ export default function Sales() {
                       </span>
                     )}
                   </span>
-                  <span className={`status-badge-custom ${statusClass}`}>
-                    {displayStatus}
-                  </span>
+                  <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                    {s.is_historical_data && (
+                      <span style={{
+                        fontSize: '0.7rem',
+                        backgroundColor: '#fffbeb',
+                        color: '#d97706',
+                        border: '1px solid #fef3c7',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontWeight: 'bold',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '2px'
+                      }}>
+                        📊 Historical Data
+                      </span>
+                    )}
+                    <span className={`status-badge-custom ${statusClass}`}>
+                      {displayStatus}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Subheader Date & Number */}

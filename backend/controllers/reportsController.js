@@ -425,12 +425,23 @@ const loadPurchaseGstRows = async (filters = {}) => {
 
 exports.salesReport = async (req, res, next) => {
   try {
-    const { from, to } = req.query;
+    const { from, to, includeLive, includeHistorical } = req.query;
     const query = {};
     if (from || to) {
       query.date = {};
       if (from) query.date[Op.gte] = new Date(from);
       if (to) query.date[Op.lte] = new Date(to);
+    }
+
+    const incLive = includeLive === undefined ? true : includeLive === 'true' || includeLive === true;
+    const incHist = includeHistorical === undefined ? true : includeHistorical === 'true' || includeHistorical === true;
+
+    if (incLive && !incHist) {
+      query.is_historical_data = { [Op.ne]: true };
+    } else if (!incLive && incHist) {
+      query.is_historical_data = true;
+    } else if (!incLive && !incHist) {
+      query.id = -1; // return empty
     }
     const sales = await Invoice.findAll({
       where: query,
@@ -1282,7 +1293,10 @@ exports.procurementReport = async (req, res, next) => {
 };
 
 const loadSalesGstRows = async ({ from, to } = {}) => {
-  const query = {};
+  const query = {
+    is_historical_data: { [Op.ne]: true },
+    gstTotal: { [Op.gt]: 0 }
+  };
   if (from || to) {
     query.date = {};
     if (from) {

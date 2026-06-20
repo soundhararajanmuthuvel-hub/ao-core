@@ -140,6 +140,11 @@ const Invoice = sequelize.define('Invoice', {
     type: DataTypes.STRING,
     defaultValue: 'invoice',
   },
+  is_historical_data: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    allowNull: false,
+  },
 });
 
 // Associations

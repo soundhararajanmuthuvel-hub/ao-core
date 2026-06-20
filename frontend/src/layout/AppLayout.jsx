@@ -546,24 +546,29 @@ export default function AppLayout() {
       <nav className="mobile-bottom-nav">
         <NavLink to="/" end className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
           <span className="bottom-nav-icon">🏠</span>
-          <span>Dashboard</span>
+          <span>Home</span>
         </NavLink>
-        <NavLink to="/crm" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+        <NavLink to="/inventory" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <span className="bottom-nav-icon">📦</span>
+          <span>Inventory</span>
+        </NavLink>
+        <NavLink to="/sales" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <span className="bottom-nav-icon">🧾</span>
+          <span>Sales</span>
+        </NavLink>
+        <NavLink to="/customers" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
           <span className="bottom-nav-icon">👥</span>
-          <span>CRM</span>
+          <span>Customers</span>
         </NavLink>
-        <NavLink to="/customer-visits" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-          <span className="bottom-nav-icon">📍</span>
-          <span>Visits</span>
-        </NavLink>
-        <NavLink to="/field-ordering" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-          <span className="bottom-nav-icon">🛒</span>
-          <span>Orders</span>
-        </NavLink>
-        <NavLink to="/delivery-tracking" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-          <span className="bottom-nav-icon">🚚</span>
-          <span>Delivery</span>
-        </NavLink>
+        <button
+          type="button"
+          className={`bottom-nav-item ${drawerOpen ? 'active' : ''}`}
+          onClick={() => setDrawerOpen(true)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', outline: 'none' }}
+        >
+          <span className="bottom-nav-icon">☰</span>
+          <span>More</span>
+        </button>
       </nav>
 
       {/* Slide-out Drawer for "More" Mobile menus */}
@@ -574,16 +579,26 @@ export default function AppLayout() {
           <button type="button" style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setDrawerOpen(false)}>✕</button>
         </div>
         <div className="drawer-grid">
+          <div className="drawer-item" onClick={() => handleDrawerNavigate('/crm')}>
+            <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>📊</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>CRM</span>
+          </div>
+          <div className="drawer-item" onClick={() => handleDrawerNavigate('/customer-visits')}>
+            <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>📍</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Visits</span>
+          </div>
+          <div className="drawer-item" onClick={() => handleDrawerNavigate('/field-ordering')}>
+            <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🛒</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Orders</span>
+          </div>
+          <div className="drawer-item" onClick={() => handleDrawerNavigate('/delivery-tracking')}>
+            <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🚚</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Delivery</span>
+          </div>
           {(isSuperAdmin || userRole === 'Manufacturing Manager') && (
             <div className="drawer-item" onClick={() => handleDrawerNavigate('/manufacturing')}>
               <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🏭</span>
               <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Production</span>
-            </div>
-          )}
-          {(isSuperAdmin || userRole === 'Sales Executive' || userRole === 'Billing Executive') && (
-            <div className="drawer-item" onClick={() => handleDrawerNavigate('/customers')}>
-              <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>👥</span>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Customers</span>
             </div>
           )}
           {isSuperAdmin && (

@@ -432,7 +432,8 @@ exports.analyzeUploadedFiles = async (req, res) => {
 
 // Executing migration
 exports.executeMigration = async (req, res) => {
-  const { tempFileId, duplicatePolicy, customerDuplicatePolicy, productDuplicatePolicy } = req.body;
+  const { tempFileId, duplicatePolicy, customerDuplicatePolicy, productDuplicatePolicy, is_historical_data } = req.body;
+  const isHistorical = is_historical_data === true || is_historical_data === 'true';
   const username = req.user?.name || 'Super Admin';
 
   const custPolicy = customerDuplicatePolicy || duplicatePolicy || 'merge';
@@ -741,7 +742,8 @@ exports.executeMigration = async (req, res) => {
         status,
         salesChannel: 'Retail Shop',
         gstBillingMode: 'exclusive',
-        type: 'invoice'
+        type: 'invoice',
+        is_historical_data: isHistorical
       }, { transaction: t });
 
       snapshot.invoices.push(newInvoice.id);
@@ -850,7 +852,8 @@ exports.executeMigration = async (req, res) => {
         status: 'Confirmed',
         salesChannel: 'Retail Shop',
         gstBillingMode: 'exclusive',
-        type: 'quote'
+        type: 'quote',
+        is_historical_data: isHistorical
       }, { transaction: t });
 
       snapshot.invoices.push(newQuote.id);
@@ -955,7 +958,8 @@ exports.executeMigration = async (req, res) => {
         status: 'Confirmed',
         salesChannel: 'Retail Shop',
         gstBillingMode: 'exclusive',
-        type: 'sales_receipt'
+        type: 'sales_receipt',
+        is_historical_data: isHistorical
       }, { transaction: t });
 
       snapshot.invoices.push(newReceipt.id);
@@ -1060,7 +1064,8 @@ exports.executeMigration = async (req, res) => {
         status: 'Confirmed',
         salesChannel: 'Retail Shop',
         gstBillingMode: 'exclusive',
-        type: 'recurring_invoice'
+        type: 'recurring_invoice',
+        is_historical_data: isHistorical
       }, { transaction: t });
 
       snapshot.invoices.push(newRecInvoice.id);
@@ -1150,7 +1155,8 @@ exports.executeMigration = async (req, res) => {
         salesChannel: 'Retail Shop',
         gstBillingMode: 'exclusive',
         type: 'expense',
-        commitment: desc
+        commitment: desc,
+        is_historical_data: isHistorical
       }, { transaction: t });
 
       snapshot.invoices.push(newExpense.id);
@@ -1202,7 +1208,8 @@ exports.executeMigration = async (req, res) => {
         status: 'Confirmed',
         salesChannel: 'Retail Shop',
         gstBillingMode: 'exclusive',
-        type: 'refund'
+        type: 'refund',
+        is_historical_data: isHistorical
       }, { transaction: t });
 
       snapshot.invoices.push(newRefund.id);
@@ -1333,7 +1340,8 @@ exports.executeMigration = async (req, res) => {
         status: 'Confirmed',
         salesChannel: 'Retail Shop',
         gstBillingMode: 'exclusive',
-        type: 'credit_note'
+        type: 'credit_note',
+        is_historical_data: isHistorical
       }, { transaction: t });
 
       snapshot.invoices.push(newCN.id);

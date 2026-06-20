@@ -101,6 +101,11 @@ const Order = sequelize.define('Order', {
     type: DataTypes.JSON,
     allowNull: true,
   },
+  is_historical_data: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    allowNull: false,
+  },
 });
 
 Order.belongsTo(require('./Customer'), { as: 'customer', foreignKey: 'customerId' });

@@ -14,6 +14,8 @@ export default function ReportsPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [includeLive, setIncludeLive] = useState(true);
+  const [includeHistorical, setIncludeHistorical] = useState(true);
 
   // GST Reports states
   const [gstSubTab, setGstSubTab] = useState('summary');
@@ -85,7 +87,7 @@ export default function ReportsPage() {
 
   const loadSales = async () => {
     try {
-      const { data } = await reportsApi.sales({ from, to });
+      const { data } = await reportsApi.sales({ from, to, includeLive, includeHistorical });
       setSales(data);
     } catch {
       toast('Failed to load sales data', 'error');
@@ -130,7 +132,7 @@ export default function ReportsPage() {
 
   const exportSales = async () => {
     try {
-      const { data } = await reportsApi.exportSales({ from, to });
+      const { data } = await reportsApi.exportSales({ from, to, includeLive, includeHistorical });
       download(data, 'sales-report.xlsx');
       toast('Exported', 'success');
     } catch {
@@ -550,7 +552,27 @@ export default function ReportsPage() {
                 <button type="button" className="btn btn-secondary" onClick={loadSales}>Load Summary</button>
                 <button type="button" className="btn btn-primary" onClick={exportSales}>Export Excel</button>
               </div>
-              {sales && <p style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#4b5563' }}>📊 Found <strong>{sales.count}</strong> invoices issued, totaling <strong>₹{Number(sales.total || 0).toLocaleString()}</strong></p>}
+              <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1rem', alignItems: 'center' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#475569', cursor: 'pointer', margin: 0, fontWeight: 500 }}>
+                  <input
+                    type="checkbox"
+                    checked={includeLive}
+                    onChange={(e) => setIncludeLive(e.target.checked)}
+                    style={{ accentColor: '#ff9800', width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  Include Live Data
+                </label>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#475569', cursor: 'pointer', margin: 0, fontWeight: 500 }}>
+                  <input
+                    type="checkbox"
+                    checked={includeHistorical}
+                    onChange={(e) => setIncludeHistorical(e.target.checked)}
+                    style={{ accentColor: '#ff9800', width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  Include Historical Data
+                </label>
+              </div>
+              {sales && <p style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#4b5563', marginBottom: 0 }}>📊 Found <strong>{sales.count}</strong> invoices issued, totaling <strong>₹{Number(sales.total || 0).toLocaleString()}</strong></p>}
             </div>
 
             <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px' }}>
@@ -959,6 +981,9 @@ export default function ReportsPage() {
                   </>
                 )}
                 <button type="button" className="btn btn-danger" onClick={exportGstPdf}>📋 Download PDF Report</button>
+              </div>
+              <div style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                ℹ️ Live GST Transactions Only: Historical imported records and 0% tax transactions are automatically excluded from all GST reports.
               </div>
             </div>
 

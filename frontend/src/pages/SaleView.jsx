@@ -504,8 +504,24 @@ export default function SaleView() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1 className="page-title">
+        <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           Invoice {sale.invoiceNumber}
+          {sale.is_historical_data && (
+            <span style={{
+              fontSize: '0.75rem',
+              backgroundColor: '#fffbeb',
+              color: '#d97706',
+              border: '1px solid #fef3c7',
+              padding: '0.25rem 0.6rem',
+              borderRadius: '9999px',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}>
+              📊 Historical Data
+            </span>
+          )}
           <span style={getStatusBadgeStyle(sale.paymentStatus)}>{String(sale.paymentStatus).toLowerCase() === 'partial' ? 'PARTIALLY PAID' : String(sale.paymentStatus).toUpperCase()}</span>
         </h1>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
