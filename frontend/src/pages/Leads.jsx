@@ -1,3 +1,8 @@
+import { useState, useEffect } from 'react';
+import { crmApi, usersApi, aiApi } from '../api';
+import { Plus, Search, Filter, Phone, Mail, MapPin, CheckSquare, FileText, UserPlus, Trash, Edit, RefreshCw, Brain } from 'lucide-react';
+import AIInsightsModal from '../components/AIInsightsModal';
+
 const LEAD_CATEGORIES = [
   'Organic Store',
   'Nattu Marundhu Kadai',
