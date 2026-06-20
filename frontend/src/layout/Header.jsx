@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useSettings } from '../context/SettingsContext';
 import { getActiveLogoUrl } from '../utils/url';
 import PWAInstallButton from '../components/PWAInstallButton';
+import { usePWA } from '../context/PWAContext';
 import { searchApi, notificationsApi, salesApi } from '../api';
 
 export default function Header({ onMenuToggle }) {
@@ -21,6 +22,11 @@ export default function Header({ onMenuToggle }) {
   const [showUser, setShowUser] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  const { isInstallable, isInstalled, installApp } = usePWA();
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+    return sessionStorage.getItem('pwa_banner_dismissed') === 'true';
+  });
 
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   useEffect(() => {
@@ -350,6 +356,74 @@ export default function Header({ onMenuToggle }) {
   if (isMobile) {
     return (
       <header className="app-header mobile-header-layout" style={{ position: 'sticky', top: 0, zIndex: 999, display: 'flex', flexDirection: 'column', padding: '0.5rem 1rem', height: 'auto', gap: '0.5rem' }}>
+        {isInstallable && !isInstalled && !bannerDismissed && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'linear-gradient(135deg, #5a2d0c, #8b4513)',
+            color: '#ffffff',
+            padding: '0.5rem 0.8rem',
+            borderRadius: '8px',
+            fontSize: '0.825rem',
+            boxShadow: '0 4px 10px rgba(90, 45, 12, 0.2)',
+            boxSizing: 'border-box',
+            width: '100%',
+            fontFamily: 'Inter, sans-serif'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+              <span style={{ fontSize: '1.25rem' }}>📲</span>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <span style={{ fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  AO ERP Web App
+                </span>
+                <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  Install for offline speed
+                </span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <button
+                type="button"
+                onClick={installApp}
+                style={{
+                  backgroundColor: '#ffffff',
+                  color: '#5a2d0c',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '0.3rem 0.75rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}
+              >
+                Install
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBannerDismissed(true);
+                  sessionStorage.setItem('pwa_banner_dismissed', 'true');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.75)',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  padding: '0.2rem',
+                  lineHeight: 1
+                }}
+                title="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
         {/* Row 1 */}
         <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
