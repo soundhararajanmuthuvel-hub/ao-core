@@ -117,7 +117,13 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
         allowTaint: false,
         width: 1080,
         height: 1350,
-        scale: isMobileViewport ? 1 : 2, // Avoid rendering desktop dimensions on mobile
+        windowWidth: 1080,
+        windowHeight: 1350,
+        scale: 1, // Fix memory, high-DPI scaling, and clipping issues on mobile viewports
+        scrollX: 0,
+        scrollY: 0,
+        x: 0,
+        y: 0,
         logging: false
       });
       const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
@@ -263,10 +269,13 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
           {/* Template Switches */}
           <div style={{
             display: 'flex',
-            gap: '0.5rem',
-            flexWrap: 'wrap',
-            justifyContent: 'center',
-            width: isMobileViewport ? '100%' : 'auto'
+            gap: '0.4rem',
+            flexWrap: isMobileViewport ? 'nowrap' : 'wrap',
+            overflowX: isMobileViewport ? 'auto' : 'visible',
+            paddingBottom: isMobileViewport ? '6px' : '0',
+            WebkitOverflowScrolling: 'touch',
+            justifyContent: isMobileViewport ? 'flex-start' : 'center',
+            width: '100%'
           }}>
             {[
               { id: 'classic', label: isMobileViewport ? 'Classic' : 'Classic Corporate' },
@@ -277,7 +286,7 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
               <button
                 key={t.id}
                 type="button"
-                className={`btn btn-sm ${template === t.id ? 'btn-primary' : 'btn-secondary'}`}
+                className={`btn btn-sm template-btn ${template === t.id ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => setTemplate(t.id)}
                 style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
               >
@@ -381,7 +390,17 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
         {/* OFF-SCREEN DOM CONTAINER USED BY HTML2CANVAS */}
         {/* Render at exact 1080 x 1350 pixels for crisp output */}
         {/* ---------------------------------------------------- */}
-        <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '1080px', height: '1350px', overflow: 'hidden' }}>
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          width: '1080px', 
+          height: '1350px', 
+          overflow: 'hidden', 
+          zIndex: -9999, 
+          opacity: 0, 
+          pointerEvents: 'none' 
+        }}>
           <div
             ref={templateRef}
             style={{

@@ -256,7 +256,7 @@ table.data-table tr:hover td {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: 2000;
   padding: 1rem;
 }
 
@@ -1122,6 +1122,16 @@ table.data-table tr:hover td {
   
   .preview-modal .modal-footer button {
     width: 100% !important;
+  }
+  
+  .preview-modal .modal-footer button.template-btn {
+    width: auto !important;
+    flex: 1;
+    min-width: 70px;
+    min-height: 38px !important;
+    padding: 0.35rem 0.5rem !important;
+    font-size: 0.8rem !important;
+    white-space: nowrap;
   }
 }
 
