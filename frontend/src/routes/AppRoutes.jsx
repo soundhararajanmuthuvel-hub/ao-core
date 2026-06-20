@@ -33,6 +33,7 @@ import Opportunities from '../pages/Opportunities';
 import FollowUps from '../pages/FollowUps';
 import CustomerReviews from '../pages/CustomerReviews';
 import CustomerMap from '../pages/CustomerMap';
+import ReEngagement from '../pages/ReEngagement';
 
 // SFA Pages
 import FieldSalesDashboard from '../pages/FieldSalesDashboard';
@@ -101,6 +102,14 @@ export default function AppRoutes() {
           element={
             <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
               <FollowUps />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="crm/re-engagement"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+              <ReEngagement />
             </RoleRoute>
           }
         />

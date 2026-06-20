@@ -4,7 +4,7 @@ import { Brain } from 'lucide-react';
 import AIInsightsModal from '../components/AIInsightsModal';
 import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
-import { resolveAssetUrl } from '../utils/url';
+import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -681,7 +681,7 @@ export default function Customers() {
       };
 
       // Try loading company logo to render inside canvas, fallback to text if cross-origin blocks
-      if (settings?.logo) {
+      if (settings?.logo || settings?.logoUrl) {
         const logo = new Image();
         logo.crossOrigin = 'anonymous';
         logo.onload = () => {
@@ -701,7 +701,7 @@ export default function Customers() {
           ctx.fillText('🌿', 540, 100);
           triggerDownload();
         };
-        logo.src = resolveAssetUrl(settings.logo);
+        logo.src = getActiveLogoUrl(settings);
       } else {
         triggerDownload();
       }

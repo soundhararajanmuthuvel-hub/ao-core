@@ -156,6 +156,8 @@ const connectDB = async () => {
   // Run dynamic schema extensions
   await addColumnIfNotExist('Settings', 'email', "VARCHAR(255) DEFAULT ''");
   await addColumnIfNotExist('Settings', 'gstNumber', "VARCHAR(255) DEFAULT ''");
+  await addColumnIfNotExist('Settings', 'websiteUrl', "VARCHAR(1000) DEFAULT ''");
+  await addColumnIfNotExist('Settings', 'logoUrl', "VARCHAR(1000) DEFAULT ''");
   await addColumnIfNotExist('Settings', 'wooStoreDescription', "TEXT DEFAULT ''");
   await addColumnIfNotExist('Settings', 'wooVersion', "VARCHAR(255) DEFAULT ''");
   await addColumnIfNotExist('Settings', 'wooWordpressVersion', "VARCHAR(255) DEFAULT ''");

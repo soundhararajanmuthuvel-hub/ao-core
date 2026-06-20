@@ -29,3 +29,14 @@ export const resolveAssetUrl = (assetPath) => {
 
   return normalizedPath;
 };
+
+export const getActiveLogoUrl = (settings) => {
+  if (!settings) return '/favicon.png';
+  if (settings.logo) {
+    return resolveAssetUrl(settings.logo);
+  }
+  if (settings.logoUrl) {
+    return resolveAssetUrl(settings.logoUrl);
+  }
+  return '/favicon.png';
+};

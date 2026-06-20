@@ -4,7 +4,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import { resolveAssetUrl } from '../utils/url';
+import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 import { motion, AnimatePresence } from 'framer-motion';
 import UserTour from '../components/UserTour';
 
@@ -329,8 +329,12 @@ export default function AppLayout() {
                   }}
                 >
                   <img
-                    src={settings?.logo ? resolveAssetUrl(settings.logo) : '/favicon.png'}
+                    src={getActiveLogoUrl(settings)}
                     alt="Logo"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = '/favicon.png';
+                    }}
                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                   />
                 </motion.div>
@@ -460,8 +464,12 @@ export default function AppLayout() {
                 zIndex: 2
               }}>
                 <img
-                  src={settings?.logo ? resolveAssetUrl(settings.logo) : '/favicon.png'}
+                  src={getActiveLogoUrl(settings)}
                   alt="Logo"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = '/favicon.png';
+                  }}
                   style={{
                     width: '100%',
                     height: '100%',

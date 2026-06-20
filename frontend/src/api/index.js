@@ -301,6 +301,20 @@ export const crmApi = {
 
   getReviews: (params) => client.get('/crm/reviews', { params }),
   sendReviewLink: (data) => client.post('/crm/reviews/send', data),
+  getReEngagementDashboard: () => client.get('/crm/re-engagement/dashboard'),
+  getReEngagementCustomers: (params) => client.get('/crm/re-engagement/customers', { params }),
+  triggerAutoFollowUps: () => client.post('/crm/re-engagement/create-tasks'),
+  getReEngagementAiInsights: () => client.get('/crm/re-engagement/ai-insights'),
 };
+
+export const databaseApi = {
+  getCounts: () => client.get('/settings/database/counts'),
+  verifyPassword: (password) => client.post('/settings/database/verify-password', { password }),
+  resetDemoData: (password) => client.post('/settings/database/reset-demo', { password }),
+  clearTransactions: (password) => client.post('/settings/database/clear-transactions', { password }),
+  factoryReset: (password) => client.post('/settings/database/factory-reset', { password }),
+  backup: () => client.get('/settings/database/backup', { responseType: 'blob' }),
+};
+
 
 

@@ -155,4 +155,46 @@ makeMongooseCompatible(Invoice, {
   createdBy: 'createdById',
 });
 
+async function updateCustomerLastOrder(invoice) {
+  if (invoice.customerId && invoice.status !== 'Draft' && invoice.status !== 'Cancelled') {
+    const Customer = require('./Customer');
+    const CrmFollowUp = require('./CrmFollowUp');
+    try {
+      const customer = await Customer.findByPk(invoice.customerId);
+      if (customer) {
+        const invoiceDate = invoice.date ? new Date(invoice.date) : new Date(invoice.createdAt);
+        if (!customer.lastOrderDate || invoiceDate > new Date(customer.lastOrderDate)) {
+          customer.lastOrderDate = invoiceDate;
+          await customer.save();
+        }
+        
+        // Auto-complete pending re-engagement follow-ups
+        await CrmFollowUp.update(
+          {
+            status: 'Completed',
+            notes: `Recovery success! Customer placed order ${invoice.invoiceNumber}.`
+          },
+          {
+            where: {
+              customerId: customer.id,
+              status: 'Pending'
+            }
+          }
+        );
+      }
+    } catch (err) {
+      console.error('Error updating customer last order date from invoice hook:', err);
+    }
+  }
+}
+
+Invoice.addHook('afterCreate', async (invoice, options) => {
+  await updateCustomerLastOrder(invoice);
+});
+
+Invoice.addHook('afterUpdate', async (invoice, options) => {
+  await updateCustomerLastOrder(invoice);
+});
+
 module.exports = Invoice;
+

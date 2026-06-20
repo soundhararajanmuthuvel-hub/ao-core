@@ -16,6 +16,14 @@ const Settings = sequelize.define('Settings', {
     type: DataTypes.STRING(1000),
     defaultValue: '',
   },
+  logoUrl: {
+    type: DataTypes.STRING(1000),
+    defaultValue: '',
+  },
+  websiteUrl: {
+    type: DataTypes.STRING(1000),
+    defaultValue: '',
+  },
   address: {
     type: DataTypes.TEXT,
     defaultValue: '',

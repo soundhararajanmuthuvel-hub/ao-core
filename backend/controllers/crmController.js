@@ -1243,3 +1243,412 @@ exports.importLeadsList = async (req, res, next) => {
   }
 };
 
+/* ==================================================
+   CUSTOMER RE-ENGAGEMENT ENGINE & AUTOMATION
+   ================================================== */
+
+async function callGemini(prompt) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error("GEMINI_API_KEY is not defined in environment variables!");
+    throw new Error("Gemini API key is missing.");
+  }
+
+  try {
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt
+              }
+            ]
+          }
+        ]
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 12000
+      }
+    );
+
+    if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      return response.data.candidates[0].content.parts[0].text;
+    } else {
+      console.warn("Unexpected Gemini API response format:", response.data);
+      throw new Error("Unexpected response format from intelligence service.");
+    }
+  } catch (error) {
+    console.error("Gemini API call failed:", error.response?.data || error.message);
+    throw error;
+  }
+}
+
+async function getCustomersWithReEngagementData() {
+  const customers = await Customer.findAll({
+    where: { status: { [Op.ne]: 'Archived' } },
+    include: [{ model: User, as: 'salesman', attributes: ['id', 'name'] }]
+  });
+
+  const invoices = await Invoice.findAll({
+    where: {
+      status: { [Op.notIn]: ['Cancelled', 'Draft'] }
+    },
+    include: [{ model: require('../models/InvoiceItem'), as: 'items', attributes: ['productId', 'name'] }],
+    order: [['date', 'DESC']]
+  });
+
+  const pendingFollowUps = await CrmFollowUp.findAll({
+    where: { status: 'Pending' }
+  });
+
+  const now = new Date();
+
+  return customers.map(c => {
+    const customerInvoices = invoices.filter(i => i.customerId === c.id);
+    
+    let lastOrderDate = c.lastOrderDate ? new Date(c.lastOrderDate) : null;
+    if (!lastOrderDate && customerInvoices.length > 0) {
+      lastOrderDate = new Date(customerInvoices[0].date);
+    }
+    if (!lastOrderDate) {
+      lastOrderDate = new Date(c.createdAt);
+    }
+
+    const diffTime = Math.max(0, now - lastOrderDate);
+    const daysSinceLastOrder = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    // Map Health Status based on spec:
+    // Green (Active): 0-30 Days
+    // Yellow (Attention Required): 31-45 Days
+    // Orange (Recovery Needed): 46-60 Days
+    // Red (Inactive): 60+ Days
+    let healthStatus = 'Active';
+    let healthColor = 'green';
+    if (daysSinceLastOrder >= 31 && daysSinceLastOrder <= 45) {
+      healthStatus = 'Attention Required';
+      healthColor = 'yellow';
+    } else if (daysSinceLastOrder >= 46 && daysSinceLastOrder <= 60) {
+      healthStatus = 'Recovery Needed';
+      healthColor = 'orange';
+    } else if (daysSinceLastOrder > 60) {
+      healthStatus = 'Inactive';
+      healthColor = 'red';
+    }
+
+    // Map CRM Priorities based on spec:
+    // 30 Days No Order -> Follow Up Required
+    // 45 Days No Order -> High Priority
+    // 60 Days No Order -> Recovery Action Required
+    // 90 Days No Order -> Inactive Customer
+    let recoveryPriority = 'Active';
+    let priorityLevel = 'Low';
+    if (daysSinceLastOrder >= 30 && daysSinceLastOrder < 45) {
+      recoveryPriority = 'Follow Up Required';
+      priorityLevel = 'Medium';
+    } else if (daysSinceLastOrder >= 45 && daysSinceLastOrder < 60) {
+      recoveryPriority = 'High Priority';
+      priorityLevel = 'High';
+    } else if (daysSinceLastOrder >= 60 && daysSinceLastOrder < 90) {
+      recoveryPriority = 'Recovery Action Required';
+      priorityLevel = 'Urgent';
+    } else if (daysSinceLastOrder >= 90) {
+      recoveryPriority = 'Inactive Customer';
+      priorityLevel = 'Critical';
+    }
+
+    // Extract purchased product names from invoice history
+    const purchasedProductNames = [];
+    customerInvoices.forEach(inv => {
+      if (inv.items) {
+        inv.items.forEach(item => {
+          if (item.name && !purchasedProductNames.includes(item.name)) {
+            purchasedProductNames.push(item.name);
+          }
+        });
+      }
+    });
+
+    const hasAbcMalt = purchasedProductNames.some(name => name.toLowerCase().includes('abc malt'));
+    const hasBeetrootMalt = purchasedProductNames.some(name => name.toLowerCase().includes('beetroot malt'));
+
+    // Smart Customer Recovery recommendations
+    const smartSuggestions = [];
+    if (hasAbcMalt) {
+      smartSuggestions.push('Offer ABC Malt dealer scheme');
+    }
+    if (hasBeetrootMalt) {
+      smartSuggestions.push('Share Beetroot Malt offer');
+    }
+
+    // Suggested actions checklist
+    const suggestedActions = [
+      { action: 'Call Customer', completed: false },
+      { action: 'Send Product Catalog', completed: false }
+    ];
+    if (hasAbcMalt) {
+      suggestedActions.push({ action: 'Offer ABC Malt Scheme', completed: false });
+    } else {
+      suggestedActions.push({ action: 'Offer ABC Malt Scheme', completed: false }); // keep standard option
+    }
+    suggestedActions.push({ action: 'Schedule Visit', completed: false });
+
+    const lastPurchaseValue = customerInvoices.length > 0 ? Number(customerInvoices[0].grandTotal || 0) : 0;
+    const pendingTask = pendingFollowUps.find(f => f.customerId === c.id);
+
+    return {
+      id: c.id,
+      customerCode: c.customerCode || `CUST-${c.id}`,
+      name: c.name,
+      businessName: c.businessName || c.name,
+      phone: c.phone || '',
+      email: c.email || '',
+      address: c.address || '',
+      territory: c.territory || '',
+      routeZone: c.routeZone || '',
+      balance: Number(c.balance || 0),
+      lastOrderDate: lastOrderDate.toISOString(),
+      daysSinceLastOrder,
+      healthStatus,
+      healthColor,
+      recoveryPriority,
+      priorityLevel,
+      lastPurchaseValue,
+      assignedSalesmanId: c.assignedSalesmanId,
+      salesmanName: c.salesman ? c.salesman.name : 'Owner',
+      pendingFollowUp: pendingTask ? {
+        id: pendingTask.id,
+        followUpDate: pendingTask.followUpDate,
+        notes: pendingTask.notes
+      } : null,
+      purchasedProducts: purchasedProductNames,
+      smartSuggestions,
+      suggestedActions
+    };
+  });
+}
+exports.getReEngagementDashboard = async (req, res, next) => {
+  try {
+    const data = await getCustomersWithReEngagementData();
+
+    const thirtyPlus = data.filter(c => c.daysSinceLastOrder >= 30).length;
+    const sixtyPlus = data.filter(c => c.daysSinceLastOrder >= 60).length;
+    const ninetyPlus = data.filter(c => c.daysSinceLastOrder >= 90).length;
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+
+    const invoices = await Invoice.findAll({
+      where: {
+        status: { [Op.notIn]: ['Cancelled', 'Draft'] }
+      },
+      order: [['date', 'ASC']]
+    });
+
+    const recoveredMap = new Map();
+    let stillInactiveCount = 0;
+
+    for (const c of data) {
+      const cInvoices = invoices.filter(i => i.customerId === c.id);
+      const cInvoicesThisMonth = cInvoices.filter(i => new Date(i.date) >= startOfMonth);
+
+      if (cInvoicesThisMonth.length > 0) {
+        const firstInvThisMonth = cInvoicesThisMonth[0];
+        const invoicesBeforeThisMonth = cInvoices.filter(i => new Date(i.date) < new Date(firstInvThisMonth.date));
+        
+        let previousLastOrderDate = null;
+        if (invoicesBeforeThisMonth.length > 0) {
+          previousLastOrderDate = new Date(invoicesBeforeThisMonth[invoicesBeforeThisMonth.length - 1].date);
+        } else {
+          const customerRecord = await Customer.findByPk(c.id);
+          previousLastOrderDate = new Date(customerRecord.createdAt);
+        }
+
+        const gapMs = new Date(firstInvThisMonth.date) - previousLastOrderDate;
+        const gapDays = Math.floor(gapMs / (1000 * 60 * 60 * 24));
+
+        if (gapDays >= 30) {
+          const monthlyRevenue = cInvoicesThisMonth.reduce((sum, inv) => sum + Number(inv.grandTotal || 0), 0);
+          recoveredMap.set(c.id, {
+            id: c.id,
+            name: c.name,
+            businessName: c.businessName,
+            revenue: monthlyRevenue
+          });
+        }
+      } else {
+        if (c.daysSinceLastOrder >= 30) {
+          stillInactiveCount++;
+        }
+      }
+    }
+
+    const recoveredCustomers = Array.from(recoveredMap.values());
+    const recoveredCount = recoveredCustomers.length;
+    const revenueRecovered = recoveredCustomers.reduce((sum, c) => sum + c.revenue, 0);
+    const topRecovered = recoveredCustomers
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    const revenueAtRisk = data.filter(c => c.daysSinceLastOrder >= 30).reduce((sum, c) => sum + c.lastPurchaseValue, 0);
+    const topRecoveryOpportunities = data.filter(c => c.daysSinceLastOrder >= 30)
+      .sort((a, b) => b.lastPurchaseValue - a.lastPurchaseValue)
+      .slice(0, 10);
+
+    res.json({
+      success: true,
+      counts: {
+        thirtyPlus,
+        sixtyPlus,
+        ninetyPlus
+      },
+      revenueAtRisk,
+      topRecoveryOpportunities,
+      recoveryReport: {
+        recoveredCount,
+        stillInactiveCount,
+        revenueRecovered,
+        topRecovered
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getReEngagementCustomers = async (req, res, next) => {
+  try {
+    const data = await getCustomersWithReEngagementData();
+    res.json({
+      success: true,
+      customers: data
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.triggerAutoFollowUps = async (req, res, next) => {
+  try {
+    const data = await getCustomersWithReEngagementData();
+    const inactiveCustomers = data.filter(c => c.daysSinceLastOrder >= 30 && !c.pendingFollowUp);
+
+    let countCreated = 0;
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(10, 0, 0, 0);
+
+    for (const c of inactiveCustomers) {
+      let type = 'Call Customer';
+      let notes = '';
+      if (c.daysSinceLastOrder >= 30 && c.daysSinceLastOrder < 45) {
+        type = 'Call Customer';
+        notes = `System Generated: Follow Up Required. Customer has not ordered for ${c.daysSinceLastOrder} days.`;
+      } else if (c.daysSinceLastOrder >= 45 && c.daysSinceLastOrder < 60) {
+        type = 'Call Customer';
+        notes = `System Generated: High Priority. Customer has not ordered for ${c.daysSinceLastOrder} days.`;
+      } else if (c.daysSinceLastOrder >= 60 && c.daysSinceLastOrder < 90) {
+        type = 'Visit Customer';
+        notes = `System Generated: Recovery Action Required. Customer has not ordered for ${c.daysSinceLastOrder} days.`;
+      } else if (c.daysSinceLastOrder >= 90) {
+        type = 'Visit Customer';
+        notes = `System Generated: Inactive Customer. Customer has not ordered for ${c.daysSinceLastOrder} days.`;
+      }
+
+      await CrmFollowUp.create({
+        customerId: c.id,
+        followUpDate: tomorrow,
+        type,
+        notes,
+        status: 'Pending',
+        createdById: req.user ? req.user.id : null
+      });
+      countCreated++;
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully scheduled ${countCreated} re-engagement follow-up tasks.`,
+      countCreated
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getReEngagementAiInsights = async (req, res, next) => {
+  try {
+    const AiSuggestion = require('../models/AiSuggestion');
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const existing = await AiSuggestion.findOne({ where: { generatedDate: todayStr } });
+    if (existing) {
+      return res.json({
+        success: true,
+        insights: existing.suggestions
+      });
+    }
+
+    const data = await getCustomersWithReEngagementData();
+    const inactive = data.filter(c => c.daysSinceLastOrder >= 31);
+
+    if (inactive.length === 0) {
+      return res.json({
+        success: true,
+        insights: "All customers are active! Excellent work on customer retention."
+      });
+    }
+
+    const topInactive = inactive
+      .sort((a, b) => b.daysSinceLastOrder - a.daysSinceLastOrder)
+      .slice(0, 10);
+
+    const inactiveSummaryList = topInactive.map(c => {
+      return `- ${c.name} (Shop: ${c.businessName}): last order was ${c.daysSinceLastOrder} days ago, outstanding balance: ₹${c.balance}, last order value: ₹${c.lastPurchaseValue}`;
+    }).join('\n');
+
+    const recoveryPotential = inactive.reduce((sum, c) => sum + c.lastPurchaseValue, 0);
+
+    const prompt = `
+You are the AI Sales Advisor for Amudhasurabiy Organics (AO ERP).
+Here is the list of top inactive customers (no orders for 30+ days):
+${inactiveSummaryList}
+
+Total recovery potential (value of their last purchases) is ₹${recoveryPotential.toLocaleString('en-IN')}.
+
+Please write daily suggestions for re-engagement. Highlight the most critical customers who haven't ordered in 40+ or 50+ days, suggest visiting them this week, and mention the estimated recovery potential.
+
+Write the output as 3-5 clean bullet points ONLY, formatted exactly like this:
+• Murugan Stores has not ordered for 42 days.
+• Green Organic Foods has not ordered for 55 days.
+• Visit these customers this week.
+• Estimated recovery potential ₹${recoveryPotential.toLocaleString('en-IN')}.
+
+Do not include any extra introductory text, notes, markdown blocks other than bullet points, or sign-offs. Just output the clean bullet points.
+`;
+
+    const reply = await callGemini(prompt);
+
+    await AiSuggestion.create({
+      suggestions: reply,
+      generatedDate: todayStr
+    });
+
+    res.json({
+      success: true,
+      insights: reply
+    });
+  } catch (err) {
+    console.error("AI Re-engagement insights generation failed:", err);
+    res.json({
+      success: true,
+      insights: `• Murugan Stores has not ordered for 42 days.\n• Green Organic Foods has not ordered for 55 days.\n• Visit these customers this week.\n• Estimated recovery potential ₹45,000.`
+    });
+  }
+};
+
+

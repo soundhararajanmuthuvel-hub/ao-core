@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { ordersApi, productsApi, customersApi, settingsApi } from '../api';
 import { useToast } from '../context/ToastContext';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { resolveAssetUrl } from '../utils/url';
+import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 
 export default function OrderNoting() {
   const { toast } = useToast();
@@ -1078,10 +1078,14 @@ export default function OrderNoting() {
                 {/* Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', borderBottom: '3px solid #ff9800', paddingBottom: '10px', marginBottom: marginSection }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1 }}>
-                    {settings?.logo && (
+                    {(settings?.logo || settings?.logoUrl) && (
                       <img
-                        src={resolveAssetUrl(settings.logo)}
+                        src={getActiveLogoUrl(settings)}
                         alt="Logo"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = '/favicon.png';
+                        }}
                         style={{
                           height: isCompact ? '38px' : '52px',
                           maxHeight: isCompact ? '38px' : '52px',

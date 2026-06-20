@@ -1,7 +1,7 @@
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import { resolveAssetUrl } from '../utils/url';
+import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { sfaApi, ordersApi, shippingApi, productsApi, customersApi } from '../api';
@@ -45,7 +45,8 @@ const menuStructure = [
       { to: '/crm/ai-lead-importer', label: 'AI Lead Importer', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
       { to: '/customers', label: 'Customers', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
       { to: '/crm/customer-map', label: 'Customer Map', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/crm/followups', label: 'Follow Ups', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] }
+      { to: '/crm/followups', label: 'Follow Ups', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
+      { to: '/crm/re-engagement', label: 'Re-Engagement', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] }
     ]
   },
   {
@@ -237,7 +238,15 @@ export default function Sidebar({ collapsed, open, onClose }) {
       >
         <div className="brand-header-flex">
           <div className="brand-logo-container">
-            <img src={settings?.logo ? resolveAssetUrl(settings.logo) : '/favicon.png'} alt="Logo" className="brand-logo-img" />
+            <img
+              src={getActiveLogoUrl(settings)}
+              alt="Logo"
+              className="brand-logo-img"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/favicon.png';
+              }}
+            />
           </div>
           {!collapsed && (
             <div className="brand-info">

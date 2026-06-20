@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { motion, AnimatePresence } from 'framer-motion';
-import { resolveAssetUrl } from '../utils/url';
+import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 import Modal from './Modal';
 import { useToast } from '../context/ToastContext';
 
@@ -89,7 +89,7 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
   useEffect(() => {
     const preloadAssets = async () => {
       // 1. Logo
-      const logoUrl = settings?.logo ? resolveAssetUrl(settings.logo) : '/favicon.png';
+      const logoUrl = getActiveLogoUrl(settings);
       const logoB64 = await getBase64Image(logoUrl);
       setLogoBase64(logoB64);
 

@@ -77,16 +77,47 @@ const runAutoSync = async () => {
   }
 };
 
+const runReEngagementCheck = async () => {
+  try {
+    console.log('[Scheduler] Running Re-Engagement customer activity check...');
+    const crmController = require('../controllers/crmController');
+    const req = { user: { id: 1 } }; // default system/admin user
+    let responseData = null;
+    const res = {
+      json(data) {
+        responseData = data;
+      }
+    };
+    const next = (err) => {
+      if (err) console.error('[Scheduler] Re-Engagement runner error in next:', err.message);
+    };
+    await crmController.triggerAutoFollowUps(req, res, next);
+    if (responseData && responseData.success) {
+      console.log(`[Scheduler] Re-Engagement activity check completed: ${responseData.message}`);
+    }
+  } catch (err) {
+    console.error('[Scheduler] Re-Engagement runner failed:', err.message);
+  }
+};
+
 const startScheduler = () => {
   console.log('[Scheduler] Initializing WooCommerce background auto-sync runner (every 1 minute)...');
   setInterval(runAutoSync, 60 * 1000);
   
   console.log('[Scheduler] Initializing Courier Tracking background auto-check runner (every 1 minute)...');
   setInterval(runTrackingAutoCheck, 60 * 1000);
+
+  console.log('[Scheduler] Initializing Customer Re-Engagement background runner (every 1 hour)...');
+  setInterval(runReEngagementCheck, 60 * 60 * 1000);
+
+  // Run once shortly after startup
+  setTimeout(runReEngagementCheck, 5000);
 };
 
 module.exports = {
   startScheduler,
   runAutoSync,
-  runTrackingAutoCheck
+  runTrackingAutoCheck,
+  runReEngagementCheck
 };
+

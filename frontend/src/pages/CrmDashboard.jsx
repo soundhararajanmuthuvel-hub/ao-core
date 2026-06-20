@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { crmApi } from '../api';
 import { LayoutDashboard, Users, UserCheck, TrendingUp, DollarSign, Calendar, BarChart3, AlertCircle } from 'lucide-react';
 
 export default function CrmDashboard() {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
+  const [reEngagementData, setReEngagementData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -11,8 +14,12 @@ export default function CrmDashboard() {
     const fetchDashboard = async () => {
       try {
         setLoading(true);
-        const res = await crmApi.getDashboard();
+        const [res, reEngRes] = await Promise.all([
+          crmApi.getDashboard(),
+          crmApi.getReEngagementDashboard()
+        ]);
         setData(res.data);
+        setReEngagementData(reEngRes.data);
         setError(null);
       } catch (err) {
         console.error('Error fetching CRM Dashboard:', err);
@@ -183,6 +190,65 @@ export default function CrmDashboard() {
       </div>
 
       <div className="chart-grid" style={{ marginBottom: '2rem' }}>
+        {/* Customers Not Ordered (Re-Engagement Widget) */}
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
+          <div>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1.25rem 0', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+              <AlertCircle size={18} color="var(--danger)" /> Customers Not Ordered
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '0.5rem 0.8rem', borderRadius: '8px', background: 'var(--bg-page)' }}>
+                <span style={{ fontWeight: 600, color: 'var(--warning)' }}>⚠️ 30+ Days (Attention Required)</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{reEngagementData?.counts?.thirtyPlus || 0}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '0.5rem 0.8rem', borderRadius: '8px', background: 'var(--bg-page)' }}>
+                <span style={{ fontWeight: 600, color: '#f97316' }}>🟠 60+ Days (Recovery Needed)</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{reEngagementData?.counts?.sixtyPlus || 0}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '0.5rem 0.8rem', borderRadius: '8px', background: 'var(--bg-page)' }}>
+                <span style={{ fontWeight: 600, color: 'var(--danger)' }}>🚨 90+ Days (Inactive Customer)</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{reEngagementData?.counts?.ninetyPlus || 0}</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', marginBottom: '1.25rem' }}>
+              <div style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Revenue At Risk</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--danger)', marginTop: '2px' }}>₹{(reEngagementData?.revenueAtRisk || 0).toLocaleString('en-IN')}</div>
+              </div>
+              <div style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', background: 'rgba(34, 197, 94, 0.05)', border: '1px solid rgba(34, 197, 94, 0.1)', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Recovered (Month)</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--success)', marginTop: '2px' }}>{reEngagementData?.recoveryReport?.recoveredCount || 0} (₹{(reEngagementData?.recoveryReport?.revenueRecovered || 0).toLocaleString('en-IN')})</div>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => navigate('/crm/re-engagement')}
+              style={{ flex: 1, padding: '0.5rem', fontWeight: 700 }}
+            >
+              View Customers
+            </button>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={async () => {
+                try {
+                  const res = await crmApi.triggerAutoFollowUps();
+                  alert(res.data.message || 'Auto follow-ups created!');
+                  const reEngRes = await crmApi.getReEngagementDashboard();
+                  setReEngagementData(reEngRes.data);
+                } catch (e) {
+                  alert('Failed to trigger auto follow-ups');
+                }
+              }}
+              style={{ flex: 1, padding: '0.5rem', fontWeight: 700, backgroundColor: 'var(--brand-primary)', border: 'none' }}
+            >
+              Create Follow-Ups
+            </button>
+          </div>
+        </div>
+
         {/* Follow Ups Status Card */}
         <div className="card">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1.5rem 0', fontSize: '1.1rem', fontWeight: 700 }}>

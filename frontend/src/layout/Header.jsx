@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useSettings } from '../context/SettingsContext';
-import { resolveAssetUrl } from '../utils/url';
+import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 import { searchApi, notificationsApi, salesApi } from '../api';
 
 export default function Header({ onMenuToggle }) {
@@ -518,19 +518,15 @@ export default function Header({ onMenuToggle }) {
             </button>
             
             <div className="header-brand" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.75rem' }}>
-              {settings?.logo ? (
-                <img 
-                  src={resolveAssetUrl(settings.logo)} 
-                  alt="Logo" 
-                  style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain' }} 
-                />
-              ) : (
-                <img 
-                  src="/favicon.png" 
-                  alt="Logo" 
-                  style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain' }} 
-                />
-              )}
+              <img 
+                src={getActiveLogoUrl(settings)} 
+                alt="Logo" 
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = '/favicon.png';
+                }}
+                style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain' }} 
+              />
               <span className="company-name-text" style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', letterSpacing: '0.2px' }}>
                 {settings?.companyName || 'AO Core'}
               </span>

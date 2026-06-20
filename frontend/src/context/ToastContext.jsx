@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSettings } from './SettingsContext';
-import { resolveAssetUrl } from '../utils/url';
+import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 
 const ToastContext = createContext(null);
 
@@ -29,7 +29,7 @@ export function ToastProvider({ children }) {
   const slideAlerts = toasts.filter((t) => t.type === 'info' || t.type === 'warning' || t.type === 'success' || t.type === 'error');
   const overlayAlerts = toasts.filter((t) => t.type === 'success' || t.type === 'error');
 
-  const logoSrc = settings?.logo ? resolveAssetUrl(settings.logo) : '/favicon.png';
+  const logoSrc = getActiveLogoUrl(settings);
 
   return (
     <ToastContext.Provider value={{ toast }}>
@@ -93,6 +93,10 @@ export function ToastProvider({ children }) {
                   <img
                     src={logoSrc}
                     alt="Logo"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = '/favicon.png';
+                    }}
                     style={{
                       width: '100%',
                       height: '100%',
@@ -194,6 +198,10 @@ export function ToastProvider({ children }) {
                     <img
                       src={logoSrc}
                       alt="Brand Logo"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = '/favicon.png';
+                      }}
                       style={{
                         width: '100%',
                         height: '100%',
@@ -321,6 +329,10 @@ export function ToastProvider({ children }) {
                     <img
                       src={logoSrc}
                       alt="Brand Logo"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = '/favicon.png';
+                      }}
                       style={{
                         width: '100%',
                         height: '100%',

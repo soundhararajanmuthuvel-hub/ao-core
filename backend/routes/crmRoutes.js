@@ -44,4 +44,11 @@ router.delete('/followups/:id', crmController.deleteFollowUp);
 router.get('/reviews', crmController.getReviewsList);
 router.post('/reviews/send', crmController.sendReviewInvite);
 
+// Customer Re-Engagement & Follow-Up Automation
+router.get('/re-engagement/dashboard', crmController.getReEngagementDashboard);
+router.get('/re-engagement/customers', crmController.getReEngagementCustomers);
+router.post('/re-engagement/create-tasks', crmController.triggerAutoFollowUps);
+router.get('/re-engagement/ai-insights', crmController.getReEngagementAiInsights);
+
 module.exports = router;
+

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
-import { settingsApi, usersApi, integrationsApi, migrationApi, customersApi, salesApi } from '../api';
+import { settingsApi, usersApi, integrationsApi, migrationApi, customersApi, salesApi, databaseApi } from '../api';
+import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -26,10 +27,28 @@ export default function SettingsPage() {
   const { settings, updateSettings, loadSettings } = useSettings();
   const { darkMode, setDarkMode } = useTheme();
   const { toast } = useToast();
-  const { updateTourCompleted } = useAuth();
+  const { user, logout, updateTourCompleted } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState(tabParam || 'profile');
+
+  // Database Management states
+  const [dbModalOpen, setDbModalOpen] = useState(false);
+  const [dbActionType, setDbActionType] = useState('');
+  const [confirmationStep, setConfirmationStep] = useState(1);
+  const [typedConfirmation, setTypedConfirmation] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [dbCounts, setDbCounts] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [actionSuccess, setActionSuccess] = useState(false);
+  const [backupFileName, setBackupFileName] = useState('');
+
+  useEffect(() => {
+    if (activeTab === 'database' && user?.role !== 'Super Admin') {
+      handleTabChange('profile');
+    }
+  }, [activeTab, user]);
+
 
   useEffect(() => {
     if (tabParam) {
@@ -44,6 +63,8 @@ export default function SettingsPage() {
 
   const [form, setForm] = useState({});
   const [logo, setLogo] = useState(null);
+  const [logoMethod, setLogoMethod] = useState('file');
+  const [filePreview, setFilePreview] = useState('');
   const [wpUploading, setWpUploading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [syncingType, setSyncingType] = useState('');
@@ -71,8 +92,27 @@ export default function SettingsPage() {
   const [userForm, setUserForm] = useState(emptyUser);
 
   useEffect(() => {
-    if (settings) setForm(settings);
+    if (settings) {
+      setForm(settings);
+      if (settings.logo) {
+        setLogoMethod('file');
+      } else if (settings.logoUrl) {
+        setLogoMethod('url');
+      } else {
+        setLogoMethod('file');
+      }
+    }
   }, [settings]);
+
+  useEffect(() => {
+    if (!logo) {
+      setFilePreview('');
+      return;
+    }
+    const objectUrl = URL.createObjectURL(logo);
+    setFilePreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [logo]);
 
   const loadStats = async () => {
     setStatsLoading(true);
@@ -136,27 +176,54 @@ export default function SettingsPage() {
     }
   }, [activeTab, userPage]);
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast('Maximum logo file size is 5 MB', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast('Supported logo formats: PNG, JPG, JPEG, SVG, WEBP', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    setLogo(file);
+  };
+
   const saveSettings = async () => {
     try {
-      await updateSettings(form);
-      toast('Settings saved successfully', 'success');
+      let currentForm = { ...form };
+
+      // Priority Logic check: If using uploaded logo, we upload it first
+      if (logoMethod === 'file' && logo) {
+        const fd = new FormData();
+        fd.append('logo', logo);
+        const { data } = await settingsApi.uploadLogo(fd);
+        if (data?.settings) {
+          currentForm.logo = data.settings.logo;
+        }
+      }
+
+      await updateSettings(currentForm);
+      toast('Company Profile saved successfully', 'success');
+      setLogo(null);
       loadSettings();
-    } catch {
-      toast('Save failed', 'error');
+    } catch (err) {
+      toast(err.response?.data?.message || 'Save failed', 'error');
     }
   };
 
-  const uploadLogo = async () => {
-    if (!logo) return;
-    const fd = new FormData();
-    fd.append('logo', logo);
-    try {
-      await settingsApi.uploadLogo(fd);
-      await loadSettings();
-      toast('Logo uploaded successfully', 'success');
-    } catch (err) {
-      toast(err.response?.data?.message || 'Upload failed', 'error');
-    }
+  const removeLogo = () => {
+    setForm(prev => ({ ...prev, logo: '', logoUrl: '' }));
+    setLogo(null);
+    setFilePreview('');
+    toast('Logo marked for removal. Save profile to apply.', 'info');
   };
 
   const uploadLogoToWP = async (file) => {
@@ -178,6 +245,103 @@ export default function SettingsPage() {
       setWpUploading(false);
     }
   };
+
+  // Database Management Handlers
+  const handleDownloadBackup = async () => {
+    try {
+      toast('Generating database backup zip...', 'info');
+      const response = await databaseApi.backup();
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const timestamp = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').split('.')[0];
+      link.setAttribute('download', `backup_${timestamp}_${user?.name?.replace(/\s+/g, '_') || 'Admin'}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast('✓ Database backup downloaded successfully', 'success');
+    } catch (err) {
+      toast('Backup download failed', 'error');
+    }
+  };
+
+  const openConfirmationModal = (actionType) => {
+    setDbActionType(actionType);
+    setConfirmationStep(1);
+    setTypedConfirmation('');
+    setAdminPassword('');
+    setDbCounts(null);
+    setBackupFileName('');
+    setActionSuccess(false);
+    setDbModalOpen(true);
+  };
+
+  const handleStep1Submit = (e) => {
+    e.preventDefault();
+    if (typedConfirmation !== 'DELETE MY ERP') {
+      toast('Please type the exact phrase to continue', 'error');
+      return;
+    }
+    setConfirmationStep(2);
+  };
+
+  const handleStep2Submit = async (e) => {
+    e.preventDefault();
+    if (!adminPassword) {
+      toast('Password is required', 'error');
+      return;
+    }
+    setModalLoading(true);
+    try {
+      await databaseApi.verifyPassword(adminPassword);
+      // Fetch DB counts for step 3
+      const { data } = await databaseApi.getCounts();
+      if (data.success) {
+        setDbCounts(data.counts);
+        setConfirmationStep(3);
+      } else {
+        toast('Failed to load database stats', 'error');
+      }
+    } catch (err) {
+      toast(err.response?.data?.message || 'Password verification failed', 'error');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleExecution = async () => {
+    setModalLoading(true);
+    try {
+      let res;
+      if (dbActionType === 'reset-demo') {
+        res = await databaseApi.resetDemoData(adminPassword);
+      } else if (dbActionType === 'clear-transactions') {
+        res = await databaseApi.clearTransactions(adminPassword);
+      } else if (dbActionType === 'factory-reset') {
+        res = await databaseApi.factoryReset(adminPassword);
+      }
+
+      if (res?.data?.success) {
+        setBackupFileName(res.data.backupFileName || '');
+        setActionSuccess(true);
+        setConfirmationStep(4);
+      } else {
+        toast('Action failed', 'error');
+      }
+    } catch (err) {
+      toast(err.response?.data?.message || 'Database execution failed', 'error');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleCompleteRedirect = () => {
+    setDbModalOpen(false);
+    toast('✅ Database Reset Completed. Logging out...', 'success');
+    logout();
+  };
+
 
   // User Management Save
   const saveUser = async () => {
@@ -412,6 +576,22 @@ export default function SettingsPage() {
         >
           💾 Data Migration
         </button>
+        {user?.role === 'Super Admin' && (
+          <button
+            type="button"
+            className={`rm-tab-btn ${activeTab === 'database' ? 'active' : ''}`}
+            onClick={() => handleTabChange('database')}
+            style={{
+              padding: '0.75rem 1.25rem',
+              fontWeight: 600,
+              fontSize: '0.9rem',
+              borderBottom: activeTab === 'database' ? '3px solid #ff9800' : '3px solid transparent',
+              color: activeTab === 'database' ? '#ff9800' : '#64748b',
+            }}
+          >
+            ⚙️ Database Management
+          </button>
+        )}
         <button
           type="button"
           className={`rm-tab-btn ${activeTab === 'help' ? 'active' : ''}`}
@@ -452,6 +632,11 @@ export default function SettingsPage() {
             <div className="form-group">
               <label>Company Email Address</label>
               <input type="email" className="form-control" placeholder="e.g. accounts@company.com" value={form.email || ''} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </div>
+
+            <div className="form-group">
+              <label>Company Website URL</label>
+              <input type="url" className="form-control" placeholder="e.g. https://mycompany.com" value={form.websiteUrl || ''} onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })} />
             </div>
 
             <div className="form-group">
@@ -501,11 +686,161 @@ export default function SettingsPage() {
             </div>
 
             <div className="form-group" style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem', marginTop: '1.25rem' }}>
-              <label>Upload Company Brand Logo</label>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '0.5rem' }}>
-                <input type="file" accept="image/*" onChange={(e) => setLogo(e.target.files[0])} />
-                <button type="button" className="btn btn-secondary btn-sm" onClick={uploadLogo}>Upload</button>
+              <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>
+                🖼️ Company Logo Management
+              </h4>
+
+              {/* Selector Option Buttons */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', backgroundColor: '#f1f5f9', padding: '0.25rem', borderRadius: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setLogoMethod('file')}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem 1rem',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    backgroundColor: logoMethod === 'file' ? '#fff' : 'transparent',
+                    color: logoMethod === 'file' ? 'var(--brand-primary, #ff9800)' : '#64748b',
+                    boxShadow: logoMethod === 'file' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.35rem'
+                  }}
+                >
+                  📤 Upload Image
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLogoMethod('url')}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem 1rem',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    backgroundColor: logoMethod === 'url' ? '#fff' : 'transparent',
+                    color: logoMethod === 'url' ? 'var(--brand-primary, #ff9800)' : '#64748b',
+                    boxShadow: logoMethod === 'url' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.35rem'
+                  }}
+                >
+                  🔗 Use Logo URL
+                </button>
               </div>
+
+              {/* Selector Content */}
+              {logoMethod === 'file' ? (
+                <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4b5563', marginBottom: '0.5rem' }}>Upload Brand Logo File</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', border: '2px dashed #e2e8f0', borderRadius: '8px', padding: '1rem', alignItems: 'center', backgroundColor: '#fafafa' }}>
+                    <input type="file" accept="image/png, image/jpeg, image/jpg, image/svg+xml, image/webp" onChange={handleFileChange} style={{ fontSize: '0.85rem', color: '#64748b' }} />
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Supported Formats: PNG, JPG, JPEG, SVG, WEBP (Max size: 5 MB)</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4b5563', marginBottom: '0.5rem' }}>Logo Web URL</label>
+                  <input
+                    type="url"
+                    className="form-control"
+                    placeholder="e.g. https://mycompany.com/logo.png"
+                    value={form.logoUrl || ''}
+                    onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
+                  />
+                  <small style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                    Paste URLs from your WordPress, Shopify, Website, or CDN.
+                  </small>
+                </div>
+              )}
+
+              {/* Logo Preview Card */}
+              <div className="preview-card" style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1rem', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155', display: 'block' }}>Company Logo Preview</span>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '4px', overflow: 'hidden' }}>
+                    {(() => {
+                      let activeSrc = '/favicon.png';
+                      if (logoMethod === 'file') {
+                        if (filePreview) {
+                          activeSrc = filePreview;
+                        } else if (form.logo) {
+                          activeSrc = resolveAssetUrl(form.logo);
+                        }
+                      } else {
+                        if (form.logoUrl) {
+                          activeSrc = form.logoUrl;
+                        } else if (form.logo) {
+                          activeSrc = resolveAssetUrl(form.logo);
+                        }
+                      }
+                      return (
+                        <img
+                          src={activeSrc}
+                          alt="Logo Preview"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = '/favicon.png';
+                          }}
+                          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                        />
+                      );
+                    })()}
+                  </div>
+                  
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      <strong>Active Source:</strong>{' '}
+                      {(() => {
+                        if (logoMethod === 'file') {
+                          if (logo) return `Local File (${logo.name})`;
+                          if (form.logo) return 'Uploaded Image Server Path';
+                        } else {
+                          if (form.logoUrl) return 'Custom Web URL';
+                          if (form.logo) return 'Uploaded Image (Priority Fallback)';
+                        }
+                        return 'Default AO ERP Logo';
+                      })()}
+                    </div>
+                    {((logoMethod === 'file' && (logo || form.logo)) || (logoMethod === 'url' && (form.logoUrl || form.logo))) && (
+                      <button
+                        type="button"
+                        onClick={removeLogo}
+                        style={{
+                          marginTop: '0.5rem',
+                          backgroundColor: '#fef2f2',
+                          color: '#ef4444',
+                          border: '1px solid #fecaca',
+                          borderRadius: '6px',
+                          padding: '0.35rem 0.75rem',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        🗑️ Remove Logo
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
             </div>
 
             <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem', marginTop: '1.25rem' }}>
@@ -1238,7 +1573,332 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+
+        {/* Database Management Tab */}
+        {activeTab === 'database' && user?.role === 'Super Admin' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
+            <div className="card" style={{ padding: '2rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem 0' }}>
+                ⚙️ Database Management Control Panel
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '0.875rem', margin: '0 0 2rem 0' }}>
+                Restricted operations for system administration. All modifications below will trigger an automatic backup, but should be handled with extreme care.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                {/* Action 1: Backup Database */}
+                <div style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '1.5rem',
+                  backgroundColor: '#f8fafc',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  transition: 'all 0.2s ease-in-out'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '1.5rem' }}>📥</span>
+                      <strong style={{ fontSize: '1rem', color: '#1e293b' }}>Backup Database</strong>
+                    </div>
+                    <p style={{ color: '#64748b', fontSize: '0.85rem', lineHeight: '1.4', marginBottom: '1.5rem' }}>
+                      Download a full ZIP archive containing the SQLite database file and a complete JSON export of all database tables.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleDownloadBackup}
+                    style={{ width: '100%', fontWeight: 700 }}
+                  >
+                    📥 Download Backup
+                  </button>
+                </div>
+
+                {/* Action 2: Reset Demo Data */}
+                <div style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '1.5rem',
+                  backgroundColor: '#f8fafc',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  transition: 'all 0.2s ease-in-out'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '1.5rem' }}>🔄</span>
+                      <strong style={{ fontSize: '1rem', color: '#1e293b' }}>Reset Demo Data</strong>
+                    </div>
+                    <p style={{ color: '#64748b', fontSize: '0.85rem', lineHeight: '1.4', marginBottom: '1.5rem' }}>
+                      Deletes all sample Customer, Product, Order, Invoice, and Payment records. <strong>Keeps Company Settings and Users.</strong>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-warning"
+                    onClick={() => openConfirmationModal('reset-demo')}
+                    style={{ width: '100%', fontWeight: 700, backgroundColor: '#f97316', borderColor: '#f97316', color: '#fff' }}
+                  >
+                    🔄 Reset Demo Data
+                  </button>
+                </div>
+
+                {/* Action 3: Clear Transactions */}
+                <div style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '1.5rem',
+                  backgroundColor: '#f8fafc',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  transition: 'all 0.2s ease-in-out'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '1.5rem' }}>🧹</span>
+                      <strong style={{ fontSize: '1rem', color: '#1e293b' }}>Clear Transactions</strong>
+                    </div>
+                    <p style={{ color: '#64748b', fontSize: '0.85rem', lineHeight: '1.4', marginBottom: '1.5rem' }}>
+                      Deletes all Invoices, Payments, Sales Orders, Shipments, and Production logs. <strong>Keeps Customers, Products, and Users.</strong>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-warning"
+                    onClick={() => openConfirmationModal('clear-transactions')}
+                    style={{ width: '100%', fontWeight: 700, backgroundColor: '#ea580c', borderColor: '#ea580c', color: '#fff' }}
+                  >
+                    🧹 Clear Transactions
+                  </button>
+                </div>
+
+                {/* Action 4: Factory Reset */}
+                <div style={{
+                  border: '1px solid #fee2e2',
+                  borderRadius: '10px',
+                  padding: '1.5rem',
+                  backgroundColor: '#fef2f2',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  transition: 'all 0.2s ease-in-out'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '1.5rem' }}>🚨</span>
+                      <strong style={{ fontSize: '1rem', color: '#991b1b' }}>Factory Reset ERP</strong>
+                    </div>
+                    <p style={{ color: '#991b1b', fontSize: '0.85rem', lineHeight: '1.4', marginBottom: '1.5rem' }}>
+                      Completely drops and syncs all database tables. Re-seeds only default role users and first-install settings. <strong>Wipes everything.</strong>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={() => openConfirmationModal('factory-reset')}
+                    style={{ width: '100%', fontWeight: 700 }}
+                  >
+                    🚨 Factory Reset ERP
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Database Confirmation Modal */}
+      {dbModalOpen && (
+        <Modal
+          title={
+            dbActionType === 'reset-demo'
+              ? '🔄 Reset Demo Data Warning'
+              : dbActionType === 'clear-transactions'
+              ? '🧹 Clear Transactions Warning'
+              : '🚨 Factory Reset ERP Warning'
+          }
+          onClose={confirmationStep === 4 ? undefined : () => setDbModalOpen(false)}
+          footer={
+            confirmationStep === 4 ? null : (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setDbModalOpen(false)}
+                  disabled={modalLoading}
+                >
+                  Cancel
+                </button>
+                {confirmationStep === 1 && (
+                  <button
+                    type="submit"
+                    form="db-confirm-step1-form"
+                    className="btn btn-primary"
+                    disabled={typedConfirmation !== 'DELETE MY ERP'}
+                  >
+                    Next Step
+                  </button>
+                )}
+                {confirmationStep === 2 && (
+                  <button
+                    type="submit"
+                    form="db-confirm-step2-form"
+                    className="btn btn-primary"
+                    disabled={modalLoading || !adminPassword}
+                  >
+                    Verify Password
+                  </button>
+                )}
+                {confirmationStep === 3 && (
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={handleExecution}
+                    disabled={modalLoading}
+                    style={{ backgroundColor: '#dc2626', borderColor: '#dc2626', color: '#fff' }}
+                  >
+                    {modalLoading ? 'Executing reset...' : 'Delete Forever'}
+                  </button>
+                )}
+              </>
+            )
+          }
+        >
+          {modalLoading && confirmationStep !== 4 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem 0', gap: '1rem' }}>
+              <LoadingSpinner />
+              <span style={{ fontSize: '0.9rem', color: '#4b5563', fontWeight: 600 }}>
+                {confirmationStep === 2 ? 'Verifying Super Admin status...' : 'Generating auto-backup archive and clearing records...'}
+              </span>
+            </div>
+          ) : (
+            <>
+              {confirmationStep === 1 && (
+                <form id="db-confirm-step1-form" onSubmit={handleStep1Submit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ backgroundColor: '#fff5f5', border: '1px solid #fee2e2', borderRadius: '8px', padding: '1rem', color: '#b91c1c' }}>
+                    <h4 style={{ margin: '0 0 0.5rem 0', fontWeight: 700, fontSize: '0.95rem' }}>⚠️ CRITICAL DESTRUCTIVE ACTION</h4>
+                    <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: '1.4' }}>
+                      You are about to execute a destructive database operation. This action cannot be undone. 
+                      Although an automatic system backup ZIP will be saved on the server, all active transactions/master-records specified will be wiped out.
+                    </p>
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>
+                      To proceed, please type <code style={{ backgroundColor: '#f3f4f6', padding: '0.15rem 0.4rem', borderRadius: '4px', color: '#dc2626', fontWeight: 700 }}>DELETE MY ERP</code> below:
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      style={{ marginTop: '0.5rem', textTransform: 'uppercase' }}
+                      placeholder="DELETE MY ERP"
+                      value={typedConfirmation}
+                      onChange={(e) => setTypedConfirmation(e.target.value)}
+                      required
+                      autoFocus
+                    />
+                  </div>
+                </form>
+              )}
+
+              {confirmationStep === 2 && (
+                <form id="db-confirm-step2-form" onSubmit={handleStep2Submit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ backgroundColor: '#eff6ff', border: '1px solid #dbeafe', borderRadius: '8px', padding: '1rem', color: '#1e40af' }}>
+                    <h4 style={{ margin: '0 0 0.5rem 0', fontWeight: 700, fontSize: '0.95rem' }}>🔒 IDENTITY VERIFICATION</h4>
+                    <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: '1.4' }}>
+                      This is a Super Admin only operation. Please enter your account password to verify your authorization level.
+                    </p>
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>Super Admin Password</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      style={{ marginTop: '0.5rem' }}
+                      placeholder="Enter password"
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
+                      required
+                      autoFocus
+                    />
+                  </div>
+                </form>
+              )}
+
+              {confirmationStep === 3 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '8px', padding: '1rem', color: '#92400e' }}>
+                    <h4 style={{ margin: '0 0 0.5rem 0', fontWeight: 700, fontSize: '0.95rem' }}>📊 SYSTEM RECORD COUNTS IMPACT</h4>
+                    <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: '1.4' }}>
+                      Please review the counts of active data rows that will be deleted or impacted by this reset:
+                    </p>
+                  </div>
+
+                  {dbCounts && (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                      gap: '0.75rem',
+                      backgroundColor: '#f8fafc',
+                      padding: '1rem',
+                      borderRadius: '8px',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      {[
+                        { label: 'Customers', count: dbCounts.customers, key: 'customers' },
+                        { label: 'Products', count: dbCounts.products, key: 'products' },
+                        { label: 'Orders', count: dbCounts.orders, key: 'orders' },
+                        { label: 'Invoices', count: dbCounts.invoices, key: 'invoices' },
+                        { label: 'Payments', count: dbCounts.payments, key: 'payments' },
+                        { label: 'Production Entries', count: dbCounts.productionEntries, key: 'productionEntries' },
+                        { label: 'Raw Materials', count: dbCounts.rawMaterials, key: 'rawMaterials' },
+                        { label: 'CRM Leads', count: dbCounts.leads, key: 'leads' },
+                        { label: 'Visits', count: dbCounts.visits, key: 'visits' },
+                      ].map((item) => (
+                        <div key={item.key} style={{ padding: '0.5rem', backgroundColor: '#fff', border: '1px solid #f1f5f9', borderRadius: '6px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', textTransform: 'uppercase', fontWeight: 600 }}>{item.label}</span>
+                          <strong style={{ fontSize: '1.1rem', color: '#0f172a' }}>{item.count}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
+                    <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#dc2626' }}>Are you absolutely sure? This cannot be undone.</span>
+                  </div>
+                </div>
+              )}
+
+              {confirmationStep === 4 && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '1.5rem 0', gap: '1rem' }}>
+                  <span style={{ fontSize: '3rem' }}>✅</span>
+                  <h4 style={{ fontWeight: 800, color: '#16a34a', margin: 0 }}>Database Operation Successful!</h4>
+                  <p style={{ color: '#4b5563', fontSize: '0.9rem', maxWidth: '400px', margin: 0 }}>
+                    The database has been cleared/reset as requested.
+                  </p>
+                  {backupFileName && (
+                    <div style={{ backgroundColor: '#f1f5f9', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontFamily: 'monospace', color: '#334155', wordBreak: 'break-all' }}>
+                      <strong>Server Auto-Backup Archive:</strong><br />
+                      {backupFileName}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleCompleteRedirect}
+                    style={{ padding: '0.6rem 2rem', fontWeight: 700, width: '100%', marginTop: '1rem' }}
+                  >
+                    Acknowledge & Logout
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }
@@ -2499,4 +3159,5 @@ function MigrationCenter() {
     </div>
   );
 }
+
 

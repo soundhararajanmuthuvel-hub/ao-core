@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useToast } from '../context/ToastContext';
-import { resolveAssetUrl } from '../utils/url';
+import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 import './Login.css';
 
 export default function Login() {
@@ -70,11 +70,15 @@ export default function Login() {
         <div className="left-panel-content animate-fade-in">
           {/* Top Logo Badge (Glassmorphic) */}
           <div className="brand-glass-badge">
-            {settings?.logo ? (
-              <img src={resolveAssetUrl(settings.logo)} alt="AO Core Logo" className="brand-logo-top" />
-            ) : (
-              <img src="/favicon.png" alt="AO Core Logo" className="brand-logo-top" />
-            )}
+            <img
+              src={getActiveLogoUrl(settings)}
+              alt="AO Core Logo"
+              className="brand-logo-top"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/favicon.png';
+              }}
+            />
             <span className="brand-logo-text-top">AO CORE ERP</span>
           </div>
 
@@ -132,11 +136,15 @@ export default function Login() {
             <div className="login-card-header">
               {/* Mobile Header Branding */}
               <div className="mobile-logo-header">
-                {settings?.logo ? (
-                  <img src={resolveAssetUrl(settings.logo)} alt="Logo" className="mobile-logo" />
-                ) : (
-                  <img src="/favicon.png" alt="Logo" className="mobile-logo" />
-                )}
+                  <img
+                    src={getActiveLogoUrl(settings)}
+                    alt="Logo"
+                    className="mobile-logo"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = '/favicon.png';
+                    }}
+                  />
                 <h3>AO CORE ERP</h3>
               </div>
               

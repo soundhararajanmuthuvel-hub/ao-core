@@ -1,5 +1,5 @@
 import '../styles/invoice-template.css';
-import { resolveAssetUrl } from '../utils/url';
+import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 
 export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-capture' }) {
   if (!sale) return null;
@@ -38,8 +38,18 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
       }}
     >
       <header className="invoice-template-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-        {settings?.logo && format !== 'Thermal' && (
-          <img src={resolveAssetUrl(settings.logo)} alt="" className="invoice-logo" style={{ maxHeight: '60px', objectFit: 'contain' }} crossOrigin="anonymous" />
+        {(settings?.logo || settings?.logoUrl) && format !== 'Thermal' && (
+          <img 
+            src={getActiveLogoUrl(settings)} 
+            alt="" 
+            className="invoice-logo" 
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = '/favicon.png';
+            }}
+            style={{ maxHeight: '60px', objectFit: 'contain' }} 
+            crossOrigin="anonymous" 
+          />
         )}
         <div style={{ textAlign: format === 'Thermal' ? 'center' : 'right', width: format === 'Thermal' ? '100%' : 'auto' }}>
           <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: primaryColor, margin: '0 0 0.25rem 0' }}>

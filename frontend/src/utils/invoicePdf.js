@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { resolveAssetUrl } from './url';
+import { resolveAssetUrl, getActiveLogoUrl } from './url';
 
 // Helper to convert hex brand color to RGB for jsPDF fill/text colors
 function hexToRgb(hex) {
@@ -51,10 +51,17 @@ export async function downloadInvoicePdf(sale, settings) {
   let companyStartX = 14;
   let companyY = 20;
 
-  if (settings?.logo) {
+  if (settings?.logo || settings?.logoUrl) {
     try {
-      const logoUrl = resolveAssetUrl(settings.logo);
-      const img = await loadImage(logoUrl);
+      let logoUrl = getActiveLogoUrl(settings);
+      let img;
+      try {
+        img = await loadImage(logoUrl);
+      } catch (err) {
+        console.error('Failed to load active logo, falling back to default:', err);
+        logoUrl = '/favicon.png';
+        img = await loadImage(logoUrl);
+      }
       const logoHeight = 15;
       const logoWidth = Math.min(35, logoHeight * (img.width / img.height));
       

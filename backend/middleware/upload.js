@@ -20,7 +20,7 @@ const storage = (subfolder) =>
   });
 
 const fileFilter = (req, file, cb) => {
-  const allowed = /jpeg|jpg|png|gif|webp/;
+  const allowed = /jpeg|jpg|png|gif|webp|svg/;
   const ext = allowed.test(path.extname(file.originalname).toLowerCase());
   const mime = allowed.test(file.mimetype);
   if (ext && mime) cb(null, true);
@@ -36,7 +36,7 @@ const purchaseInvoiceFileFilter = (req, file, cb) => {
 
 const uploadLogo = multer({
   storage: storage('logos'),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter,
 }).single('logo');
 
