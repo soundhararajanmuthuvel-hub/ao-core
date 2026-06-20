@@ -120,6 +120,9 @@ exports.createProduct = async (req, res, next) => {
     if (data.preferredSupplierId === '') {
       data.preferredSupplierId = null;
     }
+    if (data.parentProductId === '') {
+      data.parentProductId = null;
+    }
     
     let packSizesData = [];
     if (data.packSizes) {
@@ -156,6 +159,9 @@ exports.updateProduct = async (req, res, next) => {
     
     if (data.preferredSupplierId === '') {
       data.preferredSupplierId = null;
+    }
+    if (data.parentProductId === '') {
+      data.parentProductId = null;
     }
     
     let packSizesData = [];
