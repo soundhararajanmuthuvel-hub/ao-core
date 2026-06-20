@@ -46,7 +46,7 @@ const updateStock = async (productId, delta, opts = {}) => {
        WHERE productId = :productId AND batchNumber IS NOT NULL AND batchNumber != ''
        GROUP BY batchNumber, expiryDate
        HAVING remaining > 0
-       ORDER BY COALESCE(expiryDate, '9999-12-31') ASC, id ASC`,
+       ORDER BY COALESCE(expiryDate, '9999-12-31') ASC, MIN(id) ASC`,
       {
         replacements: { productId },
         type: StockMovement.sequelize.QueryTypes.SELECT,

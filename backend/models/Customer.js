@@ -218,7 +218,23 @@ async function assignTerritoryAndCode(customer) {
     customer.longitude = resolution.longitude;
     customer.territory = resolution.territory;
     customer.routeZone = resolution.routeZone;
-    customer.assignedSalesmanId = resolution.assignedSalesmanId;
+
+    let salesmanId = resolution.assignedSalesmanId;
+    if (salesmanId) {
+      const User = require('./User');
+      const userExists = await User.count({ where: { id: salesmanId } });
+      if (userExists === 0) {
+        const fallbackSalesman = await User.findOne({
+          where: {
+            role: {
+              [require('sequelize').Op.in]: ['Salesman', 'Sales Executive']
+            }
+          }
+        });
+        salesmanId = fallbackSalesman ? fallbackSalesman.id : null;
+      }
+    }
+    customer.assignedSalesmanId = salesmanId;
 
     const territoryCode = resolution.routeZone;
     const currentCode = customer.customerCode;

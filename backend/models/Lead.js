@@ -94,4 +94,32 @@ makeMongooseCompatible(Lead, {
   customer: 'customerId',
 });
 
+async function validateLeadSalesman(lead) {
+  let salesmanId = lead.assignedSalesmanId;
+  if (salesmanId) {
+    const User = require('./User');
+    const userExists = await User.count({ where: { id: salesmanId } });
+    if (userExists === 0) {
+      const fallbackSalesman = await User.findOne({
+        where: {
+          role: {
+            [require('sequelize').Op.in]: ['Salesman', 'Sales Executive']
+          }
+        }
+      });
+      lead.assignedSalesmanId = fallbackSalesman ? fallbackSalesman.id : null;
+    }
+  }
+}
+
+Lead.addHook('beforeCreate', async (lead, options) => {
+  await validateLeadSalesman(lead);
+});
+
+Lead.addHook('beforeUpdate', async (lead, options) => {
+  if (lead.changed('assignedSalesmanId')) {
+    await validateLeadSalesman(lead);
+  }
+});
+
 module.exports = Lead;
