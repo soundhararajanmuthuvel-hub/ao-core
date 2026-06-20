@@ -18,6 +18,21 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
   
   const templateRef = useRef(null);
   const isMobileViewport = window.innerWidth < 768;
+  const [exportSize, setExportSize] = useState('1080x1350'); // '1080x1080', '1080x1350', '1080x1920'
+  const isSquare = exportSize === '1080x1080';
+  
+  const getExportDimensions = () => {
+    switch (exportSize) {
+      case '1080x1080':
+        return { width: 1080, height: 1080 };
+      case '1080x1920':
+        return { width: 1080, height: 1920 };
+      case '1080x1350':
+      default:
+        return { width: 1080, height: 1350 };
+    }
+  };
+  const { width: exportWidth, height: exportHeight } = getExportDimensions();
 
   // Constants
   const balance = Number(invoice.grandTotal || 0) - Number(invoice.amountPaid || 0);
@@ -115,16 +130,34 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
       const canvas = await html2canvas(templateRef.current, {
         useCORS: true,
         allowTaint: false,
-        width: 1080,
-        height: 1350,
-        windowWidth: 1080,
-        windowHeight: 1350,
+        width: exportWidth,
+        height: exportHeight,
+        windowWidth: exportWidth,
+        windowHeight: exportHeight,
         scale: 1, // Fix memory, high-DPI scaling, and clipping issues on mobile viewports
         scrollX: 0,
         scrollY: 0,
         x: 0,
         y: 0,
-        logging: false
+        logging: false,
+        onclone: (clonedDoc) => {
+          // Force cloned document and body layout width to the exact target size to prevent responsive scaling clipping!
+          clonedDoc.documentElement.style.width = `${exportWidth}px`;
+          clonedDoc.documentElement.style.height = `${exportHeight}px`;
+          clonedDoc.body.style.width = `${exportWidth}px`;
+          clonedDoc.body.style.height = `${exportHeight}px`;
+          clonedDoc.body.style.minWidth = `${exportWidth}px`;
+          clonedDoc.body.style.overflow = 'hidden';
+          
+          // Locate the cloned template element
+          const clonedTemplate = clonedDoc.getElementById('payment-reminder-template');
+          if (clonedTemplate) {
+            clonedTemplate.style.width = `${exportWidth}px`;
+            clonedTemplate.style.height = `${exportHeight}px`;
+            clonedTemplate.style.position = 'static';
+            clonedTemplate.style.transform = 'none';
+          }
+        }
       });
       const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
       setImgUrl(dataUrl);
@@ -141,7 +174,7 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
     if (logoBase64 && qrBase64) {
       generateImage();
     }
-  }, [template, logoBase64, qrBase64]);
+  }, [template, exportSize, logoBase64, qrBase64]);
 
   // Download JPG
   const downloadJpg = () => {
@@ -283,16 +316,44 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
     <Modal
       title="Branded Reminder Preview"
       onClose={onClose}
-      className={isMobileViewport ? "preview-modal" : "modal-lg"}
+      className="preview-modal"
       footer={
         <div style={{
           display: 'flex',
-          flexDirection: isMobileViewport ? 'column' : 'row',
-          justifyContent: 'space-between',
+          flexDirection: 'column',
+          justifyContent: 'center',
           width: '100%',
           alignItems: 'center',
-          gap: '1rem'
+          gap: '0.5rem'
         }}>
+          {/* Export Size Selector */}
+          <div style={{
+            display: 'flex',
+            gap: '0.4rem',
+            flexWrap: isMobileViewport ? 'nowrap' : 'wrap',
+            overflowX: isMobileViewport ? 'auto' : 'visible',
+            paddingBottom: isMobileViewport ? '6px' : '0',
+            WebkitOverflowScrolling: 'touch',
+            justifyContent: isMobileViewport ? 'flex-start' : 'center',
+            width: '100%'
+          }}>
+            {[
+              { id: '1080x1080', label: 'Square (1080x1080)' },
+              { id: '1080x1350', label: 'Portrait (1080x1350)' },
+              { id: '1080x1920', label: 'Story (1080x1920)' }
+            ].map((sz) => (
+              <button
+                key={sz.id}
+                type="button"
+                className={`btn btn-sm template-btn ${exportSize === sz.id ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setExportSize(sz.id)}
+                style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
+              >
+                {sz.label}
+              </button>
+            ))}
+          </div>
+
           {/* Template Switches */}
           <div style={{
             display: 'flex',
@@ -326,9 +387,10 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
           <div style={{
             display: 'flex',
             gap: '0.5rem',
-            width: isMobileViewport ? '100%' : 'auto',
+            width: '100%',
             justifyContent: 'center',
-            flexDirection: isMobileViewport ? 'column' : 'row'
+            flexDirection: isMobileViewport ? 'column' : 'row',
+            marginTop: '0.5rem'
           }}>
             <button type="button" className="btn btn-secondary" style={{ width: isMobileViewport ? '100%' : 'auto' }} onClick={onClose}>Cancel</button>
             <div style={{ display: 'flex', gap: '0.5rem', width: isMobileViewport ? '100%' : 'auto', flex: isMobileViewport ? 1 : 'none' }}>
@@ -421,8 +483,8 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
           position: 'fixed', 
           top: 0, 
           left: 0, 
-          width: '1080px', 
-          height: '1350px', 
+          width: `${exportWidth}px`, 
+          height: `${exportHeight}px`, 
           overflow: 'hidden', 
           zIndex: -9999, 
           opacity: 0, 
@@ -430,10 +492,11 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
         }}>
           <div
             ref={templateRef}
+            id="payment-reminder-template"
             style={{
-              width: '1080px',
-              height: '1350px',
-              padding: '65px 75px',
+              width: `${exportWidth}px`,
+              height: `${exportHeight}px`,
+              padding: exportSize === '1080x1920' ? '90px 75px' : '55px 65px',
               boxSizing: 'border-box',
               background: currentStyles.background,
               fontFamily: "'Outfit', 'Inter', sans-serif",
@@ -443,27 +506,26 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
               position: 'relative'
             }}
           >
-            {isMobileViewport ? (
+            {exportSize === '1080x1920' ? (
               /* ==================================================== */
-              /* MOBILE LAYOUT (SINGLE COLUMN RESPONSIVE TEMPLATE)    */
+              /* STORY LAYOUT (9:16 - TALL PORTRAIT FOR STATUS/STORY)  */
               /* ==================================================== */
               <>
                 {/* Header block */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '0.75rem' }}>
-                  {/* Dedicated Logo circle container badge */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '20px' }}>
+                  {/* Logo Container */}
                   <div style={{
-                    width: '120px',
-                    height: '120px',
+                    width: '150px',
+                    height: '150px',
                     backgroundColor: '#ffffff',
                     borderRadius: '50%',
-                    padding: '16px',
+                    padding: '20px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     border: currentStyles.logoBorder,
                     boxShadow: '0 4px 25px rgba(0, 0, 0, 0.15)',
-                    boxSizing: 'border-box',
-                    margin: '0 auto'
+                    boxSizing: 'border-box'
                   }}>
                     <img
                       src={logoBase64 || '/favicon.png'}
@@ -474,7 +536,7 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
 
                   <h1 style={{ 
                     margin: 0, 
-                    fontSize: '2.5rem', 
+                    fontSize: '38px', 
                     fontWeight: 900, 
                     color: '#ffffff', 
                     letterSpacing: '0.05em',
@@ -487,9 +549,9 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                     display: 'inline-block',
                     backgroundColor: currentStyles.accentColor,
                     color: '#ffffff',
-                    padding: '0.45rem 2rem',
+                    padding: '10px 40px',
                     borderRadius: '30px',
-                    fontSize: '1.25rem',
+                    fontSize: '22px',
                     fontWeight: 800,
                     letterSpacing: '0.15em',
                     textTransform: 'uppercase',
@@ -500,32 +562,36 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                 </div>
 
                 {/* Customer greeting */}
-                <div style={{ color: '#ffffff', fontSize: '1.5rem', lineHeight: 1.5, textAlign: 'center' }}>
-                  <p style={{ margin: '0 0 0.5rem 0', fontSize: '1.85rem', fontWeight: 800 }}>Dear {customer.name},</p>
-                  <p style={{ margin: 0, color: '#e2e8f0' }}>
+                <div style={{ color: '#ffffff', textAlign: 'center', padding: '0 20px' }}>
+                  <p className="customer-name" style={{ margin: '0 0 15px 0', fontSize: '42px', fontWeight: 800, wordBreak: 'break-word', lineHeight: 1.3 }}>
+                    Dear {customer.name},
+                  </p>
+                  <p style={{ margin: 0, color: '#cbd5e1', fontSize: '24px', lineHeight: 1.5 }}>
                     We hope you are doing well. This is a friendly reminder regarding the outstanding balance for the following invoice.
                   </p>
                 </div>
 
                 {/* Invoice card details (Mobile stack) */}
-                <div style={{
+                <div className="amount-card" style={{
                   backgroundColor: currentStyles.cardBg,
                   backdropFilter: currentStyles.backdropFilter || 'none',
-                  padding: '2.25rem',
+                  padding: '45px',
                   borderRadius: '24px',
                   border: currentStyles.borderStyle,
                   boxShadow: currentStyles.shadow,
                   boxSizing: 'border-box',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '1.25rem',
+                  gap: '25px',
                   textAlign: 'center',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  width: '880px',
+                  margin: '0 auto'
                 }}>
                   {/* Outstanding Amount Header & Large Text */}
                   <div style={{ width: '100%' }}>
-                    <span style={{ fontSize: '1.1rem', color: currentStyles.lightTextColor, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', display: 'block', marginBottom: '0.5rem' }}>Outstanding Amount</span>
-                    <strong style={{ fontSize: '3.85rem', color: '#ef4444', fontWeight: 900, letterSpacing: '-0.02em', display: 'block' }}>
+                    <span style={{ fontSize: '20px', color: currentStyles.lightTextColor, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Outstanding Amount</span>
+                    <strong style={{ fontSize: '80px', color: '#ef4444', fontWeight: 900, letterSpacing: '-0.02em', display: 'block' }}>
                       ₹ {balance.toLocaleString('en-IN')}
                     </strong>
                   </div>
@@ -534,11 +600,11 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                   {daysOverdue > 0 && (
                     <div style={{
                       backgroundColor: '#fee2e2',
-                      border: '2px solid #ef4444',
+                      border: '3px solid #ef4444',
                       color: '#b91c1c',
-                      padding: '0.65rem 1.5rem',
+                      padding: '12px 30px',
                       borderRadius: '50px',
-                      fontSize: '1.1rem',
+                      fontSize: '22px',
                       fontWeight: 900,
                       letterSpacing: '0.05em',
                       boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)',
@@ -553,45 +619,46 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                   <div style={{ width: '100%', borderTop: '1px solid rgba(0,0,0,0.08)', borderTopColor: template === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)' }}></div>
 
                   {/* Invoice details cards stacked vertically */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', textAlign: 'left' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px dashed rgba(0,0,0,0.05)', borderBottomColor: template === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)' }}>
-                      <span style={{ fontSize: '1.05rem', color: currentStyles.lightTextColor, fontWeight: 700 }}>Invoice Number</span>
-                      <strong style={{ fontSize: '1.15rem', color: currentStyles.textColor, fontWeight: 800 }}>{invoice.invoiceNumber}</strong>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%', textAlign: 'left' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px dashed rgba(0,0,0,0.05)', borderBottomColor: template === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)' }}>
+                      <span style={{ fontSize: '22px', color: currentStyles.lightTextColor, fontWeight: 700 }}>Invoice Number</span>
+                      <strong style={{ fontSize: '24px', color: currentStyles.textColor, fontWeight: 800 }}>{invoice.invoiceNumber}</strong>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px dashed rgba(0,0,0,0.05)', borderBottomColor: template === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)' }}>
-                      <span style={{ fontSize: '1.05rem', color: currentStyles.lightTextColor, fontWeight: 700 }}>Invoice Date</span>
-                      <strong style={{ fontSize: '1.15rem', color: currentStyles.textColor, fontWeight: 800 }}>{invoiceDate}</strong>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px dashed rgba(0,0,0,0.05)', borderBottomColor: template === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)' }}>
+                      <span style={{ fontSize: '22px', color: currentStyles.lightTextColor, fontWeight: 700 }}>Invoice Date</span>
+                      <strong style={{ fontSize: '24px', color: currentStyles.textColor, fontWeight: 800 }}>{invoiceDate}</strong>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0' }}>
-                      <span style={{ fontSize: '1.05rem', color: currentStyles.lightTextColor, fontWeight: 700 }}>Due Date</span>
-                      <strong style={{ fontSize: '1.15rem', color: currentStyles.textColor, fontWeight: 800 }}>{dueDate}</strong>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0' }}>
+                      <span style={{ fontSize: '22px', color: currentStyles.lightTextColor, fontWeight: 700 }}>Due Date</span>
+                      <strong style={{ fontSize: '24px', color: currentStyles.textColor, fontWeight: 800 }}>{dueDate}</strong>
                     </div>
                   </div>
                 </div>
 
                 {/* QR Pay Section (Centered) */}
-                <div style={{ 
+                <div className="qr-section" style={{ 
                   display: 'flex', 
                   flexDirection: 'column', 
                   alignItems: 'center', 
-                  gap: '0.75rem', 
+                  gap: '15px', 
                   backgroundColor: 'rgba(255, 255, 255, 0.05)', 
-                  padding: '1.5rem', 
+                  padding: '30px', 
                   borderRadius: '24px', 
                   border: '1px solid rgba(255,255,255,0.08)',
-                  width: '100%',
+                  width: '880px',
+                  margin: '0 auto',
                   boxSizing: 'border-box'
                 }}>
-                  <div style={{ textAlign: 'center', color: '#ffffff', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <strong style={{ fontSize: '1.35rem', fontWeight: 800 }}>Scan to Pay via UPI</strong>
-                    <span style={{ fontSize: '1rem', color: '#cbd5e1', fontFamily: 'monospace' }}>{settings?.upiId || "7010602115@iob"}</span>
+                  <div style={{ textAlign: 'center', color: '#ffffff', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <strong style={{ fontSize: '26px', fontWeight: 800 }}>Scan to Pay via UPI</strong>
+                    <span style={{ fontSize: '20px', color: '#cbd5e1', fontFamily: 'monospace' }}>{settings?.upiId || "7010602115@iob"}</span>
                   </div>
                   <div style={{
-                    width: '140px',
-                    height: '140px',
+                    width: '180px',
+                    height: '180px',
                     backgroundColor: '#ffffff',
                     borderRadius: '16px',
-                    padding: '10px',
+                    padding: '12px',
                     display: 'flex',
                     alignItems: 'center',
                     boxSizing: 'border-box',
@@ -604,20 +671,20 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                       style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                     />
                   </div>
-                  <span style={{ fontSize: '0.95rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Scan & Pay</span>
+                  <span style={{ fontSize: '18px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Scan & Pay</span>
                 </div>
 
                 {/* Support message / Footer */}
                 <div style={{ 
                   display: 'flex', 
                   flexDirection: 'column', 
-                  gap: '1rem', 
+                  gap: '15px', 
                   alignItems: 'center', 
                   borderTop: '2px solid rgba(255,255,255,0.1)',
-                  paddingTop: '1.5rem',
+                  paddingTop: '25px',
                   width: '100%'
                 }}>
-                  <p style={{ color: '#cbd5e1', fontSize: '1.15rem', lineHeight: 1.5, textAlign: 'center', margin: 0 }}>
+                  <p style={{ color: '#cbd5e1', fontSize: '22px', lineHeight: 1.5, textAlign: 'center', margin: 0 }}>
                     Kindly arrange payment at your convenience. Ignore if already paid.
                   </p>
                   
@@ -625,16 +692,16 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                     <div style={{ 
                       display: 'flex', 
                       flexDirection: 'column', 
-                      gap: '0.5rem', 
+                      gap: '8px', 
                       color: currentStyles.footerText, 
-                      fontSize: '1.15rem',
+                      fontSize: '20px',
                       alignItems: 'center',
                       textAlign: 'center'
                     }}>
-                      <strong style={{ fontSize: '1.45rem', color: '#ffffff', fontWeight: 800 }}>
+                      <strong style={{ fontSize: '26px', color: '#ffffff', fontWeight: 800 }}>
                         {settings?.companyName || 'Amudhasurabiy Organics'}
                       </strong>
-                      <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.25rem' }}>
+                      <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '5px' }}>
                         {hasPhone && <span>📞 {settings.phone}</span>}
                         {hasEmail && <span>✉️ {settings.email}</span>}
                         {hasGst && <span>📋 GSTIN: {settings.gstNumber || settings.gstin}</span>}
@@ -646,54 +713,51 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
               </>
             ) : (
               /* ==================================================== */
-              /* DESKTOP LAYOUT (MULTI COLUMN CLASSIC TEMPLATE)       */
+              /* SQUARE / PORTRAIT COMPACT GRID LAYOUT                */
               /* ==================================================== */
               <>
                 {/* Header block */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                  {/* Dedicated Logo circle container badge */}
-                  <div style={{
-                    width: '130px',
-                    height: '130px',
-                    backgroundColor: '#ffffff',
-                    borderRadius: '50%',
-                    padding: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: currentStyles.logoBorder,
-                    boxShadow: '0 4px 25px rgba(0, 0, 0, 0.15)',
-                    boxSizing: 'border-box',
-                    marginBottom: '1.25rem'
-                  }}>
-                    <img
-                      src={logoBase64 || '/favicon.png'}
-                      alt="Logo"
-                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                    />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottom: '2px solid rgba(255,255,255,0.1)', paddingBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                    <div style={{
+                      width: '100px',
+                      height: '100px',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '50%',
+                      padding: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: currentStyles.logoBorder,
+                      boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
+                      boxSizing: 'border-box'
+                    }}>
+                      <img
+                        src={logoBase64 || '/favicon.png'}
+                        alt="Logo"
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      />
+                    </div>
+                    <h1 style={{ 
+                      margin: 0, 
+                      fontSize: '32px', 
+                      fontWeight: 900, 
+                      color: '#ffffff', 
+                      letterSpacing: '0.02em',
+                      textTransform: 'uppercase'
+                    }}>
+                      {settings?.companyName || 'Amudhasurabiy Organics'}
+                    </h1>
                   </div>
 
-                  <h1 style={{ 
-                    margin: 0, 
-                    fontSize: '2.45rem', 
-                    fontWeight: 900, 
-                    color: '#ffffff', 
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase'
-                  }}>
-                    {settings?.companyName || 'Amudhasurabiy Organics'}
-                  </h1>
-                  
                   <div style={{
-                    display: 'inline-block',
-                    marginTop: '0.65rem',
                     backgroundColor: currentStyles.accentColor,
                     color: '#ffffff',
-                    padding: '0.35rem 1.75rem',
+                    padding: '8px 25px',
                     borderRadius: '30px',
-                    fontSize: '1.05rem',
+                    fontSize: '18px',
                     fontWeight: 800,
-                    letterSpacing: '0.15em',
+                    letterSpacing: '0.1em',
                     textTransform: 'uppercase',
                     boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
                   }}>
@@ -702,40 +766,42 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                 </div>
 
                 {/* Customer greeting */}
-                <div style={{ color: '#ffffff', fontSize: '1.45rem', lineHeight: 1.6 }}>
-                  <p style={{ margin: '0 0 0.5rem 0', fontSize: '1.75rem', fontWeight: 800 }}>Dear {customer.name},</p>
+                <div style={{ color: '#ffffff', fontSize: '24px', lineHeight: 1.5 }}>
+                  <p className="customer-name" style={{ margin: '0 0 8px 0', fontSize: '36px', fontWeight: 800, wordBreak: 'break-word', textAlign: 'left' }}>
+                    Dear {customer.name},
+                  </p>
                   <p style={{ margin: 0, color: '#e2e8f0' }}>
                     We hope you are doing well. This is a friendly reminder regarding the outstanding balance for the following invoice.
                   </p>
                 </div>
 
                 {/* Invoice card details */}
-                <div style={{
+                <div className="amount-card" style={{
                   backgroundColor: currentStyles.cardBg,
                   backdropFilter: currentStyles.backdropFilter || 'none',
-                  padding: '2.5rem',
+                  padding: isSquare ? '25px' : '40px',
                   borderRadius: '24px',
                   border: currentStyles.borderStyle,
                   boxShadow: currentStyles.shadow,
                   boxSizing: 'border-box',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '1.5rem',
+                  gap: '20px',
                   position: 'relative'
                 }}>
                   {/* Header Grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: '20px' }}>
                     <div>
-                      <span style={{ fontSize: '0.95rem', color: currentStyles.lightTextColor, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', display: 'block', marginBottom: '0.35rem' }}>Invoice Number</span>
-                      <strong style={{ fontSize: '1.5rem', color: currentStyles.textColor, fontWeight: 800 }}>{invoice.invoiceNumber}</strong>
+                      <span style={{ fontSize: '18px', color: currentStyles.lightTextColor, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', display: 'block', marginBottom: '5px' }}>Invoice Number</span>
+                      <strong style={{ fontSize: '24px', color: currentStyles.textColor, fontWeight: 800 }}>{invoice.invoiceNumber}</strong>
                     </div>
                     <div>
-                      <span style={{ fontSize: '0.95rem', color: currentStyles.lightTextColor, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', display: 'block', marginBottom: '0.35rem' }}>Invoice Date</span>
-                      <strong style={{ fontSize: '1.35rem', color: currentStyles.textColor, fontWeight: 700 }}>{invoiceDate}</strong>
+                      <span style={{ fontSize: '18px', color: currentStyles.lightTextColor, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', display: 'block', marginBottom: '5px' }}>Invoice Date</span>
+                      <strong style={{ fontSize: '22px', color: currentStyles.textColor, fontWeight: 700 }}>{invoiceDate}</strong>
                     </div>
                     <div>
-                      <span style={{ fontSize: '0.95rem', color: currentStyles.lightTextColor, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', display: 'block', marginBottom: '0.35rem' }}>Due Date</span>
-                      <strong style={{ fontSize: '1.35rem', color: currentStyles.textColor, fontWeight: 700 }}>{dueDate}</strong>
+                      <span style={{ fontSize: '18px', color: currentStyles.lightTextColor, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', display: 'block', marginBottom: '5px' }}>Due Date</span>
+                      <strong style={{ fontSize: '22px', color: currentStyles.textColor, fontWeight: 700 }}>{dueDate}</strong>
                     </div>
                   </div>
 
@@ -745,8 +811,8 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                   {/* Outstanding Amount Row */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <span style={{ fontSize: '1.1rem', color: currentStyles.lightTextColor, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', display: 'block', marginBottom: '0.25rem' }}>Outstanding Amount</span>
-                      <strong style={{ fontSize: '3.65rem', color: '#ef4444', fontWeight: 900, letterSpacing: '-0.02em' }}>
+                      <span style={{ fontSize: '18px', color: currentStyles.lightTextColor, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', display: 'block', marginBottom: '5px' }}>Outstanding Amount</span>
+                      <strong style={{ fontSize: '56px', color: '#ef4444', fontWeight: 900, letterSpacing: '-0.02em' }}>
                         ₹ {balance.toLocaleString('en-IN')}
                       </strong>
                     </div>
@@ -757,9 +823,9 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                         backgroundColor: '#fee2e2',
                         border: '2px solid #ef4444',
                         color: '#b91c1c',
-                        padding: '0.85rem 1.75rem',
+                        padding: '10px 24px',
                         borderRadius: '50px',
-                        fontSize: '1.15rem',
+                        fontSize: '20px',
                         fontWeight: 900,
                         letterSpacing: '0.05em',
                         boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)',
@@ -773,9 +839,8 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                 </div>
 
                 {/* Support Message */}
-                <div style={{ color: '#e2e8f0', fontSize: '1.25rem', lineHeight: 1.6, textAlign: 'center', margin: '0.5rem 0' }}>
-                  We kindly request you to arrange payment at your earliest convenience.<br/>
-                  If payment has already been made, please ignore this reminder. Thank you for your support.
+                <div style={{ color: '#cbd5e1', fontSize: '20px', lineHeight: 1.5, textAlign: 'center', margin: isSquare ? '5px 0' : '15px 0' }}>
+                  Kindly arrange payment at your convenience. Ignore if already paid.
                 </div>
 
                 {/* Footer row */}
@@ -784,38 +849,37 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   borderTop: '2px solid rgba(255,255,255,0.1)',
-                  paddingTop: '2rem'
+                  paddingTop: '20px'
                 }}>
                   {/* Left Column: Contact details */}
                   {validFieldsCount > 0 && (
                     <div style={{ 
                       display: 'flex', 
                       flexDirection: 'column', 
-                      gap: '0.65rem', 
+                      gap: '8px', 
                       color: currentStyles.footerText, 
-                      fontSize: '1.15rem',
-                      alignItems: (hasPhone && validFieldsCount === 1) ? 'center' : 'flex-start',
-                      textAlign: (hasPhone && validFieldsCount === 1) ? 'center' : 'left'
+                      fontSize: '18px',
+                      alignItems: 'flex-start',
+                      textAlign: 'left'
                     }}>
-                      <strong style={{ fontSize: '1.5rem', color: '#ffffff', fontWeight: 800 }}>
+                      <strong style={{ fontSize: '22px', color: '#ffffff', fontWeight: 800 }}>
                         {settings?.companyName || 'Amudhasurabiy Organics'}
                       </strong>
                       {hasPhone && <span>📞 Phone: {settings.phone}</span>}
                       {hasEmail && <span>✉️ Email: {settings.email}</span>}
                       {hasGst && <span>📋 GSTIN: {settings.gstNumber || settings.gstin}</span>}
-                      {hasWebsite && <span>🌐 Website: {settings.website}</span>}
                     </div>
                   )}
 
                   {/* Right Column: QR Pay Code */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '1.25rem 1.75rem', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'right', color: '#ffffff' }}>
-                      <strong style={{ fontSize: '1.2rem', fontWeight: 800 }}>Scan to Pay via UPI</strong>
-                      <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontFamily: 'monospace' }}>{settings?.upiId || "7010602115@iob"}</span>
+                  <div className="qr-section" style={{ display: 'flex', alignItems: 'center', gap: '20px', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '15px 25px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'right', color: '#ffffff' }}>
+                      <strong style={{ fontSize: '20px', fontWeight: 800 }}>Scan to Pay via UPI</strong>
+                      <span style={{ fontSize: '16px', color: '#94a3b8', fontFamily: 'monospace' }}>{settings?.upiId || "7010602115@iob"}</span>
                     </div>
                     <div style={{
-                      width: '125px',
-                      height: '125px',
+                      width: '120px',
+                      height: '120px',
                       backgroundColor: '#ffffff',
                       borderRadius: '12px',
                       padding: '8px',

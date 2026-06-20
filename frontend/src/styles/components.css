@@ -1092,10 +1092,11 @@ table.data-table tr:hover td {
 .preview-modal {
   width: 95vw !important;
   max-width: 95vw !important;
-  height: auto !important;
-  max-height: 95vh !important;
+  height: 90vh !important;
+  max-height: 90vh !important;
   display: flex !important;
   flex-direction: column !important;
+  overflow: auto !important;
 }
 
 .preview-modal .modal-body {
@@ -1107,10 +1108,12 @@ table.data-table tr:hover td {
 
 @media (max-width: 768px) {
   .preview-modal {
-    width: 95vw !important;
-    max-width: 95vw !important;
-    height: auto !important;
-    margin: auto !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
   }
   
   .preview-modal .modal-footer {
