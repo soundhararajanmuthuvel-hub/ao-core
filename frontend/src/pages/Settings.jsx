@@ -7,6 +7,7 @@ import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const emptyUser = { name: '', email: '', password: '', role: 'Super Admin', isActive: true };
 
@@ -25,6 +26,7 @@ export default function SettingsPage() {
   const { settings, updateSettings, loadSettings } = useSettings();
   const { darkMode, setDarkMode } = useTheme();
   const { toast } = useToast();
+  const { updateTourCompleted } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState(tabParam || 'profile');
@@ -409,6 +411,20 @@ export default function SettingsPage() {
           }}
         >
           💾 Data Migration
+        </button>
+        <button
+          type="button"
+          className={`rm-tab-btn ${activeTab === 'help' ? 'active' : ''}`}
+          onClick={() => handleTabChange('help')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            fontWeight: 600,
+            fontSize: '0.9rem',
+            borderBottom: activeTab === 'help' ? '3px solid #ff9800' : '3px solid transparent',
+            color: activeTab === 'help' ? '#ff9800' : '#64748b',
+          }}
+        >
+          ❓ Help & Support
         </button>
       </div>
 
@@ -1181,6 +1197,46 @@ export default function SettingsPage() {
         {/* Data Migration Tab */}
         {activeTab === 'migration' && (
           <MigrationCenter />
+        )}
+
+        {/* Help & Support Tab */}
+        {activeTab === 'help' && (
+          <div className="card" style={{ maxWidth: 600, padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.25rem' }}>Help & Support</h3>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              Welcome to AO ERP. If you need a refresher on how to navigate the platform, you can restart the guided user onboarding tour.
+            </p>
+            <div style={{ padding: '1.25rem', border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>User Onboarding Tour</span>
+              <span style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: '1.5' }}>
+                Restart the guided tour of the ERP application. This will take you through the core modules and dashboard metrics.
+              </span>
+              <div style={{ marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={async () => {
+                    if (confirm("Would you like to restart the onboarding tour?")) {
+                      await updateTourCompleted(false);
+                      toast("Tour status reset! Redirecting to dashboard to start...", "success");
+                      window.location.href = "/";
+                    }
+                  }}
+                  style={{
+                    backgroundColor: '#5a2d0c',
+                    color: '#fff',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: 'none'
+                  }}
+                >
+                  🔄 Restart User Tour
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

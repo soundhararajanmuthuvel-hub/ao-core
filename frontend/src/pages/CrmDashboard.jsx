@@ -45,8 +45,12 @@ export default function CrmDashboard() {
   const {
     totalLeads = 0,
     newLeads = 0,
+    assignedLeads = 0,
+    leadsFoundToday = 0,
     convertedLeads = 0,
     conversionRate = 0,
+    topTerritories = [],
+    topSalesmen = [],
     totalPipelineValue = 0,
     followUpStats = { pending: 0, completed: 0, missed: 0 },
     statusBreakdown = [],
@@ -65,7 +69,7 @@ export default function CrmDashboard() {
       </div>
 
       {/* KPI Stats Grid */}
-      <div className="stat-grid" style={{ marginBottom: '2rem' }}>
+      <div className="stat-grid" style={{ marginBottom: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
         <div className="stat-card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderLeft: '4px solid var(--info)' }}>
           <div style={{ padding: '0.75rem', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--info)' }}>
             <Users size={24} />
@@ -78,11 +82,31 @@ export default function CrmDashboard() {
 
         <div className="stat-card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderLeft: '4px solid var(--warning)' }}>
           <div style={{ padding: '0.75rem', borderRadius: '12px', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--warning)' }}>
-            <TrendingUp size={24} />
+            <Users size={24} />
           </div>
           <div>
             <div className="label">New Leads</div>
             <div className="value">{newLeads}</div>
+          </div>
+        </div>
+
+        <div className="stat-card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderLeft: '4px solid #8b5cf6' }}>
+          <div style={{ padding: '0.75rem', borderRadius: '12px', background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' }}>
+            <TrendingUp size={24} />
+          </div>
+          <div>
+            <div className="label">Assigned Leads</div>
+            <div className="value" style={{ color: '#8b5cf6' }}>{assignedLeads}</div>
+          </div>
+        </div>
+
+        <div className="stat-card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderLeft: '4px solid #06b6d4' }}>
+          <div style={{ padding: '0.75rem', borderRadius: '12px', background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4' }}>
+            <Calendar size={24} />
+          </div>
+          <div>
+            <div className="label">Leads Found Today</div>
+            <div className="value" style={{ color: '#06b6d4' }}>{leadsFoundToday}</div>
           </div>
         </div>
 
@@ -91,7 +115,7 @@ export default function CrmDashboard() {
             <UserCheck size={24} />
           </div>
           <div>
-            <div className="label">Lead Conversion</div>
+            <div className="label">Conversion Rate</div>
             <div className="value success">{conversionRate}%</div>
           </div>
         </div>
@@ -104,6 +128,57 @@ export default function CrmDashboard() {
             <div className="label">Pipeline Value</div>
             <div className="value" style={{ color: 'var(--brand-primary)' }}>₹{totalPipelineValue.toLocaleString('en-IN')}</div>
           </div>
+        </div>
+      </div>
+
+      {/* Dynamic Rankings section */}
+      <div className="chart-grid" style={{ marginBottom: '2rem' }}>
+        {/* Top Territories Card */}
+        <div className="card" style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '1.25rem' }}>
+          <h3 style={{ margin: '0 0 1.25rem 0', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>📍 Top Lead Territories</h3>
+          {topTerritories.length === 0 ? (
+            <div className="empty-state" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '2rem' }}>No territory ranking data available.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {topTerritories.map((item, idx) => (
+                <div key={item.territory} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, background: 'rgba(90, 45, 12, 0.08)', color: 'var(--brand-primary)', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {idx + 1}
+                    </span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.territory}</span>
+                  </div>
+                  <span style={{ fontSize: '0.875rem', color: 'var(--brand-primary)', fontWeight: 700 }}>
+                    {item.count} Leads
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Top Salesmen Card */}
+        <div className="card" style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '1.25rem' }}>
+          <h3 style={{ margin: '0 0 1.25rem 0', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>👤 Top Salesmen Performance</h3>
+          {topSalesmen.length === 0 ? (
+            <div className="empty-state" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '2rem' }}>No salesman assignment data available.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {topSalesmen.map((item, idx) => (
+                <div key={item.salesmanName} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, background: 'rgba(34, 197, 94, 0.08)', color: 'var(--success)', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {idx + 1}
+                    </span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.salesmanName}</span>
+                  </div>
+                  <span style={{ fontSize: '0.875rem', color: 'var(--success)', fontWeight: 700 }}>
+                    {item.count} Leads
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

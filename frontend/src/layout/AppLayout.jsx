@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { resolveAssetUrl } from '../utils/url';
 import { motion, AnimatePresence } from 'framer-motion';
+import UserTour from '../components/UserTour';
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -20,6 +21,17 @@ export default function AppLayout() {
   const [showLaunch, setShowLaunch] = useState(false);
   const [launchProgress, setLaunchProgress] = useState(0);
   const [launchMessage, setLaunchMessage] = useState('Initializing AO Core...');
+
+  // Handle guided tour control of the sidebar (expanded/collapsed and mobile drawer)
+  useEffect(() => {
+    const handleTourSidebar = (e) => {
+      const { open, collapsed: isCollapsed } = e.detail;
+      if (open !== undefined) setSidebarOpen(open);
+      if (isCollapsed !== undefined) setCollapsed(isCollapsed);
+    };
+    window.addEventListener('tour-set-sidebar', handleTourSidebar);
+    return () => window.removeEventListener('tour-set-sidebar', handleTourSidebar);
+  }, []);
 
   // Global loading states from custom events
   const [activeRequests, setActiveRequests] = useState(0);
@@ -592,6 +604,8 @@ export default function AppLayout() {
           </div>
         </div>
       </div>
+
+      {user && !user.tourCompleted && !showLaunch && <UserTour />}
     </div>
   );
 }

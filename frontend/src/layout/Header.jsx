@@ -382,6 +382,15 @@ export default function Header({ onMenuToggle }) {
               )}
             </div>
             
+            <button 
+              type="button" 
+              className="btn-icon" 
+              onClick={() => navigate('/ai-assistant')} 
+              title="AI Assistant Chat" 
+              style={{ minHeight: '44px', minWidth: '44px', background: 'none', border: 'none', fontSize: '1.25rem' }}
+            >
+              🧠
+            </button>
             <button type="button" className="btn-icon" onClick={toggleDarkMode} style={{ minHeight: '44px', minWidth: '44px', background: 'none', border: 'none', fontSize: '1.25rem' }}>
               {darkMode ? '☀️' : '🌙'}
             </button>
@@ -567,6 +576,15 @@ export default function Header({ onMenuToggle }) {
               style={{ minHeight: '44px', minWidth: '44px' }}
             >
               🔍
+            </button>
+            <button 
+              type="button" 
+              className="btn-icon" 
+              onClick={() => navigate('/ai-assistant')} 
+              title="AI Assistant Chat" 
+              style={{ minHeight: '44px', minWidth: '44px', fontSize: '1.2rem' }}
+            >
+              🧠
             </button>
             <button type="button" className="btn-icon" onClick={toggleDarkMode} title="Toggle dark mode" style={{ minHeight: '44px', minWidth: '44px' }}>
               {darkMode ? '☀️' : '🌙'}

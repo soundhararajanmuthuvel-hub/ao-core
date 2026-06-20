@@ -9,6 +9,7 @@ const Visit = require('../models/Visit');
 const CustomerReview = require('../models/CustomerReview');
 const Invoice = require('../models/Invoice');
 const territoryService = require('../utils/territoryService');
+const axios = require('axios');
 
 // MOCK SIMULATED LEADS DATABASE FOR THE LEAD FINDER
 const MOCK_LEADS_SOURCE = [
@@ -40,10 +41,46 @@ const MOCK_LEADS_SOURCE = [
    ================================================== */
 exports.crmDashboard = async (req, res, next) => {
   try {
-    const totalLeads = await Lead.count();
-    const newLeads = await Lead.count({ where: { status: 'New' } });
-    const convertedLeads = await Lead.count({ where: { status: 'Customer' } });
+    const allLeadsForStats = await Lead.findAll({
+      attributes: ['area', 'assignedSalesmanId', 'status', 'createdAt'],
+      include: [{ model: User, as: 'salesman', attributes: ['id', 'name'] }]
+    });
+
+    // Leads Found Today (local timezone start of day)
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const leadsFoundToday = allLeadsForStats.filter(l => new Date(l.createdAt) >= startOfDay).length;
+
+    const totalLeads = allLeadsForStats.length;
+    const newLeads = allLeadsForStats.filter(l => l.status === 'New').length;
+    const assignedLeads = allLeadsForStats.filter(l => l.status === 'Assigned').length;
+    const convertedLeads = allLeadsForStats.filter(l => l.status === 'Customer').length;
     const conversionRate = totalLeads > 0 ? Number(((convertedLeads / totalLeads) * 100).toFixed(1)) : 0;
+
+    // Top Territories
+    const territoryCounts = {};
+    allLeadsForStats.forEach(l => {
+      if (l.area) {
+        territoryCounts[l.area] = (territoryCounts[l.area] || 0) + 1;
+      }
+    });
+    const topTerritories = Object.keys(territoryCounts)
+      .map(name => ({ territory: name, count: territoryCounts[name] }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    // Top Salesmen
+    const salesmanCounts = {};
+    allLeadsForStats.forEach(l => {
+      if (l.assignedSalesmanId) {
+        const name = l.salesman ? l.salesman.name : 'Unknown';
+        salesmanCounts[name] = (salesmanCounts[name] || 0) + 1;
+      }
+    });
+    const topSalesmen = Object.keys(salesmanCounts)
+      .map(name => ({ salesmanName: name, count: salesmanCounts[name] }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
 
     const opportunities = await CrmOpportunity.findAll();
     const totalPipelineValue = opportunities
@@ -59,15 +96,15 @@ exports.crmDashboard = async (req, res, next) => {
     const statuses = ['New', 'Assigned', 'Visited', 'Interested', 'Customer', 'Rejected'];
     const statusBreakdown = [];
     for (const stat of statuses) {
-      const count = await Lead.count({ where: { status: stat } });
+      const count = allLeadsForStats.filter(l => l.status === stat).length;
       statusBreakdown.push({ status: stat, count });
     }
 
     // Category breakdown
-    const leads = await Lead.findAll({ attributes: ['category', 'source'] });
     const categoryMap = {};
     const sourceMap = {};
-    leads.forEach(l => {
+    const leadsWithDetails = await Lead.findAll({ attributes: ['category', 'source'] });
+    leadsWithDetails.forEach(l => {
       if (l.category) categoryMap[l.category] = (categoryMap[l.category] || 0) + 1;
       if (l.source) sourceMap[l.source] = (sourceMap[l.source] || 0) + 1;
     });
@@ -75,8 +112,12 @@ exports.crmDashboard = async (req, res, next) => {
     res.json({
       totalLeads,
       newLeads,
+      assignedLeads,
+      leadsFoundToday,
       convertedLeads,
       conversionRate,
+      topTerritories,
+      topSalesmen,
       totalPipelineValue,
       followUpStats: {
         pending: pendingFollowUps,
@@ -201,30 +242,270 @@ exports.deleteLead = async (req, res, next) => {
    ================================================== */
 exports.findSimulatedLeads = async (req, res, next) => {
   try {
-    const { category, city } = req.query;
-    if (!category || !city) {
-      return res.status(400).json({ message: 'Please specify category and city to run query.' });
+    let { city, district, state, radius, categories } = req.query;
+    
+    // Support backward compatibility (old code sent city and category)
+    if (!city && req.query.city) city = req.query.city;
+    const singleCategory = req.query.category;
+    
+    // Standardize input values
+    const searchCity = city || 'Madurai';
+    const searchDistrict = district || '';
+    const searchState = state || 'Tamil Nadu';
+    const searchRadiusKm = radius ? parseFloat(radius) : 10;
+    
+    let searchCategories = [];
+    if (categories) {
+      if (Array.isArray(categories)) {
+        searchCategories = categories;
+      } else if (typeof categories === 'string') {
+        searchCategories = categories.split(',').map(c => c.trim()).filter(Boolean);
+      }
+    } else if (singleCategory) {
+      searchCategories = [singleCategory];
+    } else {
+      // Default to all supported categories
+      searchCategories = [
+        'Organic Stores', 'Supermarkets', 'Department Stores', 'Nattu Marundhu Kadai',
+        'Health Food Stores', 'Ayurvedic Shops', 'Millet Stores', 'Dry Fruit Shops', 'Organic Farms'
+      ];
     }
 
-    const catLower = category.toLowerCase();
-    const cityLower = city.toLowerCase();
+    console.log(`Lead Finder: Scan started for ${searchCity}, Radius: ${searchRadiusKm} KM, Categories: ${searchCategories.join(', ')}`);
 
-    // Filter our static mock leads database
-    const results = MOCK_LEADS_SOURCE.filter(l => 
-      l.category.toLowerCase().includes(catLower) && 
-      l.city.toLowerCase().includes(cityLower)
-    );
+    // 1. Geocode City, District, State to get center lat, lon
+    let lat = null;
+    let lon = null;
+    
+    const geocodeQuery = [searchCity, searchDistrict, searchState, 'India'].filter(Boolean).join(', ');
+    
+    try {
+      const geoRes = await axios.get('https://nominatim.openstreetmap.org/search', {
+        params: {
+          q: geocodeQuery,
+          format: 'json',
+          limit: 1
+        },
+        headers: {
+          'User-Agent': 'AO-ERP-Lead-Finder/1.0 (dines@ao.com)'
+        },
+        timeout: 6000 // 6 seconds timeout
+      });
 
-    // Filter out mock leads that are already imported into local db
-    const currentLeads = await Lead.findAll({ attributes: ['shopName'] });
-    const importedNames = currentLeads.map(l => l.shopName.toLowerCase());
+      if (geoRes.data && geoRes.data.length > 0) {
+        lat = parseFloat(geoRes.data[0].lat);
+        lon = parseFloat(geoRes.data[0].lon);
+        console.log(`Lead Finder: Geocoded "${geocodeQuery}" to lat: ${lat}, lon: ${lon}`);
+      }
+    } catch (geoErr) {
+      console.error('Lead Finder Geocoding failed, using fallbacks:', geoErr.message);
+    }
 
-    const filteredResults = results.map(r => ({
-      ...r,
-      isImported: importedNames.includes(r.shopName.toLowerCase())
-    }));
+    // Fallback coordinates for common cities in Tamil Nadu
+    if (!lat || !lon) {
+      const cityLower = searchCity.toLowerCase();
+      if (cityLower.includes('madurai')) {
+        lat = 9.9252; lon = 78.1198;
+      } else if (cityLower.includes('chennai') || cityLower.includes('madras')) {
+        lat = 13.0827; lon = 80.2707;
+      } else if (cityLower.includes('coimbatore') || cityLower.includes('kovai')) {
+        lat = 11.0168; lon = 76.9558;
+      } else if (cityLower.includes('trichy') || cityLower.includes('tiruchirappalli')) {
+        lat = 10.7905; lon = 78.7047;
+      } else if (cityLower.includes('salem')) {
+        lat = 11.6643; lon = 78.1460;
+      } else if (cityLower.includes('kumbakonam')) {
+        lat = 10.9602; lon = 79.3845;
+      } else if (cityLower.includes('thirunelveli') || cityLower.includes('tirunelveli')) {
+        lat = 8.7139; lon = 77.7567;
+      } else {
+        // Ultimate fallback
+        lat = 9.9252; lon = 78.1198;
+      }
+      console.log(`Lead Finder: Using fallback coordinates for ${searchCity}: lat: ${lat}, lon: ${lon}`);
+    }
 
-    res.json(filteredResults);
+    // Map Category names to OSM shop values
+    const CATEGORY_MAP = {
+      'Organic Stores': 'organic',
+      'Supermarkets': 'supermarket',
+      'Department Stores': 'department_store',
+      'Nattu Marundhu Kadai': 'herbalist',
+      'Health Food Stores': 'health_food',
+      'Ayurvedic Shops': 'ayurvedic',
+      'Millet Stores': 'grains',
+      'Dry Fruit Shops': 'dry_fruits',
+      'Organic Farms': 'farmland'
+    };
+
+    const osmShops = searchCategories
+      .map(cat => CATEGORY_MAP[cat])
+      .filter(Boolean)
+      .join('|');
+
+    const includeFarmland = searchCategories.includes('Organic Farms');
+    const radiusMeters = searchRadiusKm * 1000;
+
+    let elements = [];
+    let isFallbackMode = false;
+
+    // 2. Query Overpass API
+    if (osmShops || includeFarmland) {
+      try {
+        const overpassQuery = `
+          [out:json][timeout:15];
+          (
+            ${osmShops ? `node["shop"~"${osmShops}"](around:${radiusMeters},${lat},${lon});` : ''}
+            ${osmShops ? `way["shop"~"${osmShops}"](around:${radiusMeters},${lat},${lon});` : ''}
+            ${includeFarmland ? `node["landuse"="farmland"](around:${radiusMeters},${lat},${lon});` : ''}
+            ${includeFarmland ? `way["landuse"="farmland"](around:${radiusMeters},${lat},${lon});` : ''}
+          );
+          out center;
+        `;
+
+        const overpassRes = await axios.post(
+          'https://overpass-api.de/api/interpreter',
+          `data=${encodeURIComponent(overpassQuery)}`,
+          {
+            headers: { 
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'User-Agent': 'AO-ERP-Lead-Finder/1.0 (dines@ao.com)'
+            },
+            timeout: 10000 // 10 seconds timeout
+          }
+        );
+
+        if (overpassRes.data && overpassRes.data.elements) {
+          elements = overpassRes.data.elements;
+          console.log(`Lead Finder: Overpass returned ${elements.length} elements.`);
+        }
+      } catch (overpassErr) {
+        console.error('Lead Finder: Overpass query failed, resorting to simulated fallback:', overpassErr.message);
+        isFallbackMode = true;
+      }
+    }
+
+    let parsedResults = [];
+
+    // Reverse OSM mapping back to our category list
+    const getTargetCategory = (shopTag, landuseTag) => {
+      if (landuseTag === 'farmland') return 'Organic Farms';
+      if (!shopTag) return 'Organic Stores';
+      
+      const s = shopTag.toLowerCase();
+      if (s === 'organic') return 'Organic Stores';
+      if (s === 'supermarket') return 'Supermarkets';
+      if (s === 'department_store') return 'Department Stores';
+      if (s === 'herbalist') return 'Nattu Marundhu Kadai';
+      if (s === 'health_food') return 'Health Food Stores';
+      if (s === 'ayurvedic') return 'Ayurvedic Shops';
+      if (s === 'grains') return 'Millet Stores';
+      if (s === 'dry_fruits' || s === 'nuts') return 'Dry Fruit Shops';
+      
+      return 'Organic Stores'; // Default category
+    };
+
+    if (elements.length > 0 && !isFallbackMode) {
+      parsedResults = elements.map(el => {
+        const tags = el.tags || {};
+        const elLat = el.lat !== undefined ? el.lat : (el.center ? el.center.lat : lat);
+        const elLon = el.lon !== undefined ? el.lon : (el.center ? el.center.lon : lon);
+        
+        const dist = territoryService.haversineDistance(lat, lon, elLat, elLon);
+
+        // Build clean address representation
+        const street = tags['addr:street'] || '';
+        const house = tags['addr:housenumber'] || '';
+        const suburb = tags['addr:suburb'] || tags['addr:neighbourhood'] || '';
+        const elCity = tags['addr:city'] || searchCity;
+        const state = tags['addr:state'] || 'Tamil Nadu';
+        const pincode = tags['addr:postcode'] || '';
+
+        const addressParts = [house, street, suburb].filter(Boolean);
+        const fullAddress = addressParts.length > 0 
+          ? addressParts.join(', ') 
+          : `${tags.name || 'Shop'}, ${suburb || 'Local Area'}, ${elCity}`;
+
+        const shopName = tags.name || `${getTargetCategory(tags.shop, tags.landuse)} Shop`;
+
+        return {
+          shopName,
+          category: getTargetCategory(tags.shop, tags.landuse),
+          ownerName: tags.operator || tags.contact || '',
+          mobileNumber: tags.phone || tags['contact:phone'] || tags.mobile || '',
+          address: fullAddress,
+          city: elCity,
+          district: tags['addr:district'] || searchDistrict || elCity,
+          state: state,
+          pincode: pincode,
+          latitude: Number(Number(elLat).toFixed(6)),
+          longitude: Number(Number(elLon).toFixed(6)),
+          website: tags.website || tags['contact:website'] || '',
+          source: 'OpenStreetMap',
+          distanceFromCenter: Number(dist.toFixed(2))
+        };
+      });
+    }
+
+    // 3. Fallback to Local Mock Database if no Overpass results or if geocoding/overpass failed
+    if (parsedResults.length === 0) {
+      isFallbackMode = true;
+      console.log('Lead Finder: Operating in local database fallback mode.');
+      
+      // Calculate distances for mock items from the computed center
+      const lowerCity = searchCity.toLowerCase();
+      
+      const filteredMocks = MOCK_LEADS_SOURCE.filter(l => {
+        // Match city
+        const cityMatch = l.city.toLowerCase().includes(lowerCity) || lowerCity.includes(l.city.toLowerCase());
+        // Match category
+        const catMatch = searchCategories.some(cat => 
+          l.category.toLowerCase().includes(cat.toLowerCase())
+        );
+        return cityMatch && catMatch;
+      });
+
+      parsedResults = filteredMocks.map(m => {
+        const dist = territoryService.haversineDistance(lat, lon, m.latitude, m.longitude);
+        return {
+          ...m,
+          distanceFromCenter: Number(dist.toFixed(2)),
+          source: m.source + ' (Simulated)'
+        };
+      });
+    }
+
+    // Filter results by radius (since Overpass handles it, this is mainly for the mock fallback)
+    parsedResults = parsedResults.filter(r => r.distanceFromCenter <= searchRadiusKm);
+
+    // 4. Check if already imported
+    const currentLeads = await Lead.findAll({ attributes: ['shopName', 'id', 'status'] });
+    const importedMap = {};
+    currentLeads.forEach(l => {
+      importedMap[l.shopName.toLowerCase()] = { id: l.id, status: l.status };
+    });
+
+    const finalResults = parsedResults.map(r => {
+      const match = importedMap[r.shopName.toLowerCase()];
+      return {
+        ...r,
+        isImported: !!match,
+        leadId: match ? match.id : null,
+        leadStatus: match ? match.status : null
+      };
+    });
+
+    // Sort by distance ascending
+    finalResults.sort((a, b) => a.distanceFromCenter - b.distanceFromCenter);
+
+    res.json({
+      success: true,
+      center: { latitude: lat, longitude: lon },
+      isFallback: isFallbackMode,
+      resultsCount: finalResults.length,
+      results: finalResults
+    });
+
   } catch (err) {
     next(err);
   }

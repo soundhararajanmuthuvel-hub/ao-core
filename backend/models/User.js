@@ -46,6 +46,10 @@ const User = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
     },
+    tourCompleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
   },
   {
     defaultScope: {

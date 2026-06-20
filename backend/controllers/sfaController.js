@@ -8,6 +8,7 @@ const Order = require('../models/Order');
 const Invoice = require('../models/Invoice');
 const CustomerReview = require('../models/CustomerReview');
 const SalesmanLocation = require('../models/SalesmanLocation');
+const Lead = require('../models/Lead');
 const { getSettings } = require('../utils/helpers');
 
 // Helper: Haversine distance in kilometers
@@ -143,20 +144,29 @@ exports.updateRoute = async (req, res, next) => {
 // Salesman Visit Check-In / Check-Out
 exports.checkInVisit = async (req, res, next) => {
   try {
-    const { customerId, latitude, longitude } = req.body;
-    if (!customerId || latitude === undefined || longitude === undefined) {
-      return res.status(400).json({ message: 'Customer ID and GPS coordinates are required' });
+    const { customerId, leadId, latitude, longitude } = req.body;
+    if ((!customerId && !leadId) || latitude === undefined || longitude === undefined) {
+      return res.status(400).json({ message: 'Customer ID or Lead ID and GPS coordinates are required' });
     }
 
-    const customer = await Customer.findByPk(customerId);
-    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    let target = null;
+    let targetType = '';
+    if (customerId) {
+      target = await Customer.findByPk(customerId);
+      targetType = 'customer';
+    } else if (leadId) {
+      target = await Lead.findByPk(leadId);
+      targetType = 'lead';
+    }
+
+    if (!target) return res.status(404).json({ message: `${targetType === 'customer' ? 'Customer' : 'Lead'} not found` });
 
     const settings = await getSettings();
     const radiusLimit = settings.checkInRadius || 100; // in meters
 
     let distMeters = null;
-    if (customer.latitude !== null && customer.longitude !== null) {
-      const distKm = haversineDistance(Number(latitude), Number(longitude), Number(customer.latitude), Number(customer.longitude));
+    if (target.latitude !== null && target.longitude !== null) {
+      const distKm = haversineDistance(Number(latitude), Number(longitude), Number(target.latitude), Number(target.longitude));
       distMeters = distKm * 1000;
 
       if (distMeters > radiusLimit) {
@@ -165,10 +175,10 @@ exports.checkInVisit = async (req, res, next) => {
         });
       }
     } else {
-      // Auto-save customer location if coordinates are empty
-      customer.latitude = latitude;
-      customer.longitude = longitude;
-      await customer.save();
+      // Auto-save target location if coordinates are empty
+      target.latitude = latitude;
+      target.longitude = longitude;
+      await target.save();
       distMeters = 0;
     }
 
@@ -190,7 +200,8 @@ exports.checkInVisit = async (req, res, next) => {
 
     const visit = await Visit.create({
       salesmanId: req.user.id,
-      customerId,
+      customerId: customerId || null,
+      leadId: leadId || null,
       checkInTime: new Date(),
       latitude,
       longitude,
@@ -245,13 +256,15 @@ exports.getVisits = async (req, res, next) => {
     const query = {};
     if (req.query.salesmanId) query.salesmanId = req.query.salesmanId;
     if (req.query.customerId) query.customerId = req.query.customerId;
+    if (req.query.leadId) query.leadId = req.query.leadId;
     if (req.query.status) query.status = req.query.status;
 
     const visits = await Visit.findAll({
       where: query,
       include: [
         { model: User, as: 'salesman', attributes: ['id', 'name'] },
-        { model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'tier', 'territory'] }
+        { model: Customer, as: 'customer', attributes: ['id', 'name', 'phone', 'tier', 'territory'] },
+        { model: Lead, as: 'lead', attributes: ['id', 'shopName', 'mobileNumber', 'area'] }
       ],
       order: [['checkInTime', 'DESC']]
     });

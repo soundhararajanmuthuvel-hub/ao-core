@@ -47,8 +47,18 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const updateTourCompleted = async (completed) => {
+    try {
+      const { data } = await authApi.updateTour(completed);
+      setUser(data.user);
+      localStorage.setItem('user', JSON.stringify(data.user));
+    } catch (err) {
+      console.error('Failed to update tour completion status:', err);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin: user?.role === 'admin', loadUser }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin: user?.role === 'admin', loadUser, updateTourCompleted }}>
       {children}
     </AuthContext.Provider>
   );

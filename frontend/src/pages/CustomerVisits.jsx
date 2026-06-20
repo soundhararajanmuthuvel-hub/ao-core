@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { sfaApi, customersApi } from '../api';
+import { sfaApi, customersApi, crmApi } from '../api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useAuth } from '../context/AuthContext';
 import L from 'leaflet';
@@ -31,6 +31,11 @@ export default function CustomerVisits() {
   const [locating, setLocating] = useState(false);
   const [radiusLimit, setRadiusLimit] = useState(100); // default 100 meters
   
+  // Target type toggle
+  const [visitTargetType, setVisitTargetType] = useState('customer'); // 'customer' | 'lead'
+  const [assignedLeads, setAssignedLeads] = useState([]);
+  const [selectedLeadId, setSelectedLeadId] = useState('');
+
   // Tabs
   const [activeTab, setActiveTab] = useState('terminal'); // 'terminal' | 'beat'
 
@@ -102,11 +107,39 @@ export default function CustomerVisits() {
       
       const allCusts = custRes.data.customers || [];
       setCustomers(allCusts);
-      setVisitsHistory(visitsRes.data || []);
+      
+      const history = visitsRes.data || [];
+      setVisitsHistory(history);
       
       // Auto-select first customer
       if (allCusts.length > 0) {
         setSelectedCustomerId(allCusts[0].id);
+      }
+
+      // Check if there is an active check-in session that wasn't closed
+      const active = history.find(v => !v.checkOutTime);
+      if (active) {
+        setActiveVisit(active);
+        if (active.customerId) {
+          setVisitTargetType('customer');
+          setSelectedCustomerId(active.customerId);
+        } else if (active.leadId) {
+          setVisitTargetType('lead');
+          setSelectedLeadId(active.leadId);
+        }
+      }
+
+      if (user?.id) {
+        try {
+          const leadsRes = await crmApi.getLeads({ assignedSalesmanId: user.id });
+          const leads = leadsRes.data || [];
+          setAssignedLeads(leads);
+          if (leads.length > 0 && !active) {
+            setSelectedLeadId(leads[0].id);
+          }
+        } catch (leadErr) {
+          console.error('Error fetching leads:', leadErr);
+        }
       }
 
       // Check if there is a beat plan sequence for today
@@ -139,6 +172,20 @@ export default function CustomerVisits() {
   useEffect(() => {
     loadVisits();
   }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      crmApi.getLeads({ assignedSalesmanId: user.id })
+        .then(res => {
+          const leads = res.data || [];
+          setAssignedLeads(leads);
+          if (leads.length > 0 && !activeVisit) {
+            setSelectedLeadId(leads[0].id);
+          }
+        })
+        .catch(err => console.error("Error loading leads in hook:", err));
+    }
+  }, [user]);
 
   // Poll location every 10 seconds
   useEffect(() => {
@@ -195,7 +242,13 @@ export default function CustomerVisits() {
   }, [activeTab, userLocation === null]);
 
   // Update Check-In Map markers and polyline when customer changes or userLocation moves
-  const activeCustomer = customers.find(c => c.id === selectedCustomerId);
+  const activeCustomer = visitTargetType === 'customer'
+    ? customers.find(c => c.id === selectedCustomerId)
+    : null;
+  const activeLead = visitTargetType === 'lead'
+    ? assignedLeads.find(l => l.id === selectedLeadId)
+    : null;
+  const activeTarget = activeCustomer || activeLead;
 
   useEffect(() => {
     if (activeTab !== 'terminal' || !mapRef.current || !userLocation) return;
@@ -204,13 +257,14 @@ export default function CustomerVisits() {
       salesmanMarkerRef.current.setLatLng([userLocation.lat, userLocation.lng]);
     }
 
-    if (activeCustomer && activeCustomer.latitude && activeCustomer.longitude) {
-      const custLat = Number(activeCustomer.latitude);
-      const custLng = Number(activeCustomer.longitude);
+    if (activeTarget && activeTarget.latitude && activeTarget.longitude) {
+      const custLat = Number(activeTarget.latitude);
+      const custLng = Number(activeTarget.longitude);
 
+      const markerColor = visitTargetType === 'customer' ? '#ef4444' : '#f97316';
       const customerIcon = L.divIcon({
         className: 'customer-marker-icon',
-        html: `<div style="background: #ef4444; width: 14px; height: 14px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(239,68,68,0.8);"></div>`,
+        html: `<div style="background: ${markerColor}; width: 14px; height: 14px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
         iconSize: [14, 14],
         iconAnchor: [7, 7]
       });
@@ -241,7 +295,7 @@ export default function CustomerVisits() {
       setRouteGeom(null);
       mapRef.current.setView([userLocation.lat, userLocation.lng], 14);
     }
-  }, [activeTab, userLocation, selectedCustomerId]);
+  }, [activeTab, userLocation, selectedCustomerId, selectedLeadId, visitTargetType]);
 
   // Handle route line drawing
   useEffect(() => {
@@ -383,8 +437,9 @@ export default function CustomerVisits() {
   };
 
   const handleCheckIn = async () => {
-    if (!selectedCustomerId) {
-      alert('Please select a customer for check-in.');
+    const targetId = visitTargetType === 'customer' ? selectedCustomerId : selectedLeadId;
+    if (!targetId) {
+      alert(`Please select a ${visitTargetType} for check-in.`);
       return;
     }
     if (!userLocation) {
@@ -397,7 +452,8 @@ export default function CustomerVisits() {
         const localVisits = JSON.parse(localStorage.getItem('offline_visits') || '[]');
         const mockVisit = {
           id: 'offline_' + Date.now(),
-          customerId: selectedCustomerId,
+          customerId: visitTargetType === 'customer' ? targetId : null,
+          leadId: visitTargetType === 'lead' ? targetId : null,
           salesmanId: user?.id || 'local',
           checkInTime: new Date(),
           checkOutTime: null,
@@ -413,16 +469,65 @@ export default function CustomerVisits() {
         return;
       }
 
-      const res = await sfaApi.checkIn({
-        customerId: selectedCustomerId,
+      const checkInParams = {
         latitude: userLocation.lat,
         longitude: userLocation.lng
-      });
+      };
+      if (visitTargetType === 'customer') {
+        checkInParams.customerId = targetId;
+      } else {
+        checkInParams.leadId = targetId;
+      }
+
+      const res = await sfaApi.checkIn(checkInParams);
       setActiveVisit(res.data);
       alert('Check-In Successful! Geofenced radius validation passed. 🟢');
     } catch (err) {
       alert(err.response?.data?.message || 'Check-in failed due to geofencing radius constraint.');
     }
+  };
+
+  const handleConvertLead = async () => {
+    const targetId = activeVisit ? activeVisit.leadId : selectedLeadId;
+    if (!targetId) return;
+
+    if (!confirm('Are you sure you want to convert this Lead to a Customer account?')) return;
+
+    try {
+      setLoading(true);
+      const res = await crmApi.convertLead(targetId);
+      alert(res.data?.message || 'Lead converted successfully!');
+      
+      // Reload both customers and leads
+      await loadVisits();
+      
+      // Switch view mode back to customer and select the converted customer
+      if (res.data?.customer) {
+        setVisitTargetType('customer');
+        setSelectedCustomerId(res.data.customer.id);
+        if (activeVisit) {
+          setActiveVisit(prev => ({
+            ...prev,
+            customerId: res.data.customer.id,
+            leadId: null
+          }));
+        }
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to convert lead.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getActiveVisitTargetName = () => {
+    if (!activeVisit) return '';
+    if (activeVisit.customerId) {
+      return customers.find(c => c.id === activeVisit.customerId)?.name || 'Store';
+    } else if (activeVisit.leadId) {
+      return assignedLeads.find(l => l.id === activeVisit.leadId)?.shopName || 'Lead Store';
+    }
+    return 'Store';
   };
 
   const handlePhotoCapture = (e) => {
@@ -482,8 +587,8 @@ export default function CustomerVisits() {
   };
 
   const openExternalNavigation = () => {
-    if (userLocation && activeCustomer && activeCustomer.latitude && activeCustomer.longitude) {
-      const url = `https://www.google.com/maps/dir/?api=1&origin=${userLocation.lat},${userLocation.lng}&destination=${activeCustomer.latitude},${activeCustomer.longitude}`;
+    if (userLocation && activeTarget && activeTarget.latitude && activeTarget.longitude) {
+      const url = `https://www.google.com/maps/dir/?api=1&origin=${userLocation.lat},${userLocation.lng}&destination=${activeTarget.latitude},${activeTarget.longitude}`;
       window.open(url, '_blank');
     } else {
       alert('Coordinates are not fully set to construct navigation links.');
@@ -494,14 +599,14 @@ export default function CustomerVisits() {
 
   // Distance evaluation
   let calculatedDistance = null;
-  if (userLocation && activeCustomer && activeCustomer.latitude && activeCustomer.longitude) {
+  if (userLocation && activeTarget && activeTarget.latitude && activeTarget.longitude) {
     const toRad = (x) => (x * Math.PI) / 180;
     const R = 6371;
-    const dLat = toRad(Number(activeCustomer.latitude) - userLocation.lat);
-    const dLon = toRad(Number(activeCustomer.longitude) - userLocation.lng);
+    const dLat = toRad(Number(activeTarget.latitude) - userLocation.lat);
+    const dLon = toRad(Number(activeTarget.longitude) - userLocation.lng);
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(userLocation.lat)) * Math.cos(toRad(Number(activeCustomer.latitude))) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      Math.cos(toRad(userLocation.lat)) * Math.cos(toRad(Number(activeTarget.latitude))) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     calculatedDistance = Math.round(R * c * 1000); // meters
   }
@@ -511,7 +616,7 @@ export default function CustomerVisits() {
   let statusText = 'Outside Geofence';
   let statusColor = '#ef4444'; // red
 
-  if (!activeCustomer || !activeCustomer.latitude) {
+  if (!activeTarget || !activeTarget.latitude) {
     isWithinGeofence = true; // allow mapping on check-in
     statusText = 'Location Not Mapped';
     statusColor = '#f59e0b'; // amber
@@ -637,7 +742,7 @@ export default function CustomerVisits() {
             </div>
 
             {/* OSRM Route HUD Stats overlay */}
-            {activeCustomer && (
+            {activeTarget && (
               <div style={{
                 marginTop: '1rem',
                 display: 'grid',
@@ -675,48 +780,131 @@ export default function CustomerVisits() {
             <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', backgroundColor: 'var(--bg-card)', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
               <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>📍 Field Check-In Geofence</h2>
 
+              {/* Visit Target Type Toggle */}
+              <div style={{ display: 'flex', gap: '0.25rem', backgroundColor: 'var(--bg-active)', padding: '0.25rem', borderRadius: '8px' }}>
+                <button
+                  type="button"
+                  disabled={!!activeVisit}
+                  onClick={() => setVisitTargetType('customer')}
+                  style={{
+                    flex: 1,
+                    padding: '0.4rem 0.75rem',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: activeVisit ? 'not-allowed' : 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                    backgroundColor: visitTargetType === 'customer' ? 'var(--bg-card)' : 'transparent',
+                    color: visitTargetType === 'customer' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    boxShadow: visitTargetType === 'customer' ? 'var(--shadow-sm)' : 'none',
+                    transition: 'all 0.2s ease',
+                    opacity: activeVisit && visitTargetType !== 'customer' ? 0.5 : 1
+                  }}
+                >
+                  👥 Active Beat Customers
+                </button>
+                <button
+                  type="button"
+                  disabled={!!activeVisit}
+                  onClick={() => setVisitTargetType('lead')}
+                  style={{
+                    flex: 1,
+                    padding: '0.4rem 0.75rem',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: activeVisit ? 'not-allowed' : 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                    backgroundColor: visitTargetType === 'lead' ? 'var(--bg-card)' : 'transparent',
+                    color: visitTargetType === 'lead' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    boxShadow: visitTargetType === 'lead' ? 'var(--shadow-sm)' : 'none',
+                    transition: 'all 0.2s ease',
+                    opacity: activeVisit && visitTargetType !== 'lead' ? 0.5 : 1
+                  }}
+                >
+                  🎯 My Assigned Leads
+                </button>
+              </div>
+
               {!activeVisit ? (
                 // Check-In Mode
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Select Customer to Visit</label>
-                    <select 
-                      value={selectedCustomerId} 
-                      onChange={e => setSelectedCustomerId(e.target.value)} 
-                      className="form-control" 
-                      style={{ width: '100%', height: '40px' }}
-                    >
-                      {customers.map(c => (
-                        <option key={c.id} value={c.id}>{c.name} ({c.businessName || 'Retailer'})</option>
-                      ))}
-                    </select>
-                  </div>
+                  {visitTargetType === 'customer' ? (
+                    <div>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Select Customer to Visit</label>
+                      <select 
+                        value={selectedCustomerId} 
+                        onChange={e => setSelectedCustomerId(e.target.value)} 
+                        className="form-control" 
+                        style={{ width: '100%', height: '40px' }}
+                      >
+                        {customers.map(c => (
+                          <option key={c.id} value={c.id}>{c.name} ({c.businessName || 'Retailer'})</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Select Lead to Visit</label>
+                      <select 
+                        value={selectedLeadId} 
+                        onChange={e => setSelectedLeadId(e.target.value)} 
+                        className="form-control" 
+                        style={{ width: '100%', height: '40px' }}
+                      >
+                        {assignedLeads.length === 0 ? (
+                          <option value="">No assigned leads found</option>
+                        ) : (
+                          assignedLeads.map(l => (
+                            <option key={l.id} value={l.id}>{l.shopName} ({l.category || 'Lead'})</option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                  )}
 
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                     <button 
                       type="button" 
                       onClick={handleCheckIn} 
                       className="btn btn-primary" 
-                      disabled={!isWithinGeofence}
+                      disabled={!isWithinGeofence || (visitTargetType === 'lead' && assignedLeads.length === 0)}
                       style={{ 
-                        flex: 1, 
-                        backgroundColor: !isWithinGeofence ? '#94a3b8' : primaryColor, 
-                        borderColor: !isWithinGeofence ? '#94a3b8' : primaryColor, 
+                        flex: 2, 
+                        backgroundColor: (!isWithinGeofence || (visitTargetType === 'lead' && assignedLeads.length === 0)) ? '#94a3b8' : primaryColor, 
+                        borderColor: (!isWithinGeofence || (visitTargetType === 'lead' && assignedLeads.length === 0)) ? '#94a3b8' : primaryColor, 
                         color: '#fff',
                         fontWeight: 700,
-                        cursor: !isWithinGeofence ? 'not-allowed' : 'pointer',
-                        opacity: !isWithinGeofence ? 0.75 : 1
+                        cursor: (!isWithinGeofence || (visitTargetType === 'lead' && assignedLeads.length === 0)) ? 'not-allowed' : 'pointer',
+                        opacity: (!isWithinGeofence || (visitTargetType === 'lead' && assignedLeads.length === 0)) ? 0.75 : 1
                       }}
                     >
                       🟢 Check-In Visit
                     </button>
+                    {visitTargetType === 'lead' && (
+                      <button 
+                        type="button" 
+                        onClick={handleConvertLead} 
+                        className="btn btn-secondary" 
+                        disabled={assignedLeads.length === 0}
+                        style={{ 
+                          flex: 1, 
+                          borderColor: '#10b981', 
+                          color: '#10b981', 
+                          fontWeight: 700,
+                          cursor: assignedLeads.length === 0 ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        🤝 Convert
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : (
                 // Check-Out Form
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ padding: '0.75rem', backgroundColor: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', borderRadius: '8px', color: '#10b981', fontSize: '0.85rem' }}>
-                    🟢 Checked in with customer: <strong>{customers.find(c => c.id === activeVisit.customerId)?.name || 'Store'}</strong><br />
+                    🟢 Checked in with {visitTargetType === 'customer' ? 'customer' : 'lead'}: <strong>{getActiveVisitTargetName()}</strong><br />
                     Arrival Time: {new Date(activeVisit.checkInTime).toLocaleTimeString()}
                   </div>
 
@@ -764,12 +952,32 @@ export default function CustomerVisits() {
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {activeVisit.leadId && (
+                      <button 
+                        type="button" 
+                        onClick={handleConvertLead} 
+                        className="btn btn-secondary" 
+                        style={{ flex: 1, borderColor: '#10b981', color: '#10b981', fontWeight: 700, minWidth: '120px' }}
+                      >
+                        🤝 Convert to Cust.
+                      </button>
+                    )}
                     <button 
                       type="button" 
+                      disabled={!activeVisit.customerId}
                       onClick={() => navigate(`/field-ordering?customerId=${activeVisit.customerId}`)} 
                       className="btn btn-secondary" 
-                      style={{ flex: 1, borderColor: '#10b981', color: '#10b981', fontWeight: 700 }}
+                      style={{ 
+                        flex: 1, 
+                        borderColor: '#10b981', 
+                        color: '#10b981', 
+                        fontWeight: 700,
+                        minWidth: '120px',
+                        cursor: !activeVisit.customerId ? 'not-allowed' : 'pointer',
+                        opacity: !activeVisit.customerId ? 0.5 : 1
+                      }}
+                      title={!activeVisit.customerId ? "Convert to customer first to place order" : ""}
                     >
                       🛒 Place Order
                     </button>
@@ -777,7 +985,7 @@ export default function CustomerVisits() {
                       type="button" 
                       onClick={handleCheckOut} 
                       className="btn btn-danger" 
-                      style={{ flex: 1, fontWeight: 700 }}
+                      style={{ flex: 1, fontWeight: 700, minWidth: '120px' }}
                     >
                       🔴 Check-Out Visit
                     </button>
@@ -796,7 +1004,7 @@ export default function CustomerVisits() {
                   visitsHistory.map(v => (
                     <div key={v.id} style={{ padding: '0.75rem', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '0.85rem', position: 'relative' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                        <strong style={{ color: 'var(--text-primary)' }}>{v.customer?.name || 'Customer'}</strong>
+                        <strong style={{ color: 'var(--text-primary)' }}>{v.customer?.name || v.lead?.shopName || 'Retailer'}</strong>
                         <span 
                           style={{ 
                             fontSize: '0.75rem', 

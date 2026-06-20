@@ -260,6 +260,7 @@ const connectDB = async () => {
   await addColumnIfNotExist('Settings', 'paymentCounter', "INTEGER DEFAULT 0");
   await addColumnIfNotExist('Settings', 'upiId', "VARCHAR(255) DEFAULT '7010602115@iob'");
   await addColumnIfNotExist('Settings', 'payeeName', "VARCHAR(255) DEFAULT 'AMUDHASURABIY ORGANICS'");
+  await addColumnIfNotExist('Users', 'tourCompleted', "TINYINT DEFAULT 0");
 
   await addColumnIfNotExist('Invoices', 'packingCost', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('Invoices', 'handlingCost', "DECIMAL(10, 2) DEFAULT 0.00");

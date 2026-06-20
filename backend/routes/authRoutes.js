@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { login, me } = require('../controllers/authController');
+const { login, me, updateTourStatus } = require('../controllers/authController');
 
 router.post('/login', login);
 router.get('/me', auth, me);
+router.put('/me/tour', auth, updateTourStatus);
 
 router.get('/debug', async (req, res) => {
   try {

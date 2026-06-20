@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { inventoryApi, productsApi, suppliersApi } from '../api';
+import { inventoryApi, productsApi, suppliersApi, aiApi } from '../api';
 import { useToast } from '../context/ToastContext';
 import Pagination from '../components/Pagination';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { Brain } from 'lucide-react';
+import AIInsightsModal from '../components/AIInsightsModal';
 
 export default function Inventory({ defaultTab }) {
   const { toast } = useToast();
@@ -19,6 +21,11 @@ export default function Inventory({ defaultTab }) {
   const [repack, setRepack] = useState({ fromProductId: '', toProductId: '', fromQty: 0, toQty: 0, notes: '', supplierId: '' });
   const [mfg, setMfg] = useState({ inputId: '', inputQty: 0, outputId: '', outputQty: 0, notes: '', supplierId: '' });
   const [expandedProducts, setExpandedProducts] = useState({});
+
+  // AI Assistant States
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiInsights, setAiInsights] = useState('');
 
   const toggleExpand = (id) => {
     setExpandedProducts((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -89,6 +96,20 @@ export default function Inventory({ defaultTab }) {
     </select>
   );
 
+  const handleInventoryIntelligence = async () => {
+    setAiModalOpen(true);
+    setAiLoading(true);
+    setAiInsights('');
+    try {
+      const res = await aiApi.inventoryIntelligence();
+      setAiInsights(res.data.reply);
+    } catch (err) {
+      setAiInsights('Failed to forecast stockout risk and reorder sizes. Please verify your backend API connection and Gemini credentials.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const SupplierSelect = ({ value, onChange, list, label }) => (
     <div className="form-group">
       <label>{label || 'Supplier'} *</label>
@@ -111,7 +132,12 @@ export default function Inventory({ defaultTab }) {
           <h1 className="page-title">Inventory</h1>
           <p className="page-subtitle">Repack & manufacturing with supplier tracking</p>
         </div>
-        <Link to="/suppliers" className="btn btn-secondary">Manage Suppliers</Link>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button type="button" className="btn btn-secondary" onClick={handleInventoryIntelligence} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Brain size={16} /> AI Inventory Intelligence
+          </button>
+          <Link to="/suppliers" className="btn btn-secondary">Manage Suppliers</Link>
+        </div>
       </div>
       <div className="filters-bar">
         {['movements', 'report', 'adjust', 'repack', 'manufacturing'].map((t) => (
@@ -247,6 +273,14 @@ export default function Inventory({ defaultTab }) {
           )}
         </>
       )}
+      <AIInsightsModal
+        isOpen={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+        title="AI Inventory Intelligence Report"
+        insightsText={aiInsights}
+        loading={aiLoading}
+        onRetry={handleInventoryIntelligence}
+      />
     </div>
   );
 }

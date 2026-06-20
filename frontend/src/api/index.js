@@ -3,6 +3,7 @@ import client from './client';
 export const authApi = {
   login: (data) => client.post('/auth/login', data),
   me: () => client.get('/auth/me'),
+  updateTour: (tourCompleted) => client.put('/auth/me/tour', { tourCompleted }),
 };
 
 export const usersApi = {
@@ -210,6 +211,12 @@ export const courierApi = {
 export const aiApi = {
   insights: () => client.get('/ai/insights'),
   chat: (data) => client.post('/ai/chat', data),
+  analyzeLeads: () => client.post('/ai/analyze-leads'),
+  customerIntelligence: () => client.post('/ai/customer-intelligence'),
+  salesAssistant: (data) => client.post('/ai/sales-assistant', data),
+  inventoryIntelligence: () => client.post('/ai/inventory-intelligence'),
+  accountsAssistant: () => client.post('/ai/accounts-assistant'),
+  manufacturingAssistant: () => client.post('/ai/manufacturing-assistant'),
 };
 
 export const integrationsApi = {

@@ -14,7 +14,8 @@ import {
   Wallet, 
   BarChart3, 
   Settings as SettingsIcon, 
-  Users as UsersIcon 
+  Users as UsersIcon,
+  Sparkles
 } from 'lucide-react';
 
 const menuStructure = [
@@ -25,6 +26,13 @@ const menuStructure = [
     label: 'Dashboard',
     end: true,
     roles: ['Super Admin', 'admin', 'Manufacturing Manager', 'Billing Executive', 'Store Keeper', 'Dispatch Executive', 'Sales Executive', 'Sales Manager', 'Salesman', 'Delivery Staff']
+  },
+  {
+    type: 'link',
+    to: '/ai-assistant',
+    icon: Sparkles,
+    label: 'AI Assistant',
+    roles: ['Super Admin', 'admin', 'Manufacturing Manager', 'Billing Executive', 'Store Keeper', 'Sales Executive', 'Sales Manager', 'Salesman']
   },
   {
     type: 'group',
@@ -307,6 +315,7 @@ export default function Sidebar({ collapsed, open, onClose }) {
                 key={item.to}
                 to={item.to}
                 end={item.end}
+                id={`tour-${item.label.toLowerCase()}`}
                 className={() => `nav-item ${isLinkActive ? 'active' : ''}`}
                 onClick={onClose}
                 data-tooltip={item.label}
@@ -330,6 +339,7 @@ export default function Sidebar({ collapsed, open, onClose }) {
               <div key={item.id} style={{ display: 'flex', flexDirection: 'column' }}>
                 <button
                   type="button"
+                  id={`tour-${item.id.toLowerCase()}`}
                   className={`nav-group-header ${parentActive ? 'parent-active' : ''}`}
                   onClick={() => toggleMenu(item.id)}
                   data-tooltip={item.label}

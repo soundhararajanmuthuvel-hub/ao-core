@@ -24,7 +24,7 @@ exports.login = async (req, res, next) => {
 
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, tourCompleted: user.tourCompleted },
     });
   } catch (err) {
     next(err);
@@ -38,6 +38,31 @@ exports.me = async (req, res) => {
       name: req.user.name,
       email: req.user.email,
       role: req.user.role,
+      tourCompleted: req.user.tourCompleted,
     },
   });
+};
+
+exports.updateTourStatus = async (req, res, next) => {
+  try {
+    const { tourCompleted } = req.body;
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    user.tourCompleted = tourCompleted === undefined ? true : !!tourCompleted;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Tour status updated successfully',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        tourCompleted: user.tourCompleted,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
 };

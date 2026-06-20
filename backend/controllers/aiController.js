@@ -6,7 +6,327 @@ const Product = require('../models/Product');
 const RawMaterial = require('../models/RawMaterial');
 const InvoiceItem = require('../models/InvoiceItem');
 const Shipment = require('../models/Shipment');
+const Lead = require('../models/Lead');
+const User = require('../models/User');
+const axios = require('axios');
 
+// Secure Gemini API caller helper
+async function callGemini(prompt) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error("GEMINI_API_KEY is not defined in environment variables!");
+    return "AI Assistant Error: Gemini API key is missing. Please configure GEMINI_API_KEY in the .env file.";
+  }
+
+  try {
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt
+              }
+            ]
+          }
+        ]
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 12000 // 12 seconds timeout
+      }
+    );
+
+    if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      return response.data.candidates[0].content.parts[0].text;
+    } else {
+      console.warn("Unexpected Gemini API response format:", response.data);
+      return "AI Assistant Error: Unexpected response format from intelligence service.";
+    }
+  } catch (error) {
+    console.error("Gemini API call failed:", error.response?.data || error.message);
+    return `AI Assistant Error: Failed to contact the intelligence service (${error.message}).`;
+  }
+}
+
+/* ==================================================
+   CRM LEAD ANALYSIS
+   ================================================== */
+exports.analyzeLeads = async (req, res, next) => {
+  try {
+    const leads = await Lead.findAll({
+      include: [{ model: User, as: 'salesman', attributes: ['id', 'name'] }]
+    });
+
+    if (leads.length === 0) {
+      return res.json({
+        reply: "No sales leads found in the CRM module. Import leads from the CRM Lead Finder to enable AI Lead analysis."
+      });
+    }
+
+    const leadSummary = leads.map(l => ({
+      id: l.id,
+      shopName: l.shopName,
+      category: l.category,
+      ownerName: l.ownerName,
+      mobileNumber: l.mobileNumber,
+      address: l.address,
+      area: l.area,
+      status: l.status,
+      assignedSalesman: l.salesman ? l.salesman.name : 'Unassigned',
+      source: l.source
+    }));
+
+    const prompt = `
+      You are the CRM Lead Analyst for Amudhasurabiy Organics (AO ERP).
+      Here is the list of our current sales leads in JSON format:
+      ${JSON.stringify(leadSummary)}
+
+      Please:
+      1. Analyze these leads and group/highlight which ones should be prioritized (e.g. based on category matching premium health retail segments, area proximity, or completeness of owner info).
+      2. Suggest concrete, actionable follow-up advice for the sales team (e.g., target pitch angles, field visits).
+      3. Point out if any leads are unassigned or have invalid contact information.
+
+      Provide your analysis in clean Markdown with professional headers, bullet points, and small warning callouts when appropriate.
+    `;
+
+    const reply = await callGemini(prompt);
+    res.json({ success: true, reply });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ==================================================
+   CUSTOMER INTELLIGENCE
+   ================================================== */
+exports.customerIntelligence = async (req, res, next) => {
+  try {
+    const customers = await Customer.findAll();
+    const invoices = await Invoice.findAll({
+      attributes: ['customerId', 'grandTotal', 'date', 'status']
+    });
+
+    if (customers.length === 0) {
+      return res.json({
+        reply: "No customer masters found. Populate customer records to enable AI Customer Intelligence audits."
+      });
+    }
+
+    // Summarize invoices per customer
+    const customerSummaries = customers.map(c => {
+      const customerInvoices = invoices.filter(i => i.customerId === c.id);
+      const totalSpend = customerInvoices.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
+      const orderCount = customerInvoices.length;
+      const lastOrderDate = customerInvoices.length > 0 
+        ? new Date(Math.max(...customerInvoices.map(i => new Date(i.date)))).toLocaleDateString() 
+        : 'Never';
+      return {
+        id: c.id,
+        name: c.name,
+        businessName: c.businessName,
+        salesChannel: c.salesChannel,
+        tier: c.tier || 'RED',
+        totalSpend,
+        orderCount,
+        lastOrderDate
+      };
+    });
+
+    const prompt = `
+      You are the Customer Intelligence Analyst for Amudhasurabiy Organics (AO ERP).
+      Here is our customers' transaction summary database in JSON format:
+      ${JSON.stringify(customerSummaries)}
+
+      Please:
+      1. Analyze purchase history and identify customer intelligence tiers (e.g., highly active top contributors vs at-risk accounts).
+      2. Predict reorder opportunities: Identify which customers are due for their next purchase (based on typical cycles or inactivity).
+      3. Identify inactive customers (accounts with zero orders or very old last order dates) and recommend specific win-back campaigns or loyalty pitches.
+
+      Provide a highly readable, professional executive summary in Markdown.
+    `;
+
+    const reply = await callGemini(prompt);
+    res.json({ success: true, reply });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ==================================================
+   SALES ASSISTANT
+   ================================================== */
+exports.salesAssistant = async (req, res, next) => {
+  try {
+    const { customerId } = req.body;
+    let customerInfo = null;
+    if (customerId) {
+      customerInfo = await Customer.findByPk(customerId);
+    }
+    const products = await Product.findAll({ attributes: ['id', 'name', 'sku', 'sellingPrice', 'category'] });
+    const recentInvoices = await Invoice.findAll({ limit: 10, order: [['date', 'DESC']] });
+
+    const prompt = `
+      You are the AI Sales Assistant for Amudhasurabiy Organics (AO ERP).
+      Here is the list of products we sell:
+      ${JSON.stringify(products)}
+
+      ${customerInfo ? `Target customer profile we are pitching to:\n${JSON.stringify(customerInfo)}` : ''}
+
+      Recent successful sales invoices context:
+      ${JSON.stringify(recentInvoices.map(i => ({ customerType: i.customerType, grandTotal: i.grandTotal, status: i.status })))}
+
+      Please:
+      1. Suggest specific products to upsell or cross-sell based on the customer profile and top catalog items.
+      2. Generate a custom quotation optimization strategy (e.g., recommend appropriate discount percentages or package deals).
+      3. Recommend specific offers or value pitches tailored to the customer's sales channel (Retail Shop, D2C, White Label).
+
+      Provide a structured, persuasive recommendation in Markdown.
+    `;
+
+    const reply = await callGemini(prompt);
+    res.json({ success: true, reply });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ==================================================
+   INVENTORY INTELLIGENCE
+   ================================================== */
+exports.inventoryIntelligence = async (req, res, next) => {
+  try {
+    const products = await Product.findAll({
+      attributes: [
+        'name', 'sku', 'stock',
+        [sequelize.col('lowStockThreshold'), 'minStock'],
+        'unit', 'sellingPrice'
+      ]
+    });
+    const rawMaterials = await RawMaterial.findAll({ attributes: ['name', 'category', 'stock', 'minStock', 'unit'] });
+
+    const prompt = `
+      You are the Inventory Intelligence Advisor for Amudhasurabiy Organics (AO ERP).
+      Here is our current Finished Goods / Products inventory:
+      ${JSON.stringify(products)}
+
+      Here is our current Raw Materials & Packaging stock:
+      ${JSON.stringify(rawMaterials)}
+
+      Please:
+      1. Identify and predict items at risk of low stock or immediate stockout.
+      2. Recommend precise reorder quantities for items below safety thresholds.
+      3. Identify slow-moving items (items that have high stock levels but seem to have low usage or turn cycles) and suggest markdown or consolidation ideas.
+
+      Provide a detailed inventory audit in Markdown, complete with structured advice.
+    `;
+
+    const reply = await callGemini(prompt);
+    res.json({ success: true, reply });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ==================================================
+   ACCOUNTS ASSISTANT
+   ================================================== */
+exports.accountsAssistant = async (req, res, next) => {
+  try {
+    const unpaidInvoices = await Invoice.findAll({
+      where: { paymentStatus: ['Unpaid', 'Partial'] },
+      include: [{ model: Customer, as: 'customer', attributes: ['name', 'phone', 'email'] }]
+    });
+
+    if (unpaidInvoices.length === 0) {
+      return res.json({
+        reply: "🎉 **Accounts clean!** There are currently no outstanding or partially paid invoices in the ledger. All accounts balances are settled."
+      });
+    }
+
+    const balanceSummary = unpaidInvoices.map(i => ({
+      invoiceNumber: i.invoiceNumber,
+      customer: i.customer ? i.customer.name : 'Individual',
+      phone: i.customer ? i.customer.phone : 'N/A',
+      email: i.customer ? i.customer.email : 'N/A',
+      date: i.date,
+      grandTotal: i.grandTotal,
+      paidAmount: i.paidAmount || 0,
+      outstandingBalance: i.grandTotal - (i.paidAmount || 0),
+      paymentStatus: i.paymentStatus,
+      dueDate: i.dueDate
+    }));
+
+    const prompt = `
+      You are the AI Accounts Assistant for Amudhasurabiy Organics (AO ERP).
+      Here is the list of our outstanding invoices:
+      ${JSON.stringify(balanceSummary)}
+
+      Please:
+      1. Analyze the outstanding balances and summarize the total outstanding risk.
+      2. Identify high-risk or highly overdue customer accounts.
+      3. Draft a tailored, professional, and polite payment reminder message template (suitable for WhatsApp or Email) for the top 3 overdue customers.
+
+      Provide your findings and drafts in clean Markdown.
+    `;
+
+    const reply = await callGemini(prompt);
+    res.json({ success: true, reply });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ==================================================
+   MANUFACTURING ASSISTANT
+   ================================================== */
+exports.manufacturingAssistant = async (req, res, next) => {
+  try {
+    const products = await Product.findAll({
+      attributes: [
+        'id', 'name', 'stock',
+        [sequelize.col('lowStockThreshold'), 'minStock'],
+        'unit'
+      ]
+    });
+    const rawMaterials = await RawMaterial.findAll({ attributes: ['id', 'name', 'stock', 'minStock', 'unit'] });
+    const pendingInvoices = await Invoice.findAll({
+      where: { status: 'Waiting For Stock' },
+      attributes: ['id', 'invoiceNumber', 'expectedDispatchDate']
+    });
+
+    const prompt = `
+      You are the AI Manufacturing Planner for Amudhasurabiy Organics (AO ERP).
+      Finished products inventory status:
+      ${JSON.stringify(products)}
+
+      Raw materials stock levels:
+      ${JSON.stringify(rawMaterials)}
+
+      Pending customer sales orders currently blocked (waiting for stock):
+      ${JSON.stringify(pendingInvoices)}
+
+      Please:
+      1. Give manufacturing batch suggestions: which finished items should be manufactured next to resolve backorders and replenish safety stock.
+      2. Forecast raw material requirements (estimate which packaging or raw ingredients will bottleneck production).
+      3. Provide batch size optimization recommendations to maximize yield and reduce setup cycles.
+
+      Provide your planner report in clean Markdown.
+    `;
+
+    const reply = await callGemini(prompt);
+    res.json({ success: true, reply });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ==================================================
+   AI EXECUTIVE ADVISOR (Static Insight compiler)
+   ================================================== */
 exports.getAIInsights = async (req, res, next) => {
   try {
     // 1. Get dates for current month, last month, and two months ago
@@ -262,6 +582,9 @@ exports.getAIInsights = async (req, res, next) => {
   }
 };
 
+/* ==================================================
+   AI ERP CHAT ASSISTANT
+   ================================================== */
 exports.chatAI = async (req, res, next) => {
   try {
     const { message } = req.body;
@@ -269,6 +592,62 @@ exports.chatAI = async (req, res, next) => {
       return res.status(400).json({ message: 'Message is required' });
     }
 
+    // If Gemini key is set, run secure Gemini AI response
+    if (process.env.GEMINI_API_KEY) {
+      const [productsCount, customersCount, lowProducts, lowRaw, todaySales, unpaidInvoices, pendingShipments] = await Promise.all([
+        Product.count(),
+        Customer.count(),
+        Product.findAll({
+          where: { stock: { [Op.lte]: sequelize.col('lowStockThreshold') } },
+          attributes: ['id', 'name', 'stock', [sequelize.col('lowStockThreshold'), 'minStock'], 'unit'],
+          limit: 10
+        }),
+        RawMaterial.findAll({ where: { stock: { [Op.lte]: sequelize.col('minStock') } }, limit: 10 }),
+        Invoice.findAll({
+          where: { date: { [Op.gte]: new Date(new Date().setHours(0,0,0,0)) } },
+          include: [{ model: Customer, as: 'customer', attributes: ['name'] }]
+        }),
+        Invoice.findAll({ where: { paymentStatus: ['Unpaid', 'Partial'] } }),
+        Shipment.findAll({ where: { status: { [Op.notIn]: ['Delivered', 'Returned'] } } })
+      ]);
+
+      const totalTodayRevenue = todaySales.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
+      const totalOutstanding = unpaidInvoices.reduce((sum, inv) => sum + Number(inv.grandTotal - (inv.paidAmount || 0)), 0);
+
+      const erpContext = `
+        Current ERP Database Snapshot:
+        - Total Products Catalog Count: ${productsCount}
+        - Total Customers Database Count: ${customersCount}
+        - Low Stock Finished Products: ${JSON.stringify(lowProducts.map(p => ({ name: p.name, stock: p.stock, minStock: p.getDataValue('minStock') || p.minStock })))}
+        - Low Stock Raw Materials: ${JSON.stringify(lowRaw.map(r => ({ name: r.name, stock: r.stock, minStock: r.minStock })))}
+        - Today's Sales Invoices: ${todaySales.length} orders, Total revenue today: ₹${totalTodayRevenue.toFixed(2)}
+        - Outstanding invoices count: ${unpaidInvoices.length}, Total unpaid balance: ₹${totalOutstanding.toFixed(2)}
+        - Pending shipments (in transit/packing): ${pendingShipments.length} shipments.
+      `;
+
+      const prompt = `
+        You are AO AI, the intelligent ERP Assistant for Amudhasurabiy Organics (AO ERP), a premium organic millets and food processing company.
+        Here is the real-time context of the ERP database:
+        ${erpContext}
+
+        User has asked the following query: "${message}"
+
+        Please answer the question accurately using the database context when applicable. 
+        - Always respond in a professional and concise tone.
+        - Use rich Markdown formatting (tables, bullet points, bold tags, headers) to make the text beautiful.
+        - If the user asks about something not present in the context, use your general knowledge but mention you are answering as an ERP assistant.
+      `;
+
+      const reply = await callGemini(prompt);
+      return res.json({
+        success: true,
+        reply,
+        queryType: 'gemini',
+        structuredData: null
+      });
+    }
+
+    // Heuristics Fallback Mode (Runs if Gemini Key is not set)
     const query = message.toLowerCase().trim();
     let reply = '';
     let structuredData = null;
@@ -315,9 +694,10 @@ exports.chatAI = async (req, res, next) => {
       const lowProducts = await Product.findAll({
         where: {
           stock: {
-            [Op.lte]: sequelize.col('minStock'),
+            [Op.lte]: sequelize.col('lowStockThreshold'),
           },
         },
+        attributes: ['id', 'name', 'sku', 'stock', [sequelize.col('lowStockThreshold'), 'minStock'], 'unit'],
         order: [['stock', 'ASC']],
       });
 
@@ -337,7 +717,7 @@ exports.chatAI = async (req, res, next) => {
         
         if (lowProducts.length > 0) {
           reply += `### Finished Goods / Products:\n\n| Product Name | SKU | Stock | Min Stock | Unit |\n| :--- | :--- | :--- | :--- | :--- |\n` +
-            lowProducts.map(p => `| ${p.name} | ${p.sku || 'N/A'} | **${Number(p.stock).toFixed(0)}** | ${Number(p.minStock).toFixed(0)} | ${p.unit || 'pcs'} |`).join('\n') + `\n\n`;
+            lowProducts.map(p => `| ${p.name} | ${p.sku || 'N/A'} | **${Number(p.stock).toFixed(0)}** | ${Number(p.getDataValue('minStock') || p.minStock).toFixed(0)} | ${p.unit || 'pcs'} |`).join('\n') + `\n\n`;
         }
 
         if (lowRaw.length > 0) {
@@ -475,9 +855,10 @@ exports.chatAI = async (req, res, next) => {
       const lowProducts = await Product.findAll({
         where: {
           stock: {
-            [Op.lte]: sequelize.col('minStock'),
+            [Op.lte]: sequelize.col('lowStockThreshold'),
           },
         },
+        attributes: ['id', 'name', 'stock', [sequelize.col('lowStockThreshold'), 'minStock'], 'unit'],
         limit: 5,
       });
 
@@ -487,7 +868,7 @@ exports.chatAI = async (req, res, next) => {
         reply = `🚨 **High Risk of Stockout (Finished Goods):**\n\nThese finished goods have fallen below safety limits and require urgent production batches:\n\n| Product | Stock | Min Stock | Recommended Action | Risk level |\n| :--- | :--- | :--- | :--- | :--- |\n` +
           lowProducts.map(p => {
             const risk = p.stock === 0 ? 'CRITICAL (Immediate)' : 'HIGH (3-5 days)';
-            return `| ${p.name} | ${Number(p.stock).toFixed(0)} | ${Number(p.minStock).toFixed(0)} | Schedule Manufacturing Order | ${risk} |`;
+            return `| ${p.name} | ${Number(p.stock).toFixed(0)} | ${Number(p.getDataValue('minStock') || p.minStock).toFixed(0)} | Schedule Manufacturing Order | ${risk} |`;
           }).join('\n');
       }
 
@@ -496,7 +877,7 @@ exports.chatAI = async (req, res, next) => {
         items: lowProducts.map(p => ({
           name: p.name,
           stock: p.stock,
-          minStock: p.minStock,
+          minStock: p.getDataValue('minStock') || p.minStock,
         })),
       };
 

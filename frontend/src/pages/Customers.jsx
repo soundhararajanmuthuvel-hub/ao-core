@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { customersApi, productsApi, ordersApi, sfaApi, crmApi } from '../api';
+import { customersApi, productsApi, ordersApi, sfaApi, crmApi, aiApi } from '../api';
+import { Brain } from 'lucide-react';
+import AIInsightsModal from '../components/AIInsightsModal';
 import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
 import { resolveAssetUrl } from '../utils/url';
@@ -78,6 +80,11 @@ export default function Customers() {
   const [search, setSearch] = useState('');
   const [activeSegment, setActiveSegment] = useState('all');
   
+  // AI Customer Intelligence State
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiInsights, setAiInsights] = useState('');
+  
   // Selected Customer detail states
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -121,6 +128,20 @@ export default function Customers() {
       setAllProducts(res.data.products || []);
     }).catch(err => console.error(err));
   }, []);
+
+  const handleCustomerIntelligence = async () => {
+    setAiModalOpen(true);
+    setAiLoading(true);
+    setAiInsights('');
+    try {
+      const res = await aiApi.customerIntelligence();
+      setAiInsights(res.data.reply);
+    } catch (err) {
+      setAiInsights('Failed to generate customer intelligence audit. Please verify your backend API connection and Gemini credentials.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   // Main load customer lists
   const loadCustomers = useCallback(async () => {
@@ -1701,7 +1722,6 @@ export default function Customers() {
         onClick={() => setMobileDrawerOpen(false)}
       />
 
-      {/* Header bar */}
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 className="page-title" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>💼 Customer Relationship CRM</h1>
@@ -1709,9 +1729,14 @@ export default function Customers() {
             Perform CRM Intelligence scans, check timeline feeds, and record allocations.
           </p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={() => openFormModal()} style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem' }}>
-          + Add Customer
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button type="button" className="btn btn-secondary" onClick={handleCustomerIntelligence} style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Brain size={16} /> AI Customer Intelligence
+          </button>
+          <button type="button" className="btn btn-primary" onClick={() => openFormModal()} style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem' }}>
+            + Add Customer
+          </button>
+        </div>
       </div>
 
       {/* Mobile Toggle Button */}
@@ -2678,6 +2703,15 @@ export default function Customers() {
           onClose={() => setReminderModalInvoice(null)}
         />
       )}
+
+      <AIInsightsModal
+        isOpen={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+        title="CRM Customer Intelligence Audit"
+        insightsText={aiInsights}
+        loading={aiLoading}
+        onRetry={handleCustomerIntelligence}
+      />
 
     </div>
   );

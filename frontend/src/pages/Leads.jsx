@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react';
-import { crmApi, usersApi } from '../api';
-import { Plus, Search, Filter, Phone, Mail, MapPin, CheckSquare, FileText, UserPlus, Trash, Edit, RefreshCw } from 'lucide-react';
+import { crmApi, usersApi, aiApi } from '../api';
+import { Plus, Search, Filter, Phone, Mail, MapPin, CheckSquare, FileText, UserPlus, Trash, Edit, RefreshCw, Brain } from 'lucide-react';
+import AIInsightsModal from '../components/AIInsightsModal';
 
 export default function Leads() {
   const [leads, setLeads] = useState([]);
   const [salesmen, setSalesmen] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // AI Insights State
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiInsights, setAiInsights] = useState('');
   
   // Filters & Search
   const [search, setSearch] = useState('');
@@ -224,6 +230,20 @@ export default function Leads() {
     }
   };
 
+  const handleAnalyzeLeads = async () => {
+    setAiModalOpen(true);
+    setAiLoading(true);
+    setAiInsights('');
+    try {
+      const res = await aiApi.analyzeLeads();
+      setAiInsights(res.data.reply);
+    } catch (err) {
+      setAiInsights('Failed to generate lead analysis. Please verify your backend API connection and Gemini credentials.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <div style={{ padding: '1.5rem', maxWidth: '1600px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
       {/* Header */}
@@ -232,9 +252,14 @@ export default function Leads() {
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.5px' }}>CRM Leads</h1>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>Manage contacts, check-ins, followups, and conversion flow.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { resetForm(); setAddModalOpen(true); }}>
-          <Plus size={18} /> New Lead
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button className="btn btn-secondary" onClick={handleAnalyzeLeads} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Brain size={18} /> AI Lead Analyst
+          </button>
+          <button className="btn btn-primary" onClick={() => { resetForm(); setAddModalOpen(true); }}>
+            <Plus size={18} /> New Lead
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -671,6 +696,15 @@ export default function Leads() {
           </div>
         </div>
       )}
+
+      <AIInsightsModal
+        isOpen={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+        title="CRM AI Lead Analyst"
+        insightsText={aiInsights}
+        loading={aiLoading}
+        onRetry={handleAnalyzeLeads}
+      />
     </div>
   );
 }

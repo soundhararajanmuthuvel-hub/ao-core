@@ -1,11 +1,13 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { salesApi } from '../api';
+import { salesApi, aiApi } from '../api';
 import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
 import { downloadInvoicePdf } from '../utils/invoicePdf';
 import LoadingSpinner from '../components/LoadingSpinner';
 import PaymentReminderGenerator from '../components/PaymentReminderGenerator';
+import { Brain } from 'lucide-react';
+import AIInsightsModal from '../components/AIInsightsModal';
 
 const fmt = (n) => `₹${(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
@@ -23,6 +25,12 @@ export default function Sales() {
   const [dateFilter, setDateFilter] = useState('all'); // all, today, week, month
   const [customerFilter, setCustomerFilter] = useState('all');
   const [reminderModalInvoice, setReminderModalInvoice] = useState(null);
+
+  // AI Assistant States
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiTitle, setAiTitle] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiInsights, setAiInsights] = useState('');
 
   // Customer 360 state
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -349,8 +357,59 @@ export default function Sales() {
     return { lifetimeSales, totalProfit, aov, lastOrderDate, topProducts, monthlyChartData };
   }, [selectedCustomer, customerTransactions]);
 
+  const handleSalesAssistant = async () => {
+    setAiTitle('AI Sales Assistant');
+    setAiModalOpen(true);
+    setAiLoading(true);
+    setAiInsights('');
+    try {
+      const res = await aiApi.salesAssistant({});
+      setAiInsights(res.data.reply);
+    } catch (err) {
+      setAiInsights('Failed to generate sales recommendations. Please verify your backend API connection and Gemini credentials.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleAccountsAssistant = async () => {
+    setAiTitle('AI Accounts & Collections Auditor');
+    setAiModalOpen(true);
+    setAiLoading(true);
+    setAiInsights('');
+    try {
+      const res = await aiApi.accountsAssistant();
+      setAiInsights(res.data.reply);
+    } catch (err) {
+      setAiInsights('Failed to audit outstanding balances. Please verify your backend API connection and Gemini credentials.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <div className="page" style={{ padding: '1.25rem', fontFamily: 'Inter, sans-serif' }}>
+      
+      {/* Page Header */}
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 className="page-title" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>🧾 Invoices Ledger & Payments</h1>
+          <p className="page-subtitle" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem', marginBottom: 0 }}>
+            Audit outstanding accounts, track collections, and run AI Sales recommendations.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button type="button" className="btn btn-secondary" onClick={handleSalesAssistant} style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Brain size={16} /> AI Sales Assistant
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={handleAccountsAssistant} style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Brain size={16} /> AI Accounts Auditor
+          </button>
+          <Link to="/sales/create" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            + Create Invoice
+          </Link>
+        </div>
+      </div>
       
       {/* Dynamic Scoped CSS Styles for Curated Modern Look */}
       <style>{`
@@ -1291,6 +1350,15 @@ export default function Sales() {
           onClose={() => setReminderModalInvoice(null)}
         />
       )}
+
+      <AIInsightsModal
+        isOpen={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+        title={aiTitle}
+        insightsText={aiInsights}
+        loading={aiLoading}
+        onRetry={aiTitle === 'AI Sales Assistant' ? handleSalesAssistant : handleAccountsAssistant}
+      />
 
     </div>
   );

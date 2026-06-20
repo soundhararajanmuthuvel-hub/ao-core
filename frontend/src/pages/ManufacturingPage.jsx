@@ -1,11 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { manufacturingApi, repackApi, productsApi, rawMaterialsApi } from '../api';
+import { manufacturingApi, repackApi, productsApi, rawMaterialsApi, aiApi } from '../api';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { convertUnit } from '../utils/unitConverter';
+import { Brain } from 'lucide-react';
+import AIInsightsModal from '../components/AIInsightsModal';
 
 const fmt = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2 }).format(n || 0);
 
@@ -27,6 +29,11 @@ export default function ManufacturingPage() {
 
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState(null);
+  
+  // AI Assistant States
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiInsights, setAiInsights] = useState('');
   
   // Data States
   const [products, setProducts] = useState([]);
@@ -102,6 +109,20 @@ export default function ManufacturingPage() {
 
   const setTab = (tabName) => {
     setSearchParams({ tab: tabName });
+  };
+
+  const handleManufacturingAssistant = async () => {
+    setAiModalOpen(true);
+    setAiLoading(true);
+    setAiInsights('');
+    try {
+      const res = await aiApi.manufacturingAssistant();
+      setAiInsights(res.data.reply);
+    } catch (err) {
+      setAiInsights('Failed to generate manufacturing planners. Please verify your backend API connection and Gemini credentials.');
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   // Recipe delete helpers
@@ -183,7 +204,7 @@ export default function ManufacturingPage() {
 
   return (
     <div className="page" style={{ padding: '1.5rem', fontFamily: 'Inter, sans-serif' }}>
-      <div className="page-header" style={{ marginBottom: '1.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
+      <div className="page-header" style={{ marginBottom: '1.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 className="page-title" style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
             🏭 Manufacturing & Production
@@ -192,6 +213,9 @@ export default function ManufacturingPage() {
             Formulate Recipes, execute Production Wizards, repack Bulk Goods, and inspect Batch logs.
           </p>
         </div>
+        <button type="button" className="btn btn-secondary" onClick={handleManufacturingAssistant} style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Brain size={16} /> AI Manufacturing Planner
+        </button>
       </div>
 
       {/* Dashboard Statistics Cards */}
@@ -491,6 +515,15 @@ export default function ManufacturingPage() {
           onSave={saveRecipe}
         />
       )}
+
+      <AIInsightsModal
+        isOpen={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+        title="AI Manufacturing Planner"
+        insightsText={aiInsights}
+        loading={aiLoading}
+        onRetry={handleManufacturingAssistant}
+      />
     </div>
   );
 
