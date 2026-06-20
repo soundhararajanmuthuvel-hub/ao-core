@@ -20,6 +20,10 @@ const {
   salesGstHsnReport,
   salesGstRegister,
   salesGstSummaryReport,
+  getBulkStockReport,
+  getPackingConversionReport,
+  getVariantStockReport,
+  getManufacturingYieldReport,
 } = require('../controllers/reportsController');
 
 router.use(auth, authorize('admin'));
@@ -40,5 +44,10 @@ router.get('/daily', dailyReport);
 router.get('/shipping', shippingReport);
 router.get('/shipping-costs', shippingCostReport);
 router.get('/procurement/:type', procurementReport);
+
+router.get('/bulk-stock', getBulkStockReport);
+router.get('/packing-conversion', getPackingConversionReport);
+router.get('/variant-stock', getVariantStockReport);
+router.get('/mfg-yield', getManufacturingYieldReport);
 
 module.exports = router;

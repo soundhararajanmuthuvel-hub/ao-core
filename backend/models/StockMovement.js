@@ -12,7 +12,7 @@ const StockMovement = sequelize.define('StockMovement', {
     autoIncrement: true,
   },
   type: {
-    type: DataTypes.ENUM('sale', 'purchase', 'adjustment', 'repack', 'manufacturing'),
+    type: DataTypes.STRING,
     allowNull: false,
   },
   quantity: {

@@ -126,6 +126,8 @@ const connectDB = async () => {
   require('../models/Lead');
   require('../models/CrmOpportunity');
   require('../models/AiSuggestion');
+  require('../models/PackingConversion');
+  require('../models/PackingConversionItem');
 
   const shouldAlter = false;
   await dropStaleSqliteBackupTables();
@@ -271,6 +273,21 @@ const connectDB = async () => {
   await addColumnIfNotExist('Invoices', 'handlingCost', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('Invoices', 'courierCost', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('Invoices', 'loadingCost', "DECIMAL(10, 2) DEFAULT 0.00");
+
+  await addColumnIfNotExist('Products', 'parentProductId', "INTEGER NULL");
+  await addColumnIfNotExist('Products', 'packSize', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Products', 'conversionFactor', "DECIMAL(10, 4) DEFAULT 1.0000");
+
+  try {
+    if (dialect === 'mysql') {
+      console.log('Modifying Products.productType column to VARCHAR(255)...');
+      await sequelize.query("ALTER TABLE Products MODIFY COLUMN productType VARCHAR(255) DEFAULT 'BULK_PRODUCT';");
+      console.log('Modifying StockMovements.type column to VARCHAR(255)...');
+      await sequelize.query("ALTER TABLE StockMovements MODIFY COLUMN type VARCHAR(255) NOT NULL;");
+    }
+  } catch (err) {
+    console.error('Failed to alter column types for mysql:', err.message);
+  }
 
   // Ensure Settings.logo column length is VARCHAR(1000) for URL support in MySQL/SQLite
   try {

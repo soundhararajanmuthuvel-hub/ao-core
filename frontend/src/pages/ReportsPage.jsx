@@ -40,6 +40,11 @@ export default function ReportsPage() {
   const [mfgRunsCount, setMfgRunsCount] = useState(0);
   const [invValuation, setInvValuation] = useState(0);
 
+  // Manufacturing Report states
+  const [mfgSubTab, setMfgSubTab] = useState('bulk_stock');
+  const [mfgReportLoading, setMfgReportLoading] = useState(false);
+  const [mfgReportRows, setMfgReportRows] = useState([]);
+
   // Shipping Cost Report states
   const [shippingSubTab, setShippingSubTab] = useState('delivery');
   const [shippingCostsData, setShippingCostsData] = useState(null);
@@ -225,6 +230,37 @@ export default function ReportsPage() {
       }
     }
   }, [currentTab, shippingSubTab]);
+
+  const loadMfgReport = async (subTabKey) => {
+    setMfgReportLoading(true);
+    try {
+      const activeKey = subTabKey || mfgSubTab;
+      let res;
+      if (activeKey === 'bulk_stock') {
+        res = await reportsApi.bulkStock();
+      } else if (activeKey === 'variant_stock') {
+        res = await reportsApi.variantStock();
+      } else if (activeKey === 'packing_conversion') {
+        res = await reportsApi.packingConversion();
+      } else if (activeKey === 'mfg_yield') {
+        res = await reportsApi.mfgYield();
+      }
+      if (res && res.data.success) {
+        setMfgReportRows(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to load manufacturing report:', err);
+      toast('Failed to load production report data', 'error');
+    } finally {
+      setMfgReportLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentTab === 'manufacturing') {
+      loadMfgReport(mfgSubTab);
+    }
+  }, [currentTab, mfgSubTab]);
 
   const exportGstExcel = async () => {
     try {
@@ -740,11 +776,218 @@ export default function ReportsPage() {
         )}
 
         {currentTab === 'manufacturing' && (
-          <div className="card" style={{ padding: '2rem', backgroundColor: '#fff', borderRadius: '12px', textAlign: 'center' }}>
-            <span style={{ fontSize: '2.5rem' }}>🏭</span>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '1rem 0 0.5rem 0', color: '#1e293b' }}>Production Runs Report</h3>
-            <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1rem' }}>Total active recipe recipes and production orders processed.</p>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ff9800' }}>{mfgRunsCount} Finished Production Batches Logged</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {/* Manufacturing Sub-tab Navigation */}
+            <div className="rm-tabs-bar" style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', gap: '0.5rem', overflowX: 'auto', backgroundColor: '#f8fafc', padding: '0.5rem', borderRadius: '8px' }}>
+              {[
+                { key: 'bulk_stock', label: '🌾 Bulk Stock Status' },
+                { key: 'variant_stock', label: '📦 Variant Pack Stock' },
+                { key: 'packing_conversion', label: '🔄 Packing Runs Log' },
+                { key: 'mfg_yield', label: '📈 Manufacturing Yield' }
+              ].map((sub) => (
+                <button
+                  key={sub.key}
+                  type="button"
+                  className={`rm-tab-btn ${mfgSubTab === sub.key ? 'active' : ''}`}
+                  onClick={() => setMfgSubTab(sub.key)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: mfgSubTab === sub.key ? '#fff' : 'transparent',
+                    color: mfgSubTab === sub.key ? '#ff9800' : '#64748b',
+                    boxShadow: mfgSubTab === sub.key ? '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  {sub.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>
+                  {mfgSubTab === 'bulk_stock' && 'Bulk Product Stock Report'}
+                  {mfgSubTab === 'variant_stock' && 'Variant Pack Size Stock Report'}
+                  {mfgSubTab === 'packing_conversion' && 'Packing Conversion Runs Report'}
+                  {mfgSubTab === 'mfg_yield' && 'Manufacturing Yield Report'}
+                </h3>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => loadMfgReport(mfgSubTab)}
+                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                >
+                  🔄 Refresh Report
+                </button>
+              </div>
+
+              {mfgReportLoading ? (
+                <div style={{ textAlign: 'center', padding: '3rem' }}>Loading report data...</div>
+              ) : (
+                <div className="card table-wrap" style={{ padding: 0, boxShadow: 'none', border: '1px solid #e2e8f0' }}>
+                  {mfgSubTab === 'bulk_stock' && (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Product Name</th>
+                          <th>SKU</th>
+                          <th>Category</th>
+                          <th>Available Stock</th>
+                          <th>Purchase Unit Price</th>
+                          <th>Est. Value</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mfgReportRows.map((p) => (
+                          <tr key={p.id}>
+                            <td style={{ fontWeight: 600 }}>{p.name}</td>
+                            <td>{p.sku}</td>
+                            <td>{p.category}</td>
+                            <td><strong>{Number(p.stock || 0).toFixed(2)}</strong> {p.unit}</td>
+                            <td>₹{Number(p.purchasePrice || 0).toFixed(2)}</td>
+                            <td>₹{(Number(p.stock || 0) * Number(p.purchasePrice || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td>
+                              {Number(p.stock || 0) <= Number(p.lowStockThreshold || 0) ? (
+                                <span className="badge badge-danger">Low Stock</span>
+                              ) : (
+                                <span className="badge badge-success">Good</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        {mfgReportRows.length === 0 && (
+                          <tr><td colSpan="7" style={{ textAlign: 'center', color: '#64748b', padding: '2rem' }}>No bulk products found.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {mfgSubTab === 'variant_stock' && (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Variant Name</th>
+                          <th>SKU</th>
+                          <th>Parent Bulk Product</th>
+                          <th>Pack Size</th>
+                          <th>Factor (Kg)</th>
+                          <th>Available Stock</th>
+                          <th>Purchase Price</th>
+                          <th>Est. Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mfgReportRows.map((v) => (
+                          <tr key={v.id}>
+                            <td style={{ fontWeight: 600 }}>{v.name}</td>
+                            <td>{v.sku}</td>
+                            <td>{v.parentProduct?.name || '—'}</td>
+                            <td>{v.packSize || '—'}</td>
+                            <td>{Number(v.conversionFactor || 0).toFixed(4)} Kg</td>
+                            <td><strong>{Number(v.stock || 0)}</strong> {v.unit || 'pcs'}</td>
+                            <td>₹{Number(v.purchasePrice || 0).toFixed(2)}</td>
+                            <td>₹{(Number(v.stock || 0) * Number(v.purchasePrice || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          </tr>
+                        ))}
+                        {mfgReportRows.length === 0 && (
+                          <tr><td colSpan="8" style={{ textAlign: 'center', color: '#64748b', padding: '2rem' }}>No variant pack sizes found.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {mfgSubTab === 'packing_conversion' && (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Run #</th>
+                          <th>Date</th>
+                          <th>Source Bulk</th>
+                          <th>Weight Consumed</th>
+                          <th>Packed Outputs Details</th>
+                          <th>User</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mfgReportRows.map((run) => (
+                          <tr key={run.id}>
+                            <td><strong>{run.conversionNumber}</strong></td>
+                            <td>{new Date(run.date).toLocaleDateString()}</td>
+                            <td>{run.sourceProduct?.name || 'Unknown Bulk'}</td>
+                            <td>{Number(run.sourceQty || 0).toFixed(2)} {run.sourceProduct?.unit || 'Kg'}</td>
+                            <td>
+                              <div style={{ fontSize: '0.8rem' }}>
+                                {run.items?.map((item, idx) => (
+                                  <div key={idx} style={{ marginTop: '2px' }}>
+                                    📦 {item.targetProduct?.name}: <strong>{item.qty}</strong> packs ({(item.qty * item.conversionFactor).toFixed(2)} Kg)
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                            <td>{run.createdBy?.name || 'ERP System'}</td>
+                            <td>
+                              <span className={`badge ${run.status === 'completed' ? 'badge-success' : 'badge-danger'}`}>
+                                {run.status.toUpperCase()}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {mfgReportRows.length === 0 && (
+                          <tr><td colSpan="7" style={{ textAlign: 'center', color: '#64748b', padding: '2rem' }}>No packing conversion runs recorded.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {mfgSubTab === 'mfg_yield' && (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Batch #</th>
+                          <th>Date</th>
+                          <th>Finished Product</th>
+                          <th>Recipe Formula</th>
+                          <th>Target Yield</th>
+                          <th>Produced Qty</th>
+                          <th>Total Cost</th>
+                          <th>Cost/Unit</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mfgReportRows.map((entry) => (
+                          <tr key={entry.id}>
+                            <td><strong>{entry.mfgNumber}</strong></td>
+                            <td>{new Date(entry.date).toLocaleDateString()}</td>
+                            <td>{entry.product?.name} ({entry.product?.sku})</td>
+                            <td>{entry.recipe?.name || 'Manual Production Run'}</td>
+                            <td>{entry.recipe?.yieldQty || '—'} {entry.product?.unit || 'Kg'}</td>
+                            <td><strong>{entry.qtyToProduce}</strong> {entry.product?.unit || 'Kg'}</td>
+                            <td>₹{Number(entry.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td>₹{Number(entry.costPerUnit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td>
+                              <span className={`badge ${entry.status === 'completed' ? 'badge-success' : entry.status === 'reversed' ? 'badge-danger' : 'badge-warning'}`}>
+                                {entry.status.toUpperCase()}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {mfgReportRows.length === 0 && (
+                          <tr><td colSpan="9" style={{ textAlign: 'center', color: '#64748b', padding: '2rem' }}>No manufacturing yield logs found.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

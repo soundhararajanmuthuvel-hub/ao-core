@@ -402,49 +402,87 @@ export default function Dashboard() {
             )}
 
             {isMobile ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '1.25rem' }}>
-                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Due</span>
-                  <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#ef4444' }}>{fmt(outstandingValue)}</strong>
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '1.25rem' }}>
+                  <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Due</span>
+                    <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#ef4444' }}>{fmt(outstandingValue)}</strong>
+                  </div>
+                  <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Today</span>
+                    <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#22c55e' }}>{fmt(cards.todaySales || 0)}</strong>
+                  </div>
+                  <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Pending</span>
+                    <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f59e0b' }}>{cards.pendingDispatchOrders || cards.lowStockCount || 0}</strong>
+                  </div>
+                  <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total</span>
+                    <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)' }}>{cards.totalInvoices || adminData?.cards?.totalInvoices || 120}</strong>
+                  </div>
                 </div>
-                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Today</span>
-                  <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#22c55e' }}>{fmt(cards.todaySales || 0)}</strong>
+
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📦 Manufacturing & Packing</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Bulk Value</span>
+                      <strong style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>{fmt(cards.bulkStockValue || 0)}</strong>
+                    </div>
+                    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Retail Stock</span>
+                      <strong style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>{cards.retailPackStock || 0} Packs</strong>
+                    </div>
+                    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Packed Today</span>
+                      <strong style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>{cards.packingDoneToday || 0} Packs</strong>
+                    </div>
+                    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Mfg Today</span>
+                      <strong style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>{cards.mfgDoneToday || 0} KG</strong>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Pending</span>
-                  <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f59e0b' }}>{cards.pendingDispatchOrders || cards.lowStockCount || 0}</strong>
-                </div>
-                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total</span>
-                  <strong style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)' }}>{cards.totalInvoices || adminData?.cards?.totalInvoices || 120}</strong>
-                </div>
-              </div>
+              </>
             ) : (
-              <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-                <StatCard label="Today's Sales" value={fmt(cards.todaySales)} />
-                <StatCard label="Monthly Revenue" value={fmt(cards.monthlyRevenue)} />
-                <StatCard
-                  label="Outstanding Receivables"
-                  value={fmt(outstandingValue)}
-                  subtext="Pending Customer Collections"
-                  onClick={() => navigate('/sales?tab=outstanding')}
-                  style={{
-                    backgroundColor: outStyle.backgroundColor,
-                    border: outStyle.border,
-                    labelStyle: { color: outStyle.color },
-                    valueStyle: { color: outStyle.color },
-                    subtextStyle: { color: outStyle.color }
-                  }}
-                />
-                <StatCard label="Pending Dispatch Orders" value={cards.pendingDispatchOrders || 0} />
-                <StatCard label="Low Stock Products" value={cards.lowStockCount || 0} className={cards.lowStockCount > 0 ? 'danger' : ''} />
-                <StatCard
-                  label="Top Selling Product"
-                  value={charts.topProducts?.[0]?.name || 'N/A'}
-                  subtext={charts.topProducts?.[0]?.qty ? `${charts.topProducts[0].qty} units sold` : ''}
-                />
-              </div>
+              <>
+                <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <StatCard label="Today's Sales" value={fmt(cards.todaySales)} />
+                  <StatCard label="Monthly Revenue" value={fmt(cards.monthlyRevenue)} />
+                  <StatCard
+                    label="Outstanding Receivables"
+                    value={fmt(outstandingValue)}
+                    subtext="Pending Customer Collections"
+                    onClick={() => navigate('/sales?tab=outstanding')}
+                    style={{
+                      backgroundColor: outStyle.backgroundColor,
+                      border: outStyle.border,
+                      labelStyle: { color: outStyle.color },
+                      valueStyle: { color: outStyle.color },
+                      subtextStyle: { color: outStyle.color }
+                    }}
+                  />
+                  <StatCard label="Pending Dispatch Orders" value={cards.pendingDispatchOrders || 0} />
+                  <StatCard label="Low Stock Products" value={cards.lowStockCount || 0} className={cards.lowStockCount > 0 ? 'danger' : ''} />
+                  <StatCard
+                    label="Top Selling Product"
+                    value={charts.topProducts?.[0]?.name || 'N/A'}
+                    subtext={charts.topProducts?.[0]?.qty ? `${charts.topProducts[0].qty} units sold` : ''}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.75rem', marginTop: '1.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    📦 Manufacturing & Packing Overview
+                  </h3>
+                  <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                    <StatCard label="Bulk Stock Value" value={fmt(cards.bulkStockValue || 0)} />
+                    <StatCard label="Retail Pack Stock" value={`${cards.retailPackStock || 0} Packs`} />
+                    <StatCard label="Packing Done Today" value={`${cards.packingDoneToday || 0} Packs`} />
+                    <StatCard label="Manufacturing Done Today" value={`${cards.mfgDoneToday || 0} KG`} />
+                  </div>
+                </div>
+              </>
             )}
 
             {charts.monthlyRevenue && (

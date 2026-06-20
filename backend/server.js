@@ -93,6 +93,7 @@ app.use('/api/activity', require('./routes/activityRoutes'));
 app.use('/api/repack', require('./routes/repackRoutes'));
 app.use('/api/raw-materials', require('./routes/rawMaterialRoutes'));
 app.use('/api/manufacturing', require('./routes/manufacturingRoutes'));
+app.use('/api/packing-conversion', require('./routes/packingConversionRoutes'));
 app.use('/api/ai', require('./routes/aiRoutes'));
 app.use('/api/shipping', require('./routes/shippingRoutes'));
 app.use('/api/couriers', require('./routes/courierRoutes'));

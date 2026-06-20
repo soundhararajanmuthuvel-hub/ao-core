@@ -74,11 +74,16 @@ const menuStructure = [
     ]
   },
   {
-    type: 'link',
-    to: '/manufacturing',
+    type: 'group',
+    id: 'manufacturing',
     icon: Factory,
     label: 'Manufacturing',
-    roles: ['Super Admin', 'admin', 'Manufacturing Manager']
+    roles: ['Super Admin', 'admin', 'Manufacturing Manager'],
+    children: [
+      { to: '/manufacturing?tab=production', label: 'Production', roles: ['Super Admin', 'admin', 'Manufacturing Manager'] },
+      { to: '/manufacturing?tab=recipes', label: 'Recipes', roles: ['Super Admin', 'admin', 'Manufacturing Manager'] },
+      { to: '/manufacturing?tab=packing-conversion', label: 'Packing Conversion', roles: ['Super Admin', 'admin', 'Manufacturing Manager'] }
+    ]
   },
   {
     type: 'link',

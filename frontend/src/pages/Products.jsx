@@ -7,34 +7,38 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { resolveAssetUrl } from '../utils/url';
 
 const PRODUCT_TYPE_LABELS = {
-  manufactured: 'Manufactured Product',
-  repacking: 'Repacking Product',
-  trading: 'Trading Product',
-  raw_material: 'Raw Material',
-  packaging_material: 'Packaging Material'
+  RAW_MATERIAL: 'Raw Material',
+  BULK_PRODUCT: 'Bulk Product (Powder)',
+  RETAIL_PACK: 'Retail Pack Size',
+  LABEL_PACK: 'Label Pack Size',
+  manufactured: 'Manufactured Product (Legacy)',
+  repacking: 'Repacking Product (Legacy)',
+  trading: 'Trading Product (Legacy)',
+  raw_material: 'Raw Material (Legacy)',
+  packaging_material: 'Packaging Material (Legacy)'
 };
 
 const getProductTypeStyle = (type) => {
   switch (type) {
-    case 'repacking':
-      return { backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, display: 'inline-block' };
-    case 'raw_material':
+    case 'RAW_MATERIAL':
       return { backgroundColor: '#f1f5f9', color: '#475569', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, display: 'inline-block' };
-    case 'packaging_material':
-      return { backgroundColor: '#f5f5f4', color: '#57534e', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, display: 'inline-block' };
-    case 'trading':
-      return { backgroundColor: '#fef3c7', color: '#d97706', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, display: 'inline-block' };
-    case 'manufactured':
-    default:
+    case 'BULK_PRODUCT':
       return { backgroundColor: '#dcfce7', color: '#15803d', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, display: 'inline-block' };
+    case 'RETAIL_PACK':
+      return { backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, display: 'inline-block' };
+    case 'LABEL_PACK':
+      return { backgroundColor: '#fef3c7', color: '#d97706', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, display: 'inline-block' };
+    default:
+      return { backgroundColor: '#e2e8f0', color: '#64748b', padding: '0.25rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, display: 'inline-block' };
   }
 };
 
-const empty = { name: '', sku: '', barcode: '', category: 'General', stock: 0, lowStockThreshold: 10, reorderQty: 100, preferredSupplierId: '', unit: 'pcs', purchasePrice: 0, sellingPrice: 0, gstPercent: 0, supplier: '', productType: 'manufactured' };
+const empty = { name: '', sku: '', barcode: '', category: 'General', stock: 0, lowStockThreshold: 10, reorderQty: 100, preferredSupplierId: '', unit: 'pcs', purchasePrice: 0, sellingPrice: 0, gstPercent: 0, supplier: '', productType: 'BULK_PRODUCT', parentProductId: '', packSize: '', conversionFactor: 1.0000 };
 
 export default function Products() {
   const { toast } = useToast();
   const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -121,6 +125,9 @@ export default function Products() {
       
       const { data: supData } = await suppliersApi.list({ limit: 200 });
       setSuppliers(supData.suppliers || []);
+
+      const { data: allProdData } = await productsApi.list({ limit: 1000 });
+      setAllProducts(allProdData.products || []);
     } catch {
       toast('Failed to load products', 'error');
     } finally {
@@ -135,13 +142,16 @@ export default function Products() {
     setForm(p ? { 
       ...empty, 
       ...p, 
-      productType: p.productType || 'manufactured', 
+      productType: p.productType || 'BULK_PRODUCT', 
       purchasePrice: p.purchasePrice, 
       sellingPrice: p.sellingPrice, 
       reorderQty: p.reorderQty ?? 100,
       preferredSupplierId: p.preferredSupplierId || '',
+      parentProductId: p.parentProductId || '',
+      packSize: p.packSize || '',
+      conversionFactor: p.conversionFactor ?? 1.0000,
       packSizes: p.packSizes || [] 
-    } : { ...empty, packSizes: [] });
+    } : { ...empty, productType: 'BULK_PRODUCT', packSizes: [] });
     setImage(null);
     setPackViewMode('card');
     setSubFormActive(false);
@@ -416,7 +426,25 @@ export default function Products() {
               {products.map((p) => (
                 <tr key={p._id}>
                   <td>{p.image ? <img src={resolveAssetUrl(p.image)} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} /> : '—'}</td>
-                  <td>{p.name} {p.stock <= p.lowStockThreshold && <span className="badge badge-warning">Low</span>}</td>
+                  <td>
+                    <div>
+                      <strong>{p.name}</strong> {p.stock <= p.lowStockThreshold && <span className="badge badge-warning">Low</span>}
+                    </div>
+                    {p.productType === 'BULK_PRODUCT' && (
+                      <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '6px', paddingLeft: '8px', borderLeft: '2px solid #ff9800' }}>
+                        <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 'bold', display: 'block', marginBottom: '2px' }}>Variants</span>
+                        {allProducts.filter(v => String(v.parentProductId) === String(p._id || p.id)).map(v => (
+                          <div key={v._id || v.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '1px' }}>
+                            <span style={{ fontSize: '0.75rem' }}>📦 {v.packSize || v.name}</span>
+                            <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.75rem' }}>Stock: {v.stock} {v.unit || 'pcs'}</span>
+                          </div>
+                        ))}
+                        {allProducts.filter(v => String(v.parentProductId) === String(p._id || p.id)).length === 0 && (
+                          <span style={{ fontStyle: 'italic', fontSize: '0.7rem', color: '#94a3b8' }}>No variants configured</span>
+                        )}
+                      </div>
+                    )}
+                  </td>
                   <td>{p.sku}</td>
                   <td>{p.category}</td>
                   <td>
@@ -534,16 +562,56 @@ export default function Products() {
               <label>Product Type</label>
               <select
                 className="form-control"
-                value={form.productType || 'manufactured'}
+                value={form.productType || 'BULK_PRODUCT'}
                 onChange={(e) => setForm({ ...form, productType: e.target.value })}
               >
-                <option value="manufactured">Manufactured Product</option>
-                <option value="repacking">Repacking Product</option>
-                <option value="trading">Trading Product</option>
-                <option value="raw_material">Raw Material</option>
-                <option value="packaging_material">Packaging Material</option>
+                <option value="RAW_MATERIAL">Raw Material</option>
+                <option value="BULK_PRODUCT">Bulk Product (Powder)</option>
+                <option value="RETAIL_PACK">Retail Pack Size</option>
+                <option value="LABEL_PACK">Label Pack Size</option>
+                <option value="manufactured">Manufactured Product (Legacy)</option>
+                <option value="repacking">Repacking Product (Legacy)</option>
+                <option value="trading">Trading Product (Legacy)</option>
               </select>
             </div>
+            {['RETAIL_PACK', 'LABEL_PACK'].includes(form.productType) && (
+              <>
+                <div className="form-group">
+                  <label>Parent Bulk Product</label>
+                  <select
+                    className="form-control"
+                    value={form.parentProductId || ''}
+                    onChange={(e) => setForm({ ...form, parentProductId: e.target.value ? Number(e.target.value) : '' })}
+                  >
+                    <option value="">Select Parent Bulk Product</option>
+                    {allProducts.filter(p => p.productType === 'BULK_PRODUCT').map(p => (
+                      <option key={p._id || p.id} value={p._id || p.id}>{p.name} (SKU: {p.sku})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Pack Size (e.g. 200g, 1kg)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. 200g"
+                    value={form.packSize || ''}
+                    onChange={(e) => setForm({ ...form, packSize: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Conversion Factor (Weight in Kg per pack, e.g. 0.200)</label>
+                  <input
+                    type="number"
+                    step="0.0001"
+                    className="form-control"
+                    placeholder="e.g. 0.2"
+                    value={form.conversionFactor ?? 1.0000}
+                    onChange={(e) => setForm({ ...form, conversionFactor: Number(e.target.value) })}
+                  />
+                </div>
+              </>
+            )}
             <div className="form-group">
               <label>Current Stock</label>
               <input type="number" className="form-control" value={form.stock ?? 0} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} />

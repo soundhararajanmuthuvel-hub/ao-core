@@ -134,6 +134,10 @@ export const reportsApi = {
   gstSalesRegister: (params) => client.get('/reports/gst/sales-register', { params }),
   exportGstSalesRegisterExcel: (params) => client.get('/reports/gst/sales-register', { params: { ...params, export: 'excel' }, responseType: 'blob' }),
   gstSummary: (params) => client.get('/reports/gst/summary', { params }),
+  bulkStock: (params) => client.get('/reports/bulk-stock', { params }),
+  packingConversion: (params) => client.get('/reports/packing-conversion', { params }),
+  variantStock: (params) => client.get('/reports/variant-stock', { params }),
+  mfgYield: (params) => client.get('/reports/mfg-yield', { params }),
 };
 
 export const notificationsApi = {
@@ -188,6 +192,12 @@ export const manufacturingApi = {
   reverse: (id) => client.post(`/manufacturing/entries/${id}/reverse`),
   planner: () => client.get('/manufacturing/planner'),
   dashboard: () => client.get('/manufacturing/dashboard'),
+};
+
+export const packingConversionApi = {
+  list: () => client.get('/packing-conversion'),
+  create: (data) => client.post('/packing-conversion', data),
+  reverse: (id) => client.post(`/packing-conversion/${id}/reverse`),
 };
 
 export const shippingApi = {

@@ -58,8 +58,21 @@ const Product = sequelize.define('Product', {
     defaultValue: '',
   },
   productType: {
-    type: DataTypes.ENUM('manufactured', 'repacking', 'trading', 'raw_material', 'packaging_material'),
-    defaultValue: 'manufactured',
+    type: DataTypes.STRING,
+    defaultValue: 'BULK_PRODUCT',
+  },
+  parentProductId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  packSize: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  conversionFactor: {
+    type: DataTypes.DECIMAL(10, 4),
+    allowNull: true,
+    defaultValue: 1.0000,
   },
   reorderQty: {
     type: DataTypes.DECIMAL(10, 2),
@@ -202,10 +215,14 @@ Product.beforeUpdate((product) => {
   }
 });
 
+Product.belongsTo(Product, { as: 'parentProduct', foreignKey: 'parentProductId' });
+Product.hasMany(Product, { as: 'variants', foreignKey: 'parentProductId' });
+
 Product.belongsTo(require('./Supplier'), { as: 'preferredSupplier', foreignKey: 'preferredSupplierId' });
 
 makeMongooseCompatible(Product, {
   preferredSupplier: 'preferredSupplierId',
+  parentProduct: 'parentProductId',
 });
 
 module.exports = Product;

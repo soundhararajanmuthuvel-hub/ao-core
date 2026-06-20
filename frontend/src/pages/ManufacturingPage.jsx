@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { manufacturingApi, repackApi, productsApi, rawMaterialsApi, aiApi } from '../api';
+import { manufacturingApi, repackApi, productsApi, rawMaterialsApi, aiApi, packingConversionApi } from '../api';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
@@ -259,6 +259,9 @@ export default function ManufacturingPage() {
         <button type="button" className={`rm-tab-btn ${currentTab === 'repacking' ? 'active' : ''}`} onClick={() => setTab('repacking')} style={{ padding: '0.75rem 1.25rem', fontWeight: 600, fontSize: '0.9rem', borderBottom: currentTab === 'repacking' ? '3px solid #ff9800' : '3px solid transparent', color: currentTab === 'repacking' ? '#ff9800' : '#64748b' }}>
           🔄 Repacking Entry
         </button>
+        <button type="button" className={`rm-tab-btn ${currentTab === 'packing-conversion' ? 'active' : ''}`} onClick={() => setTab('packing-conversion')} style={{ padding: '0.75rem 1.25rem', fontWeight: 600, fontSize: '0.9rem', borderBottom: currentTab === 'packing-conversion' ? '3px solid #ff9800' : '3px solid transparent', color: currentTab === 'packing-conversion' ? '#ff9800' : '#64748b' }}>
+          📦 Packing Conversion
+        </button>
         <button type="button" className={`rm-tab-btn ${currentTab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')} style={{ padding: '0.75rem 1.25rem', fontWeight: 600, fontSize: '0.9rem', borderBottom: currentTab === 'history' ? '3px solid #ff9800' : '3px solid transparent', color: currentTab === 'history' ? '#ff9800' : '#64748b' }}>
           📜 Production History
         </button>
@@ -397,6 +400,14 @@ export default function ManufacturingPage() {
             rawMaterials={rawMaterials}
             loadSystemData={loadSystemData}
             setTab={setTab}
+          />
+        )}
+
+        {/* TAB: PACKING CONVERSION */}
+        {currentTab === 'packing-conversion' && (
+          <PackingConversionTab 
+            products={products}
+            loadSystemData={loadSystemData}
           />
         )}
 
@@ -2030,5 +2041,469 @@ function EditRepackModal({ batch, onClose, onRefresh, products, rawMaterials }) 
         </div>
       </form>
     </Modal>
+  );
+}
+
+function PackingConversionTab({ products, loadSystemData }) {
+  const { toast } = useToast();
+  const [conversions, setConversions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showWizard, setShowWizard] = useState(false);
+  const [detailConversion, setDetailConversion] = useState(null);
+
+  // Wizard States
+  const [sourceProductId, setSourceProductId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [targets, setTargets] = useState([{ targetProductId: '', qty: '' }]);
+
+  const loadConversions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await packingConversionApi.list();
+      setConversions(res.data || []);
+    } catch (err) {
+      console.error(err);
+      toast('Failed to load packing conversions list', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    loadConversions();
+  }, [loadConversions]);
+
+  const bulkProducts = products.filter(p => p.productType === 'BULK_PRODUCT');
+
+  const selectedBulk = products.find(p => String(p._id || p.id) === String(sourceProductId));
+  const availableVariants = selectedBulk 
+    ? products.filter(p => String(p.parentProductId) === String(selectedBulk._id || selectedBulk.id) && ['RETAIL_PACK', 'LABEL_PACK'].includes(p.productType))
+    : [];
+
+  const handleAddTarget = () => {
+    setTargets([...targets, { targetProductId: '', qty: '' }]);
+  };
+
+  const handleRemoveTarget = (index) => {
+    const list = [...targets];
+    list.splice(index, 1);
+    setTargets(list);
+  };
+
+  const handleTargetChange = (index, field, value) => {
+    const list = [...targets];
+    list[index][field] = value;
+    setTargets(list);
+  };
+
+  const handleQuickAdd = (index, amount) => {
+    const list = [...targets];
+    const currentQty = Number(list[index].qty) || 0;
+    list[index].qty = currentQty + amount;
+    setTargets(list);
+  };
+
+  const handleResetQty = (index) => {
+    const list = [...targets];
+    list[index].qty = '';
+    setTargets(list);
+  };
+
+  // Calculations for live preview
+  let totalWeightConsumed = 0;
+  targets.forEach(item => {
+    const targetProduct = products.find(p => String(p._id || p.id) === String(item.targetProductId));
+    const qty = Number(item.qty) || 0;
+    const factor = Number(targetProduct?.conversionFactor || 0);
+    totalWeightConsumed += qty * factor;
+  });
+
+  const availableStock = selectedBulk ? Number(selectedBulk.stock || 0) : 0;
+  const remainingStock = availableStock - totalWeightConsumed;
+  const isStockInsufficient = remainingStock < 0;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!sourceProductId) {
+      toast('Please select a source bulk product.', 'warning');
+      return;
+    }
+    const filteredItems = targets.filter(t => t.targetProductId && Number(t.qty) > 0);
+    if (filteredItems.length === 0) {
+      toast('Please add at least one target variant with positive quantity.', 'warning');
+      return;
+    }
+    if (isStockInsufficient) {
+      toast('Cannot perform packing conversion due to insufficient bulk stock.', 'error');
+      return;
+    }
+
+    try {
+      const payload = {
+        sourceProductId,
+        notes: notes || 'Packed powder stock into packs.',
+        items: filteredItems.map(item => ({
+          targetProductId: item.targetProductId,
+          qty: Number(item.qty)
+        }))
+      };
+      await packingConversionApi.create(payload);
+      toast('Packing conversion recorded successfully!', 'success');
+      setShowWizard(false);
+      
+      // Reset form
+      setSourceProductId('');
+      setNotes('');
+      setTargets([{ targetProductId: '', qty: '' }]);
+      
+      // Reload
+      loadConversions();
+      loadSystemData();
+    } catch (err) {
+      console.error(err);
+      toast(err.response?.data?.message || 'Failed to record packing conversion', 'error');
+    }
+  };
+
+  const handleReverse = async (id) => {
+    if (!confirm('Are you sure you want to REVERSE this packing run? Bulk stock will be returned and pack stocks will be deducted. This action cannot be undone.')) return;
+    try {
+      await packingConversionApi.reverse(id);
+      toast('Packing conversion reversed successfully', 'success');
+      loadConversions();
+      loadSystemData();
+    } catch (err) {
+      console.error(err);
+      toast(err.response?.data?.message || 'Failed to reverse packing conversion', 'error');
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+          📦 Packing Conversion Run logs
+        </h2>
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{ backgroundColor: '#ff9800', borderColor: '#ff9800', fontWeight: 600 }}
+          onClick={() => setShowWizard(true)}
+        >
+          + New Packing Conversion
+        </button>
+      </div>
+
+      <div className="card table-wrap">
+        {loading ? <LoadingSpinner /> : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Run #</th>
+                <th>Source Bulk</th>
+                <th>Total Consumed</th>
+                <th>Status</th>
+                <th>User</th>
+                <th style={{ textAlign: 'center' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {conversions.map((run) => (
+                <tr key={run.id}>
+                  <td>{new Date(run.date).toLocaleDateString()}</td>
+                  <td><strong>{run.conversionNumber}</strong></td>
+                  <td>{run.sourceProduct?.name || 'Unknown Bulk'}</td>
+                  <td>{Number(run.sourceQty || 0).toFixed(2)} {run.sourceProduct?.unit || 'Kg'}</td>
+                  <td>
+                    <span className={`badge ${run.status === 'completed' ? 'badge-success' : 'badge-danger'}`}>
+                      {run.status.toUpperCase()}
+                    </span>
+                  </td>
+                  <td>{run.createdBy?.name || 'ERP System'}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center' }}>
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary btn-sm" 
+                        onClick={() => setDetailConversion(run)}
+                      >
+                        Details
+                      </button>
+                      {run.status === 'completed' && (
+                        <button 
+                          type="button" 
+                          className="btn btn-danger btn-sm" 
+                          onClick={() => handleReverse(run.id)}
+                        >
+                          Reverse
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {conversions.length === 0 && (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                    No packing conversions recorded yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Detail Modal */}
+      {detailConversion && (
+        <Modal 
+          title={`📄 Packing Run Details: ${detailConversion.conversionNumber}`} 
+          onClose={() => setDetailConversion(null)}
+          footer={<button type="button" className="btn btn-secondary" onClick={() => setDetailConversion(null)}>Close</button>}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
+            <div>
+              <span style={{ color: '#64748b' }}>Date Logged:</span>
+              <strong style={{ display: 'block' }}>{new Date(detailConversion.date).toLocaleString()}</strong>
+            </div>
+            <div>
+              <span style={{ color: '#64748b' }}>Source Bulk:</span>
+              <strong style={{ display: 'block' }}>{detailConversion.sourceProduct?.name} ({detailConversion.sourceProduct?.sku})</strong>
+            </div>
+            <div>
+              <span style={{ color: '#64748b' }}>Total Consumed:</span>
+              <strong style={{ display: 'block' }}>{Number(detailConversion.sourceQty || 0).toFixed(2)} {detailConversion.sourceProduct?.unit || 'Kg'}</strong>
+            </div>
+            <div>
+              <span style={{ color: '#64748b' }}>Logged By:</span>
+              <strong style={{ display: 'block' }}>{detailConversion.createdBy?.name || 'ERP System'}</strong>
+            </div>
+          </div>
+          {detailConversion.notes && (
+            <div style={{ marginBottom: '1.5rem', fontSize: '0.875rem' }}>
+              <span style={{ color: '#64748b' }}>Notes:</span>
+              <div style={{ background: '#f8fafc', padding: '0.5rem 0.75rem', borderRadius: '6px', marginTop: '0.25rem' }}>{detailConversion.notes}</div>
+            </div>
+          )}
+
+          <h4 style={{ fontSize: '0.9rem', fontWeight: 700, margin: '1rem 0 0.5rem 0' }}>Packed Target Variants</h4>
+          <table className="data-table" style={{ fontSize: '0.8rem', width: '100%' }}>
+            <thead>
+              <tr>
+                <th>Target Pack Variant</th>
+                <th>SKU</th>
+                <th>Packs Produced</th>
+                <th>Pack Factor (Kg)</th>
+                <th>Total Weight (Kg)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {detailConversion.items?.map((item, idx) => (
+                <tr key={idx}>
+                  <td style={{ fontWeight: 600 }}>{item.targetProduct?.name}</td>
+                  <td>{item.targetProduct?.sku}</td>
+                  <td>{item.qty} pcs</td>
+                  <td>{Number(item.conversionFactor || 0).toFixed(4)} Kg</td>
+                  <td>{Number(item.totalWeight || 0).toFixed(2)} Kg</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Modal>
+      )}
+
+      {/* Wizard Overlay (Modal) */}
+      {showWizard && (
+        <Modal 
+          title="⚡ Execute Packing Conversion Run" 
+          onClose={() => setShowWizard(false)}
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowWizard(false)}>Cancel</button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ backgroundColor: '#ff9800', borderColor: '#ff9800' }}
+                disabled={isStockInsufficient || !sourceProductId || targets.filter(t => t.targetProductId && Number(t.qty) > 0).length === 0}
+                onClick={handleSubmit}
+              >
+                Confirm Packing Run
+              </button>
+            </>
+          }
+        >
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontWeight: 600 }}>1. Select Source Bulk Product</label>
+              <select
+                className="form-control"
+                style={{ width: '100%', height: '42px', borderRadius: '8px' }}
+                value={sourceProductId}
+                onChange={(e) => {
+                  setSourceProductId(e.target.value);
+                  setTargets([{ targetProductId: '', qty: '' }]);
+                }}
+              >
+                <option value="">-- Choose Bulk Powder --</option>
+                {bulkProducts.map(p => (
+                  <option key={p._id || p.id} value={p._id || p.id}>
+                    {p.name} (SKU: {p.sku}) [Stock: {p.stock} {p.unit || 'Kg'}]
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedBulk && (
+              <div style={{ background: 'var(--brand-primary-light, #fff7ed)', border: '1px solid #ffedd5', borderRadius: '8px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                <span style={{ color: '#c2410c', fontWeight: 600 }}>Available Bulk Stock:</span>
+                <strong style={{ color: '#c2410c' }}>{availableStock.toFixed(2)} {selectedBulk.unit || 'Kg'}</strong>
+              </div>
+            )}
+
+            {sourceProductId && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <label style={{ fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>2. Add Target Retail / Label Pack Sizes</span>
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary btn-sm"
+                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                    onClick={handleAddTarget}
+                  >
+                    + Add Row
+                  </button>
+                </label>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {targets.map((item, idx) => {
+                    const selTarget = products.find(p => String(p._id || p.id) === String(item.targetProductId));
+                    return (
+                      <div key={idx} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', position: 'relative', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {targets.length > 1 && (
+                          <button
+                            type="button"
+                            style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.2rem', cursor: 'pointer', padding: 0 }}
+                            onClick={() => handleRemoveTarget(idx)}
+                          >
+                            ×
+                          </button>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Target Pack Variant</span>
+                          <select
+                            className="form-control"
+                            style={{ width: '100%', height: '38px', borderRadius: '6px' }}
+                            value={item.targetProductId}
+                            onChange={(e) => handleTargetChange(idx, 'targetProductId', e.target.value)}
+                          >
+                            <option value="">-- Choose Pack Variant --</option>
+                            {availableVariants.map(v => (
+                              <option key={v._id || v.id} value={v._id || v.id} disabled={targets.some((t, tIdx) => tIdx !== idx && String(t.targetProductId) === String(v._id || v.id))}>
+                                {v.packSize || v.name} (SKU: {v.sku}) [Factor: {v.conversionFactor} Kg]
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {item.targetProductId && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Quantity (Packs)</span>
+                              {selTarget && (
+                                <span style={{ fontSize: '0.8rem', color: '#475569' }}>
+                                  Weight: <strong>{((Number(item.qty) || 0) * Number(selTarget.conversionFactor)).toFixed(2)} Kg</strong>
+                                </span>
+                              )}
+                            </div>
+                            <input
+                              type="number"
+                              className="form-control"
+                              style={{ width: '100%', height: '38px', borderRadius: '6px' }}
+                              placeholder="e.g. 50"
+                              min="1"
+                              value={item.qty}
+                              onChange={(e) => handleTargetChange(idx, 'qty', e.target.value)}
+                            />
+                            {/* Quick Add Buttons */}
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                              <button 
+                                type="button" 
+                                className="btn btn-secondary btn-sm"
+                                style={{ flex: '1', padding: '0.5rem', height: '38px', minWidth: '60px', fontWeight: 600 }}
+                                onClick={() => handleQuickAdd(idx, 10)}
+                              >
+                                +10
+                              </button>
+                              <button 
+                                type="button" 
+                                className="btn btn-secondary btn-sm"
+                                style={{ flex: '1', padding: '0.5rem', height: '38px', minWidth: '60px', fontWeight: 600 }}
+                                onClick={() => handleQuickAdd(idx, 50)}
+                              >
+                                +50
+                              </button>
+                              <button 
+                                type="button" 
+                                className="btn btn-secondary btn-sm"
+                                style={{ flex: '1', padding: '0.5rem', height: '38px', minWidth: '60px', fontWeight: 600 }}
+                                onClick={() => handleQuickAdd(idx, 100)}
+                              >
+                                +100
+                              </button>
+                              <button 
+                                type="button" 
+                                className="btn btn-secondary btn-sm"
+                                style={{ padding: '0.5rem', height: '38px', color: '#ef4444', borderColor: '#fecaca', fontWeight: 600 }}
+                                onClick={() => handleResetQty(idx)}
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Live Preview section */}
+            {sourceProductId && (
+              <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '1rem', background: '#f1f5f9', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.85rem', textTransform: 'uppercase', color: '#475569' }}>Live Conversion Preview</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                  <span>Total Weight to Consume:</span>
+                  <strong>{totalWeightConsumed.toFixed(2)} Kg</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+                  <span>Remaining Bulk Stock:</span>
+                  <span style={{ fontWeight: 700, color: isStockInsufficient ? '#dc2626' : '#16a34a' }}>
+                    {remainingStock.toFixed(2)} Kg
+                  </span>
+                </div>
+                {isStockInsufficient && (
+                  <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '0.5rem 0.75rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, marginTop: '0.25rem', textAlign: 'center' }}>
+                    🚨 Error: Total weight to consume exceeds available bulk stock!
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontWeight: 600 }}>Notes / Remarks</label>
+              <textarea
+                className="form-control"
+                style={{ width: '100%', borderRadius: '6px', minHeight: '60px' }}
+                placeholder="Optional remarks e.g. Batch shift B"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
   );
 }

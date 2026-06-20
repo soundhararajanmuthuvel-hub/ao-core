@@ -31,7 +31,11 @@ exports.getDashboard = async (req, res, next) => {
       lowStockCount,
       delayedOrdersCount,
       currentMonthlyRevenueResult,
-      pendingDispatchCount
+      pendingDispatchCount,
+      bulkProductsForValuation,
+      retailPackStockSum,
+      packingDoneTodayResult,
+      mfgDoneTodayResult
     ] = await Promise.all([
       Product.count(),
       sequelize.query(
@@ -78,8 +82,50 @@ exports.getDashboard = async (req, res, next) => {
         where: {
           status: { [Op.in]: ['Prepared', 'Packed'] }
         }
-      })
+      }),
+      Product.findAll({
+        where: { productType: 'BULK_PRODUCT', isArchived: false },
+        attributes: ['stock', 'purchasePrice'],
+        raw: true
+      }),
+      Product.sum('stock', {
+        where: {
+          productType: { [Op.in]: ['RETAIL_PACK', 'LABEL_PACK'] },
+          isArchived: false
+        }
+      }),
+      sequelize.query(
+        `SELECT COALESCE(SUM(pci.qty), 0) AS total
+         FROM PackingConversions pc
+         JOIN PackingConversionItems pci ON pc.id = pci.packingConversionId
+         WHERE pc.date >= :today AND pc.date < :tomorrow AND pc.status = 'completed'`,
+        {
+          replacements: { today, tomorrow },
+          type: sequelize.QueryTypes.SELECT,
+        }
+      ),
+      sequelize.query(
+        `SELECT COALESCE(SUM(qtyToProduce), 0) AS total
+         FROM ManufacturingEntries
+         WHERE date >= :today AND date < :tomorrow AND status = 'completed'`,
+        {
+          replacements: { today, tomorrow },
+          type: sequelize.QueryTypes.SELECT,
+        }
+      )
     ]);
+
+    // Calculate bulk stock value
+    let bulkStockValue = 0;
+    if (bulkProductsForValuation && bulkProductsForValuation.length) {
+      bulkProductsForValuation.forEach(p => {
+        bulkStockValue += Number(p.stock || 0) * Number(p.purchasePrice || 0);
+      });
+    }
+
+    const retailPackStock = Number(retailPackStockSum || 0);
+    const packingDoneToday = Number(packingDoneTodayResult?.[0]?.total || 0);
+    const mfgDoneToday = Number(mfgDoneTodayResult?.[0]?.total || 0);
 
     const stats = salesStatsResult[0] || { totalSales: 0, revenue: 0, profit: 0 };
     const todayData = todayStatsResult[0] || { todaySales: 0, todayOrders: 0 };
@@ -277,7 +323,11 @@ exports.getDashboard = async (req, res, next) => {
         lowStockCount,
         delayedOrdersCount,
         monthlyRevenue: Number(currentMonthlyRevenueResult || 0),
-        pendingDispatchOrders: Number(pendingDispatchCount || 0)
+        pendingDispatchOrders: Number(pendingDispatchCount || 0),
+        bulkStockValue,
+        retailPackStock,
+        packingDoneToday,
+        mfgDoneToday
       },
       charts: {
         monthlyRevenue: monthlyRevenue.map((m) => ({

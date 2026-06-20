@@ -1657,3 +1657,79 @@ exports.salesGstSummaryReport = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getBulkStockReport = async (req, res, next) => {
+  try {
+    const Product = require('../models/Product');
+    const products = await Product.findAll({
+      where: { productType: 'BULK_PRODUCT', isArchived: false }
+    });
+    res.json({ success: true, data: products });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getPackingConversionReport = async (req, res, next) => {
+  try {
+    const PackingConversion = require('../models/PackingConversion');
+    const PackingConversionItem = require('../models/PackingConversionItem');
+    const Product = require('../models/Product');
+    const User = require('../models/User');
+
+    const conversions = await PackingConversion.findAll({
+      include: [
+        { model: Product, as: 'sourceProduct', attributes: ['name', 'sku', 'unit'] },
+        { model: User, as: 'createdBy', attributes: ['name'] },
+        {
+          model: PackingConversionItem,
+          as: 'items',
+          include: [{ model: Product, as: 'targetProduct', attributes: ['name', 'sku', 'unit'] }]
+        }
+      ],
+      order: [['date', 'DESC']]
+    });
+    res.json({ success: true, data: conversions });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getVariantStockReport = async (req, res, next) => {
+  try {
+    const Product = require('../models/Product');
+    const { Op } = require('sequelize');
+    const products = await Product.findAll({
+      where: {
+        productType: { [Op.in]: ['RETAIL_PACK', 'LABEL_PACK'] },
+        isArchived: false
+      },
+      include: [{ model: Product, as: 'parentProduct', attributes: ['name', 'sku'] }]
+    });
+    res.json({ success: true, data: products });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getManufacturingYieldReport = async (req, res, next) => {
+  try {
+    const ManufacturingEntry = require('../models/ManufacturingEntry');
+    const ManufacturingRecipe = require('../models/ManufacturingRecipe');
+    const Product = require('../models/Product');
+    const User = require('../models/User');
+
+    const entries = await ManufacturingEntry.findAll({
+      where: { status: 'completed' },
+      include: [
+        { model: Product, as: 'product', attributes: ['name', 'sku', 'unit', 'purchasePrice'] },
+        { model: ManufacturingRecipe, as: 'recipe', attributes: ['name', 'yieldQty'] },
+        { model: User, as: 'createdBy', attributes: ['name'] }
+      ],
+      order: [['date', 'DESC']]
+    });
+    res.json({ success: true, data: entries });
+  } catch (err) {
+    next(err);
+  }
+};
