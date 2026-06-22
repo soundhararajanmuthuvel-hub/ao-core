@@ -198,7 +198,6 @@ export default function PublicCatalog() {
                   fontSize: '0.85rem',
                   fontWeight: 700,
                   borderRadius: '20px',
-                  border: 'none',
                   cursor: 'pointer',
                   backgroundColor: selectedCategory === cat ? brandColor : '#ffffff',
                   color: selectedCategory === cat ? '#ffffff' : '#5a2d0c',

@@ -302,7 +302,6 @@ export default function CatalogCenter() {
                 fontSize: '0.85rem',
                 fontWeight: 700,
                 borderRadius: '25px',
-                border: 'none',
                 cursor: 'pointer',
                 backgroundColor: selectedCategory === cat ? 'var(--brand-primary)' : 'var(--bg-card)',
                 color: selectedCategory === cat ? '#ffffff' : 'var(--text-secondary)',
