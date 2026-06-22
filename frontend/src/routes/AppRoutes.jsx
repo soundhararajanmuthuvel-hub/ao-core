@@ -40,10 +40,14 @@ import WhatsAppLogs from '../pages/WhatsAppLogs';
 import FieldSalesDashboard from '../pages/FieldSalesDashboard';
 import FieldSalesAnalytics from '../pages/FieldSalesAnalytics';
 
+import CatalogCenter from '../pages/CatalogCenter';
+import PublicCatalog from '../pages/PublicCatalog';
+
 export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/catalog" element={<PublicCatalog />} />
       <Route path="/track/:trackingNumber" element={<PublicTracking />} />
       <Route path="/track" element={<PublicTracking />} />
       <Route path="/reviews/portal/:token" element={<ReviewPortal />} />
@@ -196,6 +200,14 @@ export default function AppRoutes() {
           element={
             <RoleRoute roles={['Super Admin', 'Store Keeper']}>
               <ProductsPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="products/catalog-center"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+              <CatalogCenter />
             </RoleRoute>
           }
         />

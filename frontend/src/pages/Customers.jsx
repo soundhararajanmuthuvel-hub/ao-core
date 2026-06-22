@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { customersApi, productsApi, ordersApi, sfaApi, crmApi, aiApi, whatsappApi } from '../api';
+import { customersApi, productsApi, ordersApi, sfaApi, crmApi, aiApi, whatsappApi, catalogApi } from '../api';
 import { Brain } from 'lucide-react';
 import AIInsightsModal from '../components/AIInsightsModal';
 import { useToast } from '../context/ToastContext';
@@ -154,6 +154,56 @@ export default function Customers() {
       msg = `Dear ${selectedCustomer.name},\n\nPlease find attached your Running Account Ledger Statement copy up to today.\n\nThank you for your business!\n${company}`;
     }
     setRemMessage(msg);
+  };
+
+  // Product Catalog sharing states
+  const [catalogModalOpen, setCatalogModalOpen] = useState(false);
+  const [catalogPhone, setCatalogPhone] = useState('');
+  const [catalogFormat, setCatalogFormat] = useState('pdf');
+  const [catalogPricingType, setCatalogPricingType] = useState('retail');
+  const [catalogCategory, setCatalogCategory] = useState('All');
+  const [catalogProductId, setCatalogProductId] = useState('');
+  const [catalogCategories, setCatalogCategories] = useState([]);
+  const [catalogSending, setCatalogSending] = useState(false);
+
+  const openCustomerCatalogModal = () => {
+    if (selectedCustomer) {
+      setCatalogPhone(selectedCustomer.phone || '');
+      setCatalogFormat('pdf');
+      setCatalogPricingType('retail');
+      setCatalogCategory('All');
+      setCatalogProductId('');
+      setCatalogModalOpen(true);
+      productsApi.categories().then(({ data }) => {
+        setCatalogCategories(data.categories || []);
+      }).catch(e => console.error(e));
+    }
+  };
+
+  const handleSendCatalogWhatsApp = async () => {
+    if (!catalogPhone) {
+      toast('Phone number is required', 'warning');
+      return;
+    }
+    setCatalogSending(true);
+    try {
+      const payload = {
+        phone: catalogPhone,
+        customerId: selectedCustomer.id || selectedCustomer._id,
+        pricingType: catalogPricingType,
+        category: catalogCategory,
+        format: catalogFormat,
+        productId: catalogFormat === 'image' ? catalogProductId : undefined
+      };
+      await catalogApi.shareWhatsApp(payload);
+      toast('Catalog dispatched successfully via WhatsApp!', 'success');
+      setCatalogModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast(err.response?.data?.message || 'Failed to send catalog via WhatsApp', 'error');
+    } finally {
+      setCatalogSending(false);
+    }
   };
 
   const getReminderStatementBlob = () => {
@@ -2221,6 +2271,14 @@ export default function Customers() {
                     >
                       💬 WhatsApp Customer
                     </button>
+                    <button 
+                      type="button" 
+                      className="btn btn-secondary btn-sm" 
+                      style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem', fontWeight: 700 }}
+                      onClick={openCustomerCatalogModal}
+                    >
+                      📖 Send Catalog
+                    </button>
                     
                     {(() => {
                       const pending = salesHistory.filter(i => i.paymentStatus !== 'paid' && i.status !== 'Cancelled');
@@ -2974,6 +3032,102 @@ export default function Customers() {
                 required
               />
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* WhatsApp Product Catalog Modal */}
+      {catalogModalOpen && (
+        <Modal
+          title="📖 Share Product Catalog via WhatsApp"
+          onClose={() => setCatalogModalOpen(false)}
+          footer={
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', width: '100%' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setCatalogModalOpen(false)} disabled={catalogSending}>
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                onClick={handleSendCatalogWhatsApp} 
+                disabled={catalogSending}
+              >
+                {catalogSending ? 'Sending...' : 'Send Catalog'}
+              </button>
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0.5rem' }}>
+            <div className="form-group">
+              <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Recipient Phone Number</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                value={catalogPhone} 
+                onChange={(e) => setCatalogPhone(e.target.value)}
+                placeholder="e.g. 917010602115"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Catalog Format</label>
+              <select 
+                className="form-control" 
+                value={catalogFormat} 
+                onChange={(e) => setCatalogFormat(e.target.value)}
+              >
+                <option value="pdf">Full PDF Catalog Document</option>
+                <option value="image">Single Product Image Poster Link</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Pricing Tier</label>
+              <select 
+                className="form-control" 
+                value={catalogPricingType} 
+                onChange={(e) => setCatalogPricingType(e.target.value)}
+              >
+                <option value="retail">Retail Pricing</option>
+                <option value="distributor">Distributor Pricing</option>
+                <option value="super_stockist">Stockist Pricing</option>
+                <option value="hide">Hide Prices</option>
+              </select>
+            </div>
+
+            {catalogFormat === 'pdf' ? (
+              <div className="form-group">
+                <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Product Category Filter</label>
+                <select 
+                  className="form-control" 
+                  value={catalogCategory} 
+                  onChange={(e) => setCatalogCategory(e.target.value)}
+                >
+                  <option value="All">All Categories</option>
+                  {catalogCategories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="form-group">
+                <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Select Product *</label>
+                <select 
+                  className="form-control" 
+                  value={catalogProductId} 
+                  onChange={(e) => setCatalogProductId(e.target.value)}
+                  required
+                >
+                  <option value="">-- Select Product --</option>
+                  {allProducts.filter(p => !p.isArchived).map(p => (
+                    <option key={p.id || p._id} value={p.id || p._id}>
+                      {p.name} ({p.sku})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </Modal>
       )}

@@ -336,5 +336,12 @@ export const databaseApi = {
   backup: () => client.get('/settings/database/backup', { responseType: 'blob' }),
 };
 
+export const catalogApi = {
+  getPublicCatalog: () => client.get('/catalog/public'),
+  downloadPdf: (params) => client.get('/catalog/download/pdf', { params, responseType: 'blob' }),
+  downloadImage: (productId, params) => client.get(`/catalog/download/image/${productId}`, { params, responseType: 'blob' }),
+  shareWhatsApp: (data) => client.post('/catalog/share/whatsapp', data),
+};
+
 
 

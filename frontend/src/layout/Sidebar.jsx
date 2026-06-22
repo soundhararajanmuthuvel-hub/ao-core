@@ -55,9 +55,10 @@ const menuStructure = [
     id: 'inventory',
     icon: Package,
     label: 'Inventory',
-    roles: ['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager'],
+    roles: ['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager', 'Sales Manager', 'Salesman', 'Sales Executive'],
     children: [
       { to: '/products', label: 'Products', roles: ['Super Admin', 'admin', 'Store Keeper'] },
+      { to: '/products/catalog-center', label: 'Catalog Center', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
       { to: '/products?tab=raw-materials', label: 'Raw Materials', roles: ['Super Admin', 'admin', 'Manufacturing Manager', 'Store Keeper'] },
       { to: '/inventory', label: 'Stock', roles: ['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager'] }
     ]

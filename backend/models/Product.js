@@ -190,6 +190,14 @@ const Product = sequelize.define('Product', {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0.00,
   },
+  ingredients: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  benefits: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
   isLowStock: {
     type: DataTypes.VIRTUAL,
     get() {
@@ -227,6 +235,42 @@ Product.belongsTo(require('./Supplier'), { as: 'preferredSupplier', foreignKey: 
 makeMongooseCompatible(Product, {
   preferredSupplier: 'preferredSupplierId',
   parentProduct: 'parentProductId',
+});
+
+Product.addHook('afterCreate', () => {
+  try {
+    const catalogController = require('../controllers/catalogController');
+    catalogController.clearCatalogCache();
+  } catch (e) {}
+});
+
+Product.addHook('afterUpdate', (product) => {
+  try {
+    if (
+      product.changed('sellingPrice') ||
+      product.changed('mrp') ||
+      product.changed('greenPrice') ||
+      product.changed('yellowPrice') ||
+      product.changed('redPrice') ||
+      product.changed('wholesalePrice') ||
+      product.changed('packSize') ||
+      product.changed('image') ||
+      product.changed('name') ||
+      product.changed('description') ||
+      product.changed('ingredients') ||
+      product.changed('benefits')
+    ) {
+      const catalogController = require('../controllers/catalogController');
+      catalogController.clearCatalogCache();
+    }
+  } catch (e) {}
+});
+
+Product.addHook('afterDestroy', () => {
+  try {
+    const catalogController = require('../controllers/catalogController');
+    catalogController.clearCatalogCache();
+  } catch (e) {}
 });
 
 module.exports = Product;

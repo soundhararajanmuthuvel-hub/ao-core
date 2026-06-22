@@ -238,6 +238,8 @@ const connectDB = async () => {
   await addColumnIfNotExist('Products', 'greenPrice', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('Products', 'yellowPrice', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('Products', 'redPrice', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Products', 'ingredients', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'benefits', "TEXT NULL");
 
   // SFA Settings enhancements
   await addColumnIfNotExist('Settings', 'minOrderGreen', "DECIMAL(10, 2) DEFAULT 10000.00");
