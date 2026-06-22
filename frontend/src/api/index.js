@@ -243,6 +243,12 @@ export const integrationsApi = {
   saveMappings: (data) => client.post('/integrations/mappings', data),
   getStats: () => client.get('/integrations/stats'),
   
+  // Developer Exports Credentials Admin
+  getCredentials: () => client.get('/external/credentials'),
+  createCredential: (data) => client.post('/external/credentials', data),
+  deleteCredential: (id) => client.delete(`/external/credentials/${id}`),
+  regenerateCredential: (id) => client.post(`/external/credentials/${id}/regenerate`),
+  
   // Legacy WooCommerce endpoints (kept for compatibility)
   testWooConnection: () => client.post('/integrations/test-connection'),
   connect: (data) => client.post('/integrations/connect', data),

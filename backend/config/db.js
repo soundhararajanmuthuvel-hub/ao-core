@@ -139,6 +139,7 @@ const connectDB = async () => {
   require('../models/IntegrationCustomer');
   require('../models/IntegrationOrder');
   require('../models/IntegrationCatalogue');
+  require('../models/IntegrationExportCredential');
 
   const shouldAlter = false;
   await dropStaleSqliteBackupTables();
@@ -281,6 +282,10 @@ const connectDB = async () => {
   await addColumnIfNotExist('Settings', 'upiId', "VARCHAR(255) DEFAULT '7010602115@iob'");
   await addColumnIfNotExist('Settings', 'payeeName', "VARCHAR(255) DEFAULT 'AMUDHASURABIY ORGANICS'");
   await addColumnIfNotExist('Users', 'tourCompleted', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('integration_connections', 'syncDirection', "VARCHAR(50) DEFAULT 'Import'");
+  await addColumnIfNotExist('integration_connections', 'conflictStrategy', "VARCHAR(50) DEFAULT 'Latest'");
+  await addColumnIfNotExist('integration_connections', 'rateLimitCount', "INTEGER DEFAULT 60");
+  await addColumnIfNotExist('integration_connections', 'allowedIps', "VARCHAR(1000) NULL");
 
   await addColumnIfNotExist('Invoices', 'packingCost', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('Invoices', 'handlingCost', "DECIMAL(10, 2) DEFAULT 0.00");

@@ -88,6 +88,22 @@ const IntegrationConnection = sequelize.define('IntegrationConnection', {
     type: DataTypes.DATE,
     allowNull: true,
   },
+  syncDirection: {
+    type: DataTypes.ENUM('Import', 'Export', 'Bidirectional'),
+    defaultValue: 'Import',
+  },
+  conflictStrategy: {
+    type: DataTypes.ENUM('Latest', 'ERP', 'External', 'Manual'),
+    defaultValue: 'Latest',
+  },
+  rateLimitCount: {
+    type: DataTypes.INTEGER,
+    defaultValue: 60,
+  },
+  allowedIps: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 }, {
   tableName: 'integration_connections',
   timestamps: true,

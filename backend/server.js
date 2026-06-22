@@ -101,6 +101,7 @@ app.use('/api/crm', require('./routes/crmRoutes'));
 app.use('/api/migration', require('./routes/migrationRoutes'));
 app.use('/api/whatsapp', require('./routes/whatsappRoutes'));
 app.use('/api/catalog', require('./routes/catalogRoutes'));
+app.use('/api/external', require('./routes/externalRoutes'));
 
 /* =========================
    PUBLIC REVIEW PORTAL ROUTES

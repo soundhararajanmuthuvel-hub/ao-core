@@ -554,8 +554,113 @@ exports.webhookReceiver = async (req, res, next) => {
       if (text && fromPhone) {
         const lowerText = text.toLowerCase();
         
-        // Auto Card Trigger: "Show [Product Name]"
-        if (lowerText.startsWith('show ')) {
+        if (lowerText === 'my balance') {
+          try {
+            const customerObj = await Customer.findOne({
+              where: {
+                [Op.or]: [
+                  { phone: fromPhone },
+                  { phone: { [Op.like]: `%${fromPhone}%` } }
+                ]
+              }
+            });
+
+            if (customerObj) {
+              const Invoice = require('../models/Invoice');
+              const Payment = require('../models/Payment');
+
+              const invoices = await Invoice.findAll({ where: { customerId: customerObj.id } });
+              const totalSales = invoices.reduce((sum, inv) => sum + Number(inv.grandTotal || inv.total || 0), 0);
+
+              const payments = await Payment.findAll({ where: { customerId: customerObj.id } });
+              const receivedAmount = payments.reduce((sum, pay) => sum + Number(pay.amount || 0), 0);
+              const pendingAmount = totalSales - receivedAmount;
+
+              const replyText = `📄 *Your Ledger Balance Summary* 📄
+----------------------------------
+*Customer:* ${customerObj.name}
+*Total Billing:* Rs. ${totalSales.toFixed(2)}
+*Total Paid:* Rs. ${receivedAmount.toFixed(2)}
+*Outstanding Balance:* Rs. ${pendingAmount.toFixed(2)}
+
+${pendingAmount > 0 ? '⚠️ Please clear your pending dues at the earliest. Thank you!' : '✅ Your account is fully settled. Thank you!'}
+----------------------------------
+Amudhasurabiy Organics`;
+
+              await whatsappService.sendMessage(fromPhone, replyText, null, 'Chatbot Ledger Balance');
+            } else {
+              await whatsappService.sendMessage(fromPhone, `Sorry, we could not find a customer profile associated with your phone number (${fromPhone}). Please contact our support team.`, null, 'Chatbot Ledger Balance');
+            }
+          } catch (err) {
+            console.error('Chatbot ledger balance reply failed:', err.message);
+          }
+        } else if (lowerText === 'show catalogue' || lowerText === 'show catalog') {
+          try {
+            const IntegrationCatalogue = require('../models/IntegrationCatalogue');
+            const catalogue = await IntegrationCatalogue.findOne();
+            
+            let brochurePath = null;
+            if (catalogue && catalogue.pdfUrl) {
+              brochurePath = catalogue.pdfUrl;
+            } else {
+              // Ensure fallback folder and placeholder PDF exist
+              const tempDir = path.resolve(__dirname, '../uploads/temp');
+              if (!fs.existsSync(tempDir)) {
+                fs.mkdirSync(tempDir, { recursive: true });
+              }
+              brochurePath = path.join(tempDir, 'amudhasurabiy_brochure.pdf');
+              if (!fs.existsSync(brochurePath)) {
+                fs.writeFileSync(brochurePath, 'Amudhasurabiy Organics Catalogue Brochure Placeholder PDF.');
+              }
+            }
+
+            const customerObj = await Customer.findOne({
+              where: {
+                [Op.or]: [
+                  { phone: fromPhone },
+                  { phone: { [Op.like]: `%${fromPhone}%` } }
+                ]
+              }
+            });
+
+            await whatsappService.sendPdf(
+              fromPhone,
+              'Here is our latest catalog brochure. Feel free to contact us with any questions!',
+              brochurePath,
+              customerObj?.id || null,
+              'Chatbot Catalogue'
+            );
+          } catch (err) {
+            console.error('Chatbot catalogue reply failed:', err.message);
+          }
+        } else if (lowerText.endsWith(' price')) {
+          try {
+            const productName = text.substring(0, text.length - 6).trim();
+            const Product = require('../models/Product');
+            const product = await Product.findOne({
+              where: {
+                name: { [Op.like]: `%${productName}%` }
+              }
+            });
+
+            if (product) {
+              const cardMsg = `💰 *Product Price Card* 💰
+----------------------------------
+*Name:* ${product.name}
+*Price:* Rs. ${Number(product.sellingPrice || product.price || 0).toFixed(2)}
+*MRP:* Rs. ${Number(product.mrp || product.price || 0).toFixed(2)}
+*Stock Status:* ${product.stock > 0 ? `🟢 In Stock (${Math.round(product.stock)} items)` : '🔴 Out of Stock'}
+----------------------------------
+Amudhasurabiy Organics`;
+
+              await whatsappService.sendMessage(fromPhone, cardMsg, null, 'Chatbot Product Price');
+            } else {
+              await whatsappService.sendMessage(fromPhone, `Sorry, we couldn't find the price for "${productName}" in our catalog.`, null, 'Chatbot Product Price');
+            }
+          } catch (err) {
+            console.error('Chatbot product price reply failed:', err.message);
+          }
+        } else if (lowerText.startsWith('show ')) {
           const productName = text.substring(5).trim();
           const Product = require('../models/Product');
           const product = await Product.findOne({

@@ -1183,159 +1183,8 @@ exports.syncNow = async (req, res, next) => {
         tenantId
       });
 
-      let imported = 0;
-      let failed = 0;
-      let syncError = null;
+      const result = await universalApiService.syncData(connection, entityType, tenantId, client, mappings, job);
 
-      try {
-        // Form path based on scanned API endpoints
-        let path = `/${entityType.toLowerCase()}s`;
-        // Quick WooCommerce check
-        if (connection.platformType === 'WooCommerce') {
-          path = `/wp-json/wc/v3/${entityType.toLowerCase()}s`;
-        }
-
-        const response = await client.get(path);
-        let records = [];
-
-        if (Array.isArray(response.data)) {
-          records = response.data;
-        } else if (response.data && typeof response.data === 'object') {
-          const keys = Object.keys(response.data);
-          for (const k of keys) {
-            if (Array.isArray(response.data[k])) {
-              records = response.data[k];
-              break;
-            }
-          }
-        }
-
-        const typeMappings = mappings.filter(m => m.entityType === entityType);
-
-        // Process mapping helper
-        const mapFields = (record) => {
-          const result = {};
-          typeMappings.forEach(m => {
-            const val = record[m.externalField];
-            if (val !== undefined) {
-              result[m.internalField] = val;
-            }
-          });
-          return result;
-        };
-
-        // Cache records in DB
-        for (const record of records) {
-          try {
-            const mapped = mapFields(record);
-            const externalId = String(record.id || record.externalId || record.sku || Math.random());
-
-            if (entityType === 'Product') {
-              await IntegrationProduct.upsert({
-                connectionId: id,
-                externalId,
-                name: mapped.name || record.name || 'Imported Product',
-                sku: mapped.sku || record.sku,
-                barcode: mapped.barcode || record.barcode,
-                category: mapped.category || record.category,
-                brand: mapped.brand || record.brand,
-                price: Number(mapped.price || record.price || 0),
-                mrp: Number(mapped.mrp || record.mrp || 0),
-                wholesalePrice: Number(mapped.wholesalePrice || record.wholesalePrice || 0),
-                distributorPrice: Number(mapped.distributorPrice || record.distributorPrice || 0),
-                stock: Math.round(Number(mapped.stock || record.stock || 0)),
-                gst: Number(mapped.gst || record.gst || 0),
-                hsn: mapped.hsn || record.hsn,
-                weight: Number(mapped.weight || record.weight || 0.0),
-                description: mapped.description || record.description,
-                benefits: mapped.benefits || record.benefits,
-                imageUrl: mapped.imageUrl || record.imageUrl,
-                catalogueUrl: mapped.catalogueUrl || record.catalogueUrl,
-                status: mapped.status || record.status || 'active',
-                tenantId
-              });
-              
-              // AUTO SYNC IMPORTED PRODUCTS INTO MAIN PRODUCTS TABLE (AI ASSISTANT ANSWER SUPPORT)
-              const Product = require('../models/Product');
-              await Product.upsert({
-                name: mapped.name || record.name || 'Imported Product',
-                sku: mapped.sku || record.sku || `IMP-PROD-${externalId}`,
-                price: Number(mapped.price || record.price || 0),
-                stock: Math.round(Number(mapped.stock || record.stock || 0)),
-                description: mapped.description || record.description || '',
-                benefits: mapped.benefits || record.benefits || '',
-                ingredients: mapped.ingredients || record.ingredients || '',
-                image: mapped.imageUrl || record.imageUrl || '',
-                category: mapped.category || record.category || 'General',
-                productType: 'trading',
-                unit: 'pcs'
-              });
-            } else if (entityType === 'Customer') {
-              await IntegrationCustomer.upsert({
-                connectionId: id,
-                externalId,
-                name: mapped.name || record.name || 'Imported Customer',
-                phone: mapped.phone || record.phone,
-                email: mapped.email || record.email,
-                address: mapped.address || record.address,
-                city: mapped.city || record.city,
-                state: mapped.state || record.state,
-                country: mapped.country || record.country,
-                gstNumber: mapped.gstNumber || record.gstNumber,
-                customerType: mapped.customerType || record.customerType,
-                creditLimit: Number(mapped.creditLimit || record.creditLimit || 0),
-                outstanding: Number(mapped.outstanding || record.outstanding || 0),
-                tenantId
-              });
-            } else if (entityType === 'Order') {
-              await IntegrationOrder.upsert({
-                connectionId: id,
-                externalId,
-                orderNumber: mapped.orderNumber || record.orderNumber || `ORD-${externalId}`,
-                customerName: mapped.customerName || record.customerName,
-                items: JSON.stringify(mapped.items || record.items || []),
-                amount: Number(mapped.amount || record.amount || 0),
-                status: mapped.status || record.status || 'Pending',
-                paymentStatus: mapped.paymentStatus || record.paymentStatus || 'Unpaid',
-                shipmentStatus: mapped.shipmentStatus || record.shipmentStatus || 'Unshipped',
-                orderDate: mapped.orderDate || record.orderDate,
-                deliveryDate: mapped.deliveryDate || record.deliveryDate,
-                tenantId
-              });
-            } else if (entityType === 'Catalogue') {
-              await IntegrationCatalogue.upsert({
-                connectionId: id,
-                externalId,
-                name: mapped.name || record.name || 'Imported Catalogue',
-                pdfUrl: mapped.pdfUrl || record.pdfUrl,
-                imageUrl: mapped.imageUrl || record.imageUrl,
-                category: mapped.category || record.category,
-                productMapping: JSON.stringify(mapped.productMapping || record.productMapping || []),
-                version: mapped.version || record.version || '1.0.0',
-                tenantId
-              });
-            }
-
-            imported++;
-          } catch (itemErr) {
-            failed++;
-            console.error(`Item sync failed for connection ${id}:`, itemErr.message);
-          }
-        }
-
-        job.status = 'Completed';
-        job.completedAt = new Date();
-        await job.save();
-      } catch (err) {
-        syncError = err.message;
-        failed = 1;
-        job.status = 'Failed';
-        job.errorMessage = err.message;
-        job.completedAt = new Date();
-        await job.save();
-      }
-
-      // Add to Integration Log
       const now = new Date();
       await IntegrationLog.create({
         connectionId: id,
@@ -1343,15 +1192,22 @@ exports.syncNow = async (req, res, next) => {
         time: now.toTimeString().split(' ')[0],
         entityType,
         action: 'Sync',
-        recordsImported: imported,
-        recordsFailed: failed,
-        status: syncError ? 'Failed' : 'Success',
+        recordsImported: result.imported || 0,
+        recordsFailed: result.failed || 0,
+        status: result.success ? 'Success' : 'Failed',
         duration: Date.now() - startTime,
-        errorMessage: syncError,
+        errorMessage: result.errorMessage,
         tenantId
       });
 
-      syncResults.push({ entityType, imported, failed, error: syncError });
+      syncResults.push({
+        entityType,
+        imported: result.imported || 0,
+        exported: result.exported || 0,
+        failed: result.failed || 0,
+        error: result.errorMessage,
+        status: result.status
+      });
     }
 
     // Update connection lastSyncTime & status
