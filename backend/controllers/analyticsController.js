@@ -37,7 +37,8 @@ exports.getDashboard = async (req, res, next) => {
       bulkProductsForValuation,
       retailPackStockSum,
       packingDoneTodayResult,
-      mfgDoneTodayResult
+      mfgDoneTodayResult,
+      packingConversionsToday
     ] = await Promise.all([
       Product.count(),
       sequelize.query(
