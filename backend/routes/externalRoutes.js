@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/role');
-const externalAuth = require('../middleware/externalAuth');
+const validateExternalApiKey = require('../middleware/validateExternalApiKey');
 const externalController = require('../controllers/externalController');
 
 // ==========================================
@@ -14,18 +14,23 @@ router.delete('/credentials/:id', auth, authorize('admin'), externalController.d
 router.post('/credentials/:id/regenerate', auth, authorize('admin'), externalController.regenerateExportCredential);
 
 // ==========================================
+// PUBLIC HEALTH CHECK FOR SAAS / EXTERNAL LINKS
+// ==========================================
+router.get('/health', externalController.getHealth);
+
+// ==========================================
 // SECURE EXTERNAL DATA EXPORTS (API Key authenticated)
 // ==========================================
-router.get('/products', externalAuth, externalController.getProducts);
-router.get('/customers', externalAuth, externalController.getCustomers);
-router.get('/orders', externalAuth, externalController.getOrders);
-router.get('/invoices', externalAuth, externalController.getInvoices);
-router.get('/catalogues', externalAuth, externalController.getCatalogues);
-router.get('/outstanding', externalAuth, externalController.getOutstanding);
-router.get('/reports', externalAuth, externalController.getReports);
-router.get('/settings', externalAuth, externalController.getSettings);
-router.post('/whatsapp/send', externalAuth, externalController.sendWhatsApp);
-router.post('/order/create', externalAuth, externalController.createOrder);
-router.post('/customer/create', externalAuth, externalController.createCustomer);
+router.get('/products', validateExternalApiKey, externalController.getProducts);
+router.get('/customers', validateExternalApiKey, externalController.getCustomers);
+router.get('/orders', validateExternalApiKey, externalController.getOrders);
+router.get('/invoices', validateExternalApiKey, externalController.getInvoices);
+router.get('/catalogues', validateExternalApiKey, externalController.getCatalogues);
+router.get('/outstanding', validateExternalApiKey, externalController.getOutstanding);
+router.get('/reports', validateExternalApiKey, externalController.getReports);
+router.get('/settings', validateExternalApiKey, externalController.getSettings);
+router.post('/whatsapp/send', validateExternalApiKey, externalController.sendWhatsApp);
+router.post('/order/create', validateExternalApiKey, externalController.createOrder);
+router.post('/customer/create', validateExternalApiKey, externalController.createCustomer);
 
 module.exports = router;

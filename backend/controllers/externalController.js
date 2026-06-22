@@ -123,6 +123,30 @@ exports.regenerateExportCredential = async (req, res, next) => {
   }
 };
 
+// ==========================================
+// PUBLIC HEALTH CHECK FOR SAAS / EXTERNAL LINKS
+// ==========================================
+
+exports.getHealth = async (req, res, next) => {
+  try {
+    let dbStatus = 'connected';
+    try {
+      const connectDB = require('../config/db');
+      await connectDB.sequelize.authenticate();
+    } catch (e) {
+      dbStatus = 'disconnected';
+    }
+    res.json({
+      success: true,
+      service: "AO Core ERP",
+      version: "1.0.0",
+      status: "online",
+      database: dbStatus
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 
 // ==========================================
 // SECURE EXTERNAL DATA EXPORTS (API Key authenticated)
@@ -131,7 +155,7 @@ exports.regenerateExportCredential = async (req, res, next) => {
 exports.getProducts = async (req, res, next) => {
   try {
     const products = await Product.findAll();
-    res.json({ success: true, count: products.length, products });
+    res.json({ success: true, count: products.length, products, data: products });
   } catch (err) {
     next(err);
   }
@@ -140,7 +164,7 @@ exports.getProducts = async (req, res, next) => {
 exports.getCustomers = async (req, res, next) => {
   try {
     const customers = await Customer.findAll();
-    res.json({ success: true, count: customers.length, customers });
+    res.json({ success: true, count: customers.length, customers, data: customers });
   } catch (err) {
     next(err);
   }
@@ -149,7 +173,7 @@ exports.getCustomers = async (req, res, next) => {
 exports.getOrders = async (req, res, next) => {
   try {
     const orders = await Order.findAll();
-    res.json({ success: true, count: orders.length, orders });
+    res.json({ success: true, count: orders.length, orders, data: orders });
   } catch (err) {
     next(err);
   }
@@ -158,7 +182,7 @@ exports.getOrders = async (req, res, next) => {
 exports.getInvoices = async (req, res, next) => {
   try {
     const invoices = await Invoice.findAll();
-    res.json({ success: true, count: invoices.length, invoices });
+    res.json({ success: true, count: invoices.length, invoices, data: invoices });
   } catch (err) {
     next(err);
   }
@@ -168,7 +192,7 @@ exports.getCatalogues = async (req, res, next) => {
   try {
     const tenantId = req.tenantId || 1;
     const catalogues = await IntegrationCatalogue.findAll({ where: { tenantId } });
-    res.json({ success: true, count: catalogues.length, catalogues });
+    res.json({ success: true, count: catalogues.length, catalogues, data: catalogues });
   } catch (err) {
     next(err);
   }
@@ -218,13 +242,19 @@ exports.getOutstanding = async (req, res, next) => {
       }
     }
 
-    // Output requested exact JSON structure
-    res.json({
+    const outputData = {
       customer: customerObj.name,
       totalSales,
       receivedAmount,
       pendingAmount,
       lastPaymentDate
+    };
+
+    // Output standardized data envelope along with legacy keys at root
+    res.json({
+      success: true,
+      ...outputData,
+      data: outputData
     });
   } catch (err) {
     next(err);
@@ -237,14 +267,17 @@ exports.getReports = async (req, res, next) => {
     const totalReceipts = await Payment.sum('amount') || 0;
     const pendingOutstanding = totalSales - totalReceipts;
 
+    const summaryData = {
+      totalSales,
+      totalReceipts,
+      pendingOutstanding,
+      generatedAt: new Date()
+    };
+
     res.json({
       success: true,
-      summary: {
-        totalSales,
-        totalReceipts,
-        pendingOutstanding,
-        generatedAt: new Date()
-      }
+      summary: summaryData,
+      data: summaryData
     });
   } catch (err) {
     next(err);
@@ -254,14 +287,20 @@ exports.getReports = async (req, res, next) => {
 exports.getSettings = async (req, res, next) => {
   try {
     const settings = await Settings.findOne() || await Settings.create({});
-    res.json({
-      success: true,
+    
+    const settingsData = {
       companyName: settings?.companyName || 'Amudhasurabiy Organics',
       address: settings?.address || '',
       phone: settings?.phone || '',
       email: settings?.email || '',
       websiteUrl: settings?.websiteUrl || '',
       gstNumber: settings?.gstNumber || ''
+    };
+
+    res.json({
+      success: true,
+      ...settingsData,
+      data: settingsData
     });
   } catch (err) {
     next(err);
@@ -309,7 +348,8 @@ exports.createOrder = async (req, res, next) => {
     res.status(201).json({
       success: true,
       message: '✓ Order created successfully via developer API.',
-      order
+      order,
+      data: order
     });
   } catch (err) {
     next(err);
@@ -336,7 +376,8 @@ exports.createCustomer = async (req, res, next) => {
     res.status(201).json({
       success: true,
       message: '✓ Customer profile created successfully via developer API.',
-      customer
+      customer,
+      data: customer
     });
   } catch (err) {
     next(err);
