@@ -13,6 +13,8 @@ const normalizeOrigin = (value) => value?.trim().replace(/\/$/, '');
 
 const allowedOrigins = [
   normalizeOrigin(process.env.CLIENT_URL),
+  'https://erp.amudhasurabiy.com',
+  'http://erp.amudhasurabiy.com',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
 ].filter(Boolean);
