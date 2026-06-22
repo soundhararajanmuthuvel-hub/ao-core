@@ -22,6 +22,7 @@ import RoutePlanner from '../pages/RoutePlanner';
 import CustomerVisits from '../pages/CustomerVisits';
 import MobileCatalog from '../pages/MobileCatalog';
 import FieldOrdering from '../pages/FieldOrdering';
+import DeliveryTracking from '../pages/DeliveryTracking';
 import ReviewPortal from '../pages/ReviewPortal';
 import IntegrationsMarketplace from '../pages/IntegrationsMarketplace';
 
