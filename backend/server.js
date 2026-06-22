@@ -104,6 +104,7 @@ app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/sfa', require('./routes/sfaRoutes'));
 app.use('/api/crm', require('./routes/crmRoutes'));
 app.use('/api/migration', require('./routes/migrationRoutes'));
+app.use('/api/whatsapp', require('./routes/whatsappRoutes'));
 
 /* =========================
    PUBLIC REVIEW PORTAL ROUTES

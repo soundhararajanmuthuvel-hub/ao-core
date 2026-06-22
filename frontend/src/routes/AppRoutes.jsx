@@ -34,6 +34,7 @@ import FollowUps from '../pages/FollowUps';
 import CustomerReviews from '../pages/CustomerReviews';
 import CustomerMap from '../pages/CustomerMap';
 import ReEngagement from '../pages/ReEngagement';
+import WhatsAppLogs from '../pages/WhatsAppLogs';
 
 // SFA Pages
 import FieldSalesDashboard from '../pages/FieldSalesDashboard';
@@ -110,6 +111,14 @@ export default function AppRoutes() {
           element={
             <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
               <ReEngagement />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="crm/whatsapp-logs"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager']}>
+              <WhatsAppLogs />
             </RoleRoute>
           }
         />

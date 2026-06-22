@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { customersApi, productsApi, ordersApi, sfaApi, crmApi, aiApi } from '../api';
+import { customersApi, productsApi, ordersApi, sfaApi, crmApi, aiApi, whatsappApi } from '../api';
 import { Brain } from 'lucide-react';
 import AIInsightsModal from '../components/AIInsightsModal';
 import { useToast } from '../context/ToastContext';
@@ -122,6 +122,194 @@ export default function Customers() {
 
   // Mobile list drawer state
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
+  // Customer WhatsApp Reminder Modal states
+  const [remModalOpen, setRemModalOpen] = useState(false);
+  const [remPhone, setRemPhone] = useState('');
+  const [remDocType, setRemDocType] = useState('statement');
+  const [remMessage, setRemMessage] = useState('');
+  const [remSending, setRemSending] = useState(false);
+
+  const openCustomerReminderModal = () => {
+    if (selectedCustomer) {
+      setRemPhone(selectedCustomer.phone || '');
+      setRemDocType('statement');
+      const company = settings?.companyName || 'Amudhasurabiy Organics';
+      const balance = Number(selectedCustomer.balance || 0).toLocaleString('en-IN');
+      const defaultMsg = `Dear ${selectedCustomer.name},\n\nPlease find attached your Outstanding Statement copy. Your total outstanding due is *₹${balance}*.\n\nKindly process the payment at your earliest convenience.\n\nThank you!\n${company}`;
+      setRemMessage(defaultMsg);
+      setRemModalOpen(true);
+    }
+  };
+
+  const handleRemDocTypeChange = (type) => {
+    setRemDocType(type);
+    if (!selectedCustomer) return;
+    const company = settings?.companyName || 'Amudhasurabiy Organics';
+    let msg = '';
+    if (type === 'statement') {
+      const balance = Number(selectedCustomer.balance || 0).toLocaleString('en-IN');
+      msg = `Dear ${selectedCustomer.name},\n\nPlease find attached your Outstanding Statement copy. Your total outstanding due is *₹${balance}*.\n\nKindly process the payment at your earliest convenience.\n\nThank you!\n${company}`;
+    } else {
+      msg = `Dear ${selectedCustomer.name},\n\nPlease find attached your Running Account Ledger Statement copy up to today.\n\nThank you for your business!\n${company}`;
+    }
+    setRemMessage(msg);
+  };
+
+  const getReminderStatementBlob = () => {
+    if (!selectedCustomer) return null;
+    const doc = new jsPDF();
+    
+    doc.setFont('helvetica', 'normal');
+    
+    doc.setFontSize(22);
+    doc.setTextColor(249, 115, 22); // orange-500 (#f97316)
+    doc.text(settings?.companyName || 'Amudhasurabiy Organics', 14, 25);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139); // gray-500
+    doc.text(`GSTIN: ${settings?.gstNumber || 'N/A'}`, 14, 31);
+    doc.text(`Phone: ${settings?.phone || 'N/A'}  |  Email: ${settings?.email || 'N/A'}`, 14, 36);
+    doc.text(`Address: ${settings?.address || 'N/A'}`, 14, 41);
+
+    doc.setDrawColor(226, 232, 240); // border gray
+    doc.setLineWidth(0.5);
+    doc.line(14, 45, 196, 45);
+
+    doc.setFontSize(14);
+    doc.setTextColor(15, 23, 42); // slate-900
+    doc.setFont('helvetica', 'bold');
+    doc.text('PAYMENT REMINDER STATEMENT', 14, 55);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Customer Name: ${selectedCustomer.name}`, 14, 65);
+    doc.text(`Business Name: ${selectedCustomer.businessName || 'N/A'}`, 14, 70);
+    doc.text(`Contact Phone: ${selectedCustomer.phone || 'N/A'}`, 14, 75);
+    doc.text(`Email Address: ${selectedCustomer.email || 'N/A'}`, 14, 80);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Total Outstanding: Rs. ${Number(selectedCustomer.balance).toLocaleString('en-IN')}`, 120, 65);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Reminders Shared: ${selectedCustomer.remindersSent || 0}`, 120, 70);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(51, 65, 85);
+    const reminderMsg = `Dear ${selectedCustomer.name},\nThis is a friendly reminder regarding your outstanding balance of Rs. ${Number(selectedCustomer.balance).toLocaleString('en-IN')} with Amudhasurabiy Organics. We kindly request you to clear the pending invoice balance at your earliest convenience. Thank you for your continued partnership.`;
+    const splitMsg = doc.splitTextToSize(reminderMsg, 182);
+    doc.text(splitMsg, 14, 90);
+
+    const pendingBills = salesHistory.filter(i => i.paymentStatus !== 'paid' && i.status !== 'Cancelled');
+    const tableData = pendingBills.map(item => {
+      const balance = Number(item.grandTotal) - Number(item.amountPaid);
+      const due = item.dueDate ? new Date(item.dueDate) : new Date(item.date);
+      const diffTime = new Date() - due;
+      const daysOverdue = diffTime > 0 ? Math.floor(diffTime / (1000 * 60 * 60 * 24)) : 0;
+      
+      return [
+        item.invoiceNumber,
+        new Date(item.date).toLocaleDateString(),
+        new Date(due).toLocaleDateString(),
+        daysOverdue > 0 ? `${daysOverdue} Days` : 'Not due',
+        `Rs. ${Number(item.grandTotal).toLocaleString('en-IN')}`,
+        `Rs. ${balance.toLocaleString('en-IN')}`
+      ];
+    });
+
+    doc.autoTable({
+      startY: 110,
+      head: [['Invoice No', 'Invoice Date', 'Due Date', 'Overdue Age', 'Total Amount', 'Outstanding']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [249, 115, 22] }, // Orange-500
+      styles: { fontSize: 9 }
+    });
+
+    const finalY = doc.previousAutoTable.finalY + 15;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(100, 116, 139);
+    doc.text('Thank you for your support!', 14, finalY);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(249, 115, 22);
+    doc.text('Amudhasurabiy Organics', 14, finalY + 5);
+
+    return doc.output('blob');
+  };
+
+  const getLedgerBlob = () => {
+    if (!selectedCustomer) return null;
+    const ledger = buildLedger();
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text(settings?.companyName || 'Amudhasurabiy Organics', 14, 20);
+    doc.setFontSize(10);
+    doc.text('Customer Ledger Account Statement', 14, 26);
+    
+    doc.setFontSize(12);
+    doc.text(`Customer Name: ${selectedCustomer.name}`, 14, 36);
+    doc.text(`Business Name: ${selectedCustomer.businessName || 'N/A'}`, 14, 42);
+    doc.text(`Outstanding Balance: Rs. ${Number(selectedCustomer.balance || 0).toLocaleString('en-IN')}`, 14, 48);
+
+    const tableData = ledger.map(item => [
+      new Date(item.date).toLocaleDateString(),
+      item.reference,
+      item.description,
+      item.debit > 0 ? `Rs. ${item.debit.toFixed(2)}` : '',
+      item.credit > 0 ? `Rs. ${item.credit.toFixed(2)}` : '',
+      `Rs. ${item.balance.toFixed(2)}`
+    ]);
+
+    doc.autoTable({
+      startY: 56,
+      head: [['Date', 'Reference', 'Description', 'Debit', 'Credit', 'Running Balance']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: '#ff9800' }
+    });
+
+    return doc.output('blob');
+  };
+
+  const handleSendReminderWhatsApp = async () => {
+    if (!remPhone) {
+      toast('Recipient phone number is required', 'error');
+      return;
+    }
+    setRemSending(true);
+    try {
+      const pdfBlob = remDocType === 'statement' ? getReminderStatementBlob() : getLedgerBlob();
+      const filename = remDocType === 'statement' 
+        ? `Statement_${selectedCustomer.name.replace(/\s+/g, '_')}.pdf`
+        : `Ledger_${selectedCustomer.name.replace(/\s+/g, '_')}.pdf`;
+      
+      const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+      
+      const formData = new FormData();
+      formData.append('pdf', file);
+      formData.append('phone', remPhone);
+      formData.append('message', remMessage);
+      formData.append('customerId', selectedCustomer.id || selectedCustomer._id);
+      formData.append('messageType', 'Outstanding Recovery');
+
+      await whatsappApi.sendPdf(formData);
+      
+      await customersApi.createReminder(selectedCustomer.id || selectedCustomer._id, {
+        channel: 'WhatsApp PDF',
+        invoiceNumber: remDocType === 'statement' ? 'STATEMENT' : 'LEDGER',
+        amount: Number(selectedCustomer.balance)
+      });
+
+      toast(`✓ ${remDocType === 'statement' ? 'Statement' : 'Ledger'} sent successfully via WhatsApp!`, 'success');
+      setRemModalOpen(false);
+      loadCustomer360Details(selectedCustomerId);
+    } catch (err) {
+      console.error(err);
+      toast(err.response?.data?.message || 'Failed to dispatch WhatsApp reminder', 'error');
+    } finally {
+      setRemSending(false);
+    }
+  };
 
   useEffect(() => {
     productsApi.list({ limit: 1000 }).then(res => {
@@ -1173,6 +1361,20 @@ export default function Customers() {
                         ? new Date(paymentsHistory[0].date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) 
                         : 'No payments recorded'}
                     </strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#166534', opacity: 0.8 }}>Credit Days:</span>
+                    <strong>{selectedCustomer.creditDays || 0} Days</strong>
+                  </div>
+                  <div style={{ marginTop: '0.75rem', borderTop: '1px solid #bbf7d0', paddingTop: '0.75rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-success btn-sm btn-block"
+                      style={{ width: '100%', fontWeight: 700, backgroundColor: '#16a34a', borderColor: '#16a34a', color: '#fff' }}
+                      onClick={openCustomerReminderModal}
+                    >
+                      💬 Send WhatsApp Reminder
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2699,6 +2901,81 @@ export default function Customers() {
           settings={settings}
           onClose={() => setReminderModalInvoice(null)}
         />
+      )}
+
+      {/* WhatsApp Statement/Ledger Reminder Modal */}
+      {remModalOpen && (
+        <Modal
+          title="💬 Send Account Reminder Statement"
+          onClose={() => setRemModalOpen(false)}
+          footer={
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', width: '100%' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setRemModalOpen(false)} disabled={remSending}>
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-success" 
+                style={{ backgroundColor: '#10b981', borderColor: '#10b981', color: '#ffffff', minWidth: '120px', fontWeight: 650 }}
+                onClick={handleSendReminderWhatsApp} 
+                disabled={remSending}
+              >
+                {remSending ? 'Sending...' : 'Send WhatsApp'}
+              </button>
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0.5rem' }}>
+            <div className="form-group">
+              <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Recipient Phone Number</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                value={remPhone} 
+                onChange={(e) => setRemPhone(e.target.value)}
+                placeholder="e.g. +919876543210"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Attachment Document Type</label>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                  <input 
+                    type="radio" 
+                    name="remDocType" 
+                    value="statement" 
+                    checked={remDocType === 'statement'} 
+                    onChange={() => handleRemDocTypeChange('statement')} 
+                  />
+                  <span>Outstanding Statement PDF</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                  <input 
+                    type="radio" 
+                    name="remDocType" 
+                    value="ledger" 
+                    checked={remDocType === 'ledger'} 
+                    onChange={() => handleRemDocTypeChange('ledger')} 
+                  />
+                  <span>Running Account Ledger PDF</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>WhatsApp Message Text</label>
+              <textarea 
+                className="form-control" 
+                rows="5"
+                value={remMessage} 
+                onChange={(e) => setRemMessage(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+        </Modal>
       )}
 
     </div>

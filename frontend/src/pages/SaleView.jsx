@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { salesApi, productsApi, customersApi } from '../api';
-import { downloadInvoicePdf } from '../utils/invoicePdf';
+import { salesApi, productsApi, customersApi, whatsappApi } from '../api';
+import { downloadInvoicePdf, getInvoicePdfBlob } from '../utils/invoicePdf';
 import { downloadInvoiceJpg, shareInvoiceWhatsApp } from '../utils/invoiceImage';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -25,6 +25,95 @@ export default function SaleView() {
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [payMethod, setPayMethod] = useState('upi');
   const [payRefNumber, setPayRefNumber] = useState('');
+
+  // WhatsApp dispatch modal state
+  const [waModalOpen, setWaModalOpen] = useState(false);
+  const [waPhone, setWaPhone] = useState('');
+  const [waMessage, setWaMessage] = useState('');
+  const [waAttachPdf, setWaAttachPdf] = useState(true);
+  const [waTemplate, setWaTemplate] = useState('invoice');
+  const [waSending, setWaSending] = useState(false);
+
+  const openWaModal = () => {
+    if (sale) {
+      const defaultPhone = sale.customer?.phone || '';
+      setWaPhone(defaultPhone);
+      const customerName = sale.customer?.name || 'Customer';
+      const invoiceNumber = sale.invoiceNumber;
+      const amount = Number(sale.grandTotal).toLocaleString('en-IN');
+      const company = settings?.companyName || 'Amudhasurabiy Organics';
+      const defaultMsg = `Dear ${customerName},\n\nPlease find attached invoice *${invoiceNumber}* for amount *₹${amount}*.\n\nThank you for your business!\n${company}`;
+      setWaMessage(defaultMsg);
+      setWaTemplate('invoice');
+      setWaAttachPdf(true);
+      setWaModalOpen(true);
+    }
+  };
+
+  const handleTemplateChange = (tmpl) => {
+    setWaTemplate(tmpl);
+    if (!sale) return;
+    const customerName = sale.customer?.name || 'Customer';
+    const invoiceNumber = sale.invoiceNumber;
+    const amount = Number(sale.grandTotal).toLocaleString('en-IN');
+    const dueDate = sale.dueDate ? new Date(sale.dueDate).toLocaleDateString('en-IN') : '';
+    const company = settings?.companyName || 'Amudhasurabiy Organics';
+    const activeShip = sale.shipments && sale.shipments.length > 0 ? sale.shipments[0] : null;
+    const courier = activeShip?.courier || 'our delivery partner';
+    const awb = activeShip?.trackingNumber || 'N/A';
+    const trackingUrl = activeShip?.trackingNumber ? `${window.location.origin}/track/${activeShip.trackingNumber}` : `${window.location.origin}/track`;
+
+    let msg = '';
+    if (tmpl === 'invoice') {
+      msg = `Dear ${customerName},\n\nPlease find attached invoice *${invoiceNumber}* for amount *₹${amount}*.\n\nThank you for your business!\n${company}`;
+    } else if (tmpl === 'reminder') {
+      msg = `Dear ${customerName},\n\nThis is a friendly reminder that invoice *${invoiceNumber}* of amount *₹${amount}* was due on *${dueDate}*.\n\nPlease process the payment at your earliest convenience.\n\nThank you!\n${company}`;
+    } else if (tmpl === 'tracking') {
+      msg = `Dear ${customerName},\n\nYour order against invoice *${invoiceNumber}* has been shipped via *${courier}* with Tracking/AWB *${awb}*.\n\nYou can track your shipment here: ${trackingUrl}\n\nThank you!\n${company}`;
+    } else if (tmpl === 'greeting') {
+      msg = `Dear ${customerName},\n\nWarm greetings from *${company}*! We wish you a prosperous day ahead.\n\nThank you for being our valued partner!`;
+    }
+    setWaMessage(msg);
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!waPhone) {
+      toast('Recipient phone number is required', 'error');
+      return;
+    }
+    setWaSending(true);
+    try {
+      if (waAttachPdf) {
+        const pdfBlob = await getInvoicePdfBlob(sale, settings);
+        const file = new File([pdfBlob], `${sale.invoiceNumber}.pdf`, { type: 'application/pdf' });
+        
+        const formData = new FormData();
+        formData.append('pdf', file);
+        formData.append('phone', waPhone);
+        formData.append('message', waMessage);
+        formData.append('customerId', sale.customerId || sale.customer?.id || '');
+        formData.append('messageType', waTemplate === 'invoice' ? 'Invoice' : (waTemplate === 'reminder' ? 'Payment Reminder' : (waTemplate === 'tracking' ? 'Shipment' : 'Greeting')));
+
+        await whatsappApi.sendPdf(formData);
+        toast('✓ Invoice PDF sent successfully via WhatsApp!', 'success');
+      } else {
+        const payload = {
+          phone: waPhone,
+          message: waMessage,
+          customerId: sale.customerId || sale.customer?.id || '',
+          messageType: waTemplate === 'invoice' ? 'Invoice' : (waTemplate === 'reminder' ? 'Payment Reminder' : (waTemplate === 'tracking' ? 'Shipment' : 'Greeting'))
+        };
+        await whatsappApi.sendText(payload);
+        toast('✓ Message sent successfully via WhatsApp!', 'success');
+      }
+      setWaModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast(err.response?.data?.message || 'Failed to dispatch WhatsApp message', 'error');
+    } finally {
+      setWaSending(false);
+    }
+  };
 
   // Edit Form state
   const [isEditing, setIsEditing] = useState(false);
@@ -576,8 +665,8 @@ export default function SaleView() {
           <button type="button" className="btn btn-secondary" onClick={handleJpg} disabled={!!busy}>
             {busy === 'jpg' ? '…' : 'Download JPG'}
           </button>
-          <button type="button" className="btn btn-whatsapp" onClick={handleWhatsApp} disabled={!!busy}>
-            {busy === 'wa' ? '…' : 'Send WhatsApp'}
+          <button type="button" className="btn btn-whatsapp" onClick={openWaModal} disabled={!!busy}>
+            💬 Send WhatsApp
           </button>
         </div>
       </div>
@@ -1220,6 +1309,134 @@ export default function SaleView() {
               </div>
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp Dispatch Modal */}
+      {waModalOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.45)',
+          backdropFilter: 'blur(6px)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1.5rem'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '16px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            width: '100%',
+            maxWidth: '520px',
+            border: '1px solid #e2e8f0',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid #f1f5f9',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#f8fafc'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                💬 Send WhatsApp Notification
+              </h2>
+              <button 
+                type="button" 
+                onClick={() => setWaModalOpen(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group">
+                <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Recipient Phone Number</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  value={waPhone} 
+                  onChange={(e) => setWaPhone(e.target.value)}
+                  placeholder="e.g. +919876543210"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Message Template</label>
+                <select 
+                  className="form-control" 
+                  value={waTemplate} 
+                  onChange={(e) => handleTemplateChange(e.target.value)}
+                >
+                  <option value="invoice">Invoice Template</option>
+                  <option value="reminder">Payment Reminder Template</option>
+                  <option value="tracking">Shipment Tracking Template</option>
+                  <option value="greeting">Greetings Template</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Message Text</label>
+                <textarea 
+                  className="form-control" 
+                  rows="5"
+                  value={waMessage} 
+                  onChange={(e) => setWaMessage(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input 
+                  type="checkbox" 
+                  id="waAttachPdf" 
+                  checked={waAttachPdf} 
+                  onChange={(e) => setWaAttachPdf(e.target.checked)}
+                />
+                <label htmlFor="waAttachPdf" style={{ fontSize: '0.85rem', fontWeight: 650, cursor: 'pointer', margin: 0 }}>
+                  Attach Invoice PDF document
+                </label>
+              </div>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid #f1f5f9',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '0.75rem',
+              background: '#f8fafc'
+            }}>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => setWaModalOpen(false)}
+                disabled={waSending}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-success" 
+                style={{ backgroundColor: '#10b981', borderColor: '#10b981', color: '#ffffff', minWidth: '120px', fontWeight: 650 }}
+                onClick={handleSendWhatsApp}
+                disabled={waSending}
+              >
+                {waSending ? 'Sending...' : 'Send WhatsApp'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -33,7 +33,8 @@ const loadImage = (url) => {
   });
 };
 
-export async function downloadInvoicePdf(sale, settings) {
+// Core document builder to keep code DRY
+export async function buildInvoicePdfDoc(sale, settings) {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -229,5 +230,15 @@ export async function downloadInvoicePdf(sale, settings) {
   doc.setFontSize(8);
   doc.text('Terms & Conditions: Goods once sold cannot be returned or exchanged.', 14, footerY + 5.5);
 
+  return doc;
+}
+
+export async function downloadInvoicePdf(sale, settings) {
+  const doc = await buildInvoicePdfDoc(sale, settings);
   doc.save(`${sale.invoiceNumber}.pdf`);
+}
+
+export async function getInvoicePdfBlob(sale, settings) {
+  const doc = await buildInvoicePdfDoc(sale, settings);
+  return doc.output('blob');
 }

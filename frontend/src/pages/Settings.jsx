@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
-import { settingsApi, usersApi, integrationsApi, migrationApi, customersApi, salesApi, databaseApi } from '../api';
+import { settingsApi, usersApi, integrationsApi, migrationApi, customersApi, salesApi, databaseApi, whatsappApi } from '../api';
 import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
@@ -29,6 +29,7 @@ export default function SettingsPage() {
   const { darkMode, setDarkMode } = useTheme();
   const { toast } = useToast();
   const { user, logout, updateTourCompleted } = useAuth();
+  const isSuperAdmin = user?.role === 'Super Admin';
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState(tabParam || 'profile');
@@ -92,6 +93,75 @@ export default function SettingsPage() {
   const [userPages, setUserPages] = useState(1);
   const [userModal, setUserModal] = useState(null);
   const [userForm, setUserForm] = useState(emptyUser);
+
+  // WhatsApp Integration states
+  const [waForm, setWaForm] = useState({
+    provider: 'WAHA',
+    apiUrl: 'http://localhost:3000',
+    apiKey: '',
+    instanceId: 'default',
+    webhookUrl: '',
+    status: 'Disconnected'
+  });
+  const [waLoading, setWaLoading] = useState(false);
+  const [waSaving, setWaSaving] = useState(false);
+  const [waTesting, setWaTesting] = useState(false);
+
+  const loadWhatsAppSettings = async () => {
+    setWaLoading(true);
+    try {
+      const { data } = await whatsappApi.getSettings();
+      if (data.success && data.settings) {
+        setWaForm(data.settings);
+      }
+    } catch (err) {
+      console.error('Failed to load WhatsApp settings:', err);
+      toast('Failed to load WhatsApp settings', 'error');
+    } finally {
+      setWaLoading(false);
+    }
+  };
+
+  const saveWhatsAppSettings = async () => {
+    setWaSaving(true);
+    try {
+      const { data } = await whatsappApi.updateSettings(waForm);
+      if (data.success) {
+        toast('WhatsApp Integration configurations saved successfully', 'success');
+        if (data.settings) {
+          setWaForm(prev => ({ ...prev, ...data.settings }));
+        }
+      }
+    } catch (err) {
+      toast(err.response?.data?.message || 'Failed to save WhatsApp settings', 'error');
+    } finally {
+      setWaSaving(false);
+    }
+  };
+
+  const testWhatsAppConnection = async () => {
+    setWaTesting(true);
+    try {
+      await whatsappApi.updateSettings(waForm);
+      const { data } = await whatsappApi.testConnection();
+      if (data.success) {
+        toast('✓ WhatsApp Connection Connected Successfully', 'success');
+      } else {
+        toast(data.message || 'WhatsApp Connection failed', 'error');
+      }
+      loadWhatsAppSettings();
+    } catch (err) {
+      toast(err.response?.data?.message || 'WhatsApp Connection test failed', 'error');
+    } finally {
+      setWaTesting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'whatsapp') {
+      loadWhatsAppSettings();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (settings) {
@@ -549,6 +619,20 @@ export default function SettingsPage() {
           }}
         >
           🔌 Integrations (Woo)
+        </button>
+        <button
+          type="button"
+          className={`rm-tab-btn ${activeTab === 'whatsapp' ? 'active' : ''}`}
+          onClick={() => handleTabChange('whatsapp')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            fontWeight: 600,
+            fontSize: '0.9rem',
+            borderBottom: activeTab === 'whatsapp' ? '3px solid #ff9800' : '3px solid transparent',
+            color: activeTab === 'whatsapp' ? '#ff9800' : '#64748b',
+          }}
+        >
+          💬 WhatsApp Integration
         </button>
         <button
           type="button"
@@ -1825,6 +1909,133 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* WhatsApp Integration Tab */}
+        {activeTab === 'whatsapp' && (
+          <div className="card" style={{ maxWidth: 600, padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              💬 WhatsApp Integration Configurations
+            </h3>
+            <p style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+              Configure your self-hosted WAHA (WhatsApp HTTP API) or third-party WhatsApp Gateway credentials. 
+              Only Super Admin users can modify these settings.
+            </p>
+
+            {waLoading ? <LoadingSpinner /> : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="form-group">
+                  <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>WhatsApp API Provider</label>
+                  <select 
+                    className="form-control" 
+                    value={waForm.provider || 'WAHA'} 
+                    onChange={(e) => setWaForm({ ...waForm, provider: e.target.value })}
+                    disabled={!isSuperAdmin || waSaving}
+                  >
+                    <option value="WAHA">WAHA (WhatsApp HTTP API)</option>
+                    <option value="Evolution API">Evolution API</option>
+                    <option value="UltraMsg">UltraMsg</option>
+                    <option value="Green API">Green API</option>
+                    <option value="Meta Cloud API">Meta Cloud API</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>API Base URL</label>
+                  <input 
+                    type="url"
+                    className="form-control" 
+                    placeholder="e.g. http://localhost:3000"
+                    value={waForm.apiUrl || ''} 
+                    onChange={(e) => setWaForm({ ...waForm, apiUrl: e.target.value })}
+                    disabled={!isSuperAdmin || waSaving}
+                  />
+                  <small style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                    Enter the URL of your WAHA instance or provider gateway endpoint.
+                  </small>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>API Key (Token)</label>
+                  <input 
+                    type="password"
+                    className="form-control" 
+                    placeholder={waForm.apiKey ? '********' : 'Enter API Key / Token'}
+                    value={waForm.apiKey || ''} 
+                    onChange={(e) => setWaForm({ ...waForm, apiKey: e.target.value })}
+                    disabled={!isSuperAdmin || waSaving}
+                  />
+                  <small style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                    Token or Bearer Authorization key for gateway API request header protection.
+                  </small>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>Instance ID / Session Name</label>
+                  <input 
+                    type="text"
+                    className="form-control" 
+                    placeholder="e.g. default"
+                    value={waForm.instanceId || ''} 
+                    onChange={(e) => setWaForm({ ...waForm, instanceId: e.target.value })}
+                    disabled={!isSuperAdmin || waSaving}
+                  />
+                  <small style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                    Unique session name registered inside the WhatsApp provider backend.
+                  </small>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>Webhook URL / Secret (Optional)</label>
+                  <input 
+                    type="text"
+                    className="form-control" 
+                    placeholder="Enter webhook secret or endpoint"
+                    value={waForm.webhookUrl || ''} 
+                    onChange={(e) => setWaForm({ ...waForm, webhookUrl: e.target.value })}
+                    disabled={!isSuperAdmin || waSaving}
+                  />
+                  <small style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                    Used for incoming status confirmations (Sent, Delivered, Read).
+                  </small>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.5rem 0' }}>
+                  <div style={{
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    backgroundColor: waForm.status === 'Connected' ? '#10b981' : '#ef4444'
+                  }}></div>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#4b5563' }}>
+                    Connection Status: {waForm.status || 'Disconnected'}
+                  </span>
+                </div>
+
+                {isSuperAdmin && (
+                  <div style={{ display: 'flex', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem', marginTop: '0.5rem' }}>
+                    <button 
+                      type="button" 
+                      className="btn btn-secondary" 
+                      onClick={testWhatsAppConnection}
+                      disabled={waTesting || waSaving}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    >
+                      {waTesting ? 'Testing...' : '🔌 Test Connection'}
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn btn-primary" 
+                      onClick={saveWhatsAppSettings}
+                      disabled={waSaving || waTesting}
+                    >
+                      {waSaving ? 'Saving...' : '💾 Save Settings'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

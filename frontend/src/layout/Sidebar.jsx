@@ -46,7 +46,8 @@ const menuStructure = [
       { to: '/customers', label: 'Customers', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
       { to: '/crm/customer-map', label: 'Customer Map', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
       { to: '/crm/followups', label: 'Follow Ups', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/crm/re-engagement', label: 'Re-Engagement', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] }
+      { to: '/crm/re-engagement', label: 'Re-Engagement', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
+      { to: '/crm/whatsapp-logs', label: 'Communication Center', roles: ['Super Admin', 'admin', 'Sales Manager'] }
     ]
   },
   {

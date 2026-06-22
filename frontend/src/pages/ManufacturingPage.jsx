@@ -2206,58 +2206,6 @@ function RecipeFormModal({ type, form, setForm, products, rawMaterials, onClose,
   );
 }
 
-      <div className="form-group">
-        <label>Formulation Notes / Instructions</label>
-        <textarea className="form-control" rows={2} value={form.notes || ''} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-      </div>
-
-      <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-          <strong>📝 Recipe Components (Ingredients)</strong>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={addIngredient}>+ Add Ingredient</button>
-        </div>
-        
-        <div style={{ maxHeight: '220px', overflowY: 'auto', paddingRight: '0.25rem' }}>
-          {form.materials?.map((mat, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
-              {isMfg ? (
-                /* Mfg raw material ingredients list */
-                <select style={{ flex: 2 }} className="form-control form-control-sm" value={mat.rawMaterialId} onChange={(e) => handleIngredientChange(idx, 'rawMaterialId', e.target.value)} required>
-                  <option value="">Select Raw Material / Ingredient...</option>
-                  {rawMaterials.map(rm => (
-                    <option key={rm.id} value={rm.id}>{rm.name} ({rm.materialCode}) [Stock: {rm.stock} {rm.unit} | Cost: ₹{Number(rm.purchasePrice || 0).toFixed(1)}/{rm.unit}]</option>
-                  ))}
-                </select>
-              ) : (
-                /* Repack bulk finished product input */
-                <select style={{ flex: 2 }} className="form-control form-control-sm" value={mat.productId} onChange={(e) => handleIngredientChange(idx, 'productId', e.target.value)} required>
-                  <option value="">Select Bulk Source Product...</option>
-                  {products.map(p => (
-                    <option key={p.id || p._id} value={p.id || p._id}>{p.name} ({p.sku}) [Stock: {p.stock} {p.unit} | Cost: ₹{Number(p.purchasePrice || 0).toFixed(1)}/{p.unit}]</option>
-                  ))}
-                </select>
-              )}
-              <input style={{ flex: 1 }} type="number" step="0.0001" className="form-control form-control-sm" placeholder="Quantity needed" value={mat.qty} onChange={(e) => handleIngredientChange(idx, 'qty', Number(e.target.value))} required />
-              <button type="button" className="btn btn-danger btn-sm" style={{ padding: '0.1rem 0.4rem', fontSize: '1rem' }} onClick={() => removeIngredient(idx)} disabled={form.materials.length <= 1}>&times;</button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginTop: '1rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-        <div>
-          <span>Estimated Recipe Cost:</span>
-          <strong style={{ display: 'block', color: '#ff9800', fontSize: '1.1rem', fontWeight: 800 }}>{fmt(modalCost)}</strong>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <span>Cost Per Yield Unit:</span>
-          <strong style={{ display: 'block', color: '#0f172a', fontSize: '1.1rem', fontWeight: 800 }}>{fmt(modalCostPerUnit)}</strong>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 // -------------------------------------------------------------
 // sub-component: EDIT REPACK MODAL
 // -------------------------------------------------------------

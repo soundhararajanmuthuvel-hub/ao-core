@@ -314,7 +314,17 @@ export const crmApi = {
   getReEngagementDashboard: () => client.get('/crm/re-engagement/dashboard'),
   getReEngagementCustomers: (params) => client.get('/crm/re-engagement/customers', { params }),
   triggerAutoFollowUps: () => client.post('/crm/re-engagement/create-tasks'),
-  getReEngagementAiInsights: () => client.get('/crm/re-engagement/ai-insights'),
+  getReEngagementAiInsights: (params) => client.get('/crm/re-engagement/ai-insights', { params }),
+};
+
+export const whatsappApi = {
+  getSettings: () => client.get('/whatsapp/settings'),
+  updateSettings: (data) => client.put('/whatsapp/settings', data),
+  testConnection: () => client.post('/whatsapp/settings/test'),
+  sendPdf: (formData) => client.post('/whatsapp/send-pdf', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  sendText: (data) => client.post('/whatsapp/send-text', data),
+  getLogs: (params) => client.get('/whatsapp/logs', { params }),
+  getStats: () => client.get('/whatsapp/stats')
 };
 
 export const databaseApi = {

@@ -126,6 +126,8 @@ const connectDB = async () => {
   require('../models/Lead');
   require('../models/CrmOpportunity');
   require('../models/AiSuggestion');
+  require('../models/WhatsAppSettings');
+  require('../models/WhatsAppLog');
   require('../models/PackingConversion');
   require('../models/PackingConversionItem');
 

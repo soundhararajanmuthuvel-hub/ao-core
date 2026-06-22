@@ -110,14 +110,30 @@ const startScheduler = () => {
   console.log('[Scheduler] Initializing Customer Re-Engagement background runner (every 1 hour)...');
   setInterval(runReEngagementCheck, 60 * 60 * 1000);
 
+  console.log('[Scheduler] Initializing Auto Payment Reminders background runner (every 1 hour)...');
+  setInterval(runAutoPaymentRemindersCheck, 60 * 60 * 1000);
+
   // Run once shortly after startup
   setTimeout(runReEngagementCheck, 5000);
+  setTimeout(runAutoPaymentRemindersCheck, 10000);
+};
+
+const runAutoPaymentRemindersCheck = async () => {
+  try {
+    console.log('[Scheduler] Running Auto Payment Reminders activity check...');
+    const whatsappService = require('../services/whatsappService');
+    const count = await whatsappService.runAutoPaymentReminders();
+    console.log(`[Scheduler] Auto Payment Reminders run complete: sent ${count} reminders.`);
+  } catch (err) {
+    console.error('[Scheduler] Auto Payment Reminders check failed:', err.message);
+  }
 };
 
 module.exports = {
   startScheduler,
   runAutoSync,
   runTrackingAutoCheck,
-  runReEngagementCheck
+  runReEngagementCheck,
+  runAutoPaymentRemindersCheck
 };
 
