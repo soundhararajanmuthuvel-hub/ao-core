@@ -76,7 +76,7 @@ export default function Login() {
               className="brand-logo-top"
               onError={(e) => {
                 e.target.onerror = null;
-                e.target.src = '/favicon.png';
+                e.target.src = '/default-logo.png';
               }}
             />
             <span className="brand-logo-text-top">AO CORE ERP</span>
@@ -142,7 +142,7 @@ export default function Login() {
                     className="mobile-logo"
                     onError={(e) => {
                       e.target.onerror = null;
-                      e.target.src = '/favicon.png';
+                      e.target.src = '/default-logo.png';
                     }}
                   />
                 <h3>AO CORE ERP</h3>

@@ -601,7 +601,7 @@ export default function Header({ onMenuToggle }) {
                 alt="Logo" 
                 onError={(e) => {
                   e.target.onerror = null;
-                  e.target.src = '/favicon.png';
+                  e.target.src = '/default-logo.png';
                 }}
                 style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain' }} 
               />

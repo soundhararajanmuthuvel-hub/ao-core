@@ -11,27 +11,17 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const normalizeOrigin = (value) => value?.trim().replace(/\/$/, '');
 
-const allowedOrigins = [
-  normalizeOrigin(process.env.CLIENT_URL),
-  'https://erp.amudhasurabiy.com',
-  'http://erp.amudhasurabiy.com',
-  'https://crp.amudhasurabiy.com',
-  'http://crp.amudhasurabiy.com',
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-].filter(Boolean);
-
 const corsOptions = {
-  origin(origin, callback) {
-    // Dynamically match localhost, 127.0.0.1, and local private network subnets (192.168.x.x, 10.x.x.x, 172.16.x.x)
-    const isLocalNetwork = /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+):\d+$/i.test(origin);
-    if (!origin || allowedOrigins.includes(origin) || isLocalNetwork) {
-      return callback(null, true);
-    }
-
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
-  },
+  origin: [
+    "https://erp.amudhasurabiy.com",
+    "https://ao-core.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173"
+  ],
   credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 };
 
 /* =========================
@@ -43,6 +33,7 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.get('/api/assets/company-logo', require('./controllers/settingsController').getCompanyLogoImage);
 
 /* =========================
    ROOT ROUTE

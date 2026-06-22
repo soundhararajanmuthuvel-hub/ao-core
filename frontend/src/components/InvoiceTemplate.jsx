@@ -45,7 +45,7 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
             className="invoice-logo" 
             onError={(e) => {
               e.target.onerror = null;
-              e.target.src = '/favicon.png';
+              e.target.src = '/default-logo.png';
             }}
             style={{ maxHeight: '60px', objectFit: 'contain' }} 
             crossOrigin="anonymous" 

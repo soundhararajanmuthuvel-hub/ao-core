@@ -335,7 +335,7 @@ export default function AppLayout() {
                     alt="Logo"
                     onError={(e) => {
                       e.target.onerror = null;
-                      e.target.src = '/favicon.png';
+                      e.target.src = '/default-logo.png';
                     }}
                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                   />
@@ -470,7 +470,7 @@ export default function AppLayout() {
                   alt="Logo"
                   onError={(e) => {
                     e.target.onerror = null;
-                    e.target.src = '/favicon.png';
+                    e.target.src = '/default-logo.png';
                   }}
                   style={{
                     width: '100%',

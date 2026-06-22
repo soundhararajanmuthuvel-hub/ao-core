@@ -36,6 +36,7 @@ router.post('/settings/test', whatsappController.testConnection);
 // Sending message endpoints
 router.post('/send-pdf', uploadPdf, whatsappController.sendInvoicePdf);
 router.post('/send-text', whatsappController.sendQuickText);
+router.post('/send-document', whatsappController.sendDocument);
 
 // Log monitoring endpoints
 router.get('/logs', whatsappController.getLogs);

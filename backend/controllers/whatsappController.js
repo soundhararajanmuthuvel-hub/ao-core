@@ -141,39 +141,142 @@ exports.testConnection = async (req, res, next) => {
 };
 
 exports.sendInvoicePdf = async (req, res, next) => {
+  const startTime = Date.now();
+  const invoiceId = req.body.invoiceId || req.body.saleId;
+  const customerPhone = req.body.phone || req.body.customerPhone;
+  const messageText = req.body.message || 'Please find attached your invoice.';
+  const customerId = req.body.customerId;
+  const messageType = req.body.messageType || 'Invoice';
+  let pdfPath = req.file ? req.file.path : null;
+
+  const Invoice = require('../models/Invoice');
+  const Customer = require('../models/Customer');
+  const { getSettings } = require('../utils/helpers');
+  const { generateInvoicePdf } = require('../utils/invoiceGenerator');
+
+  let invoice = null;
+  let customer = null;
+
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No PDF file uploaded' });
+    // 1. Fetch Invoice
+    if (invoiceId) {
+      invoice = await Invoice.findByPk(invoiceId, {
+        include: [
+          { model: Customer, as: 'customer' },
+          { association: 'items' }
+        ]
+      });
     }
 
-    const { phone, message, customerId, messageType = 'Invoice' } = req.body;
-    if (!phone) {
-      return res.status(400).json({ message: 'Recipient phone number is required' });
+    if (!invoice && customerId) {
+      invoice = await Invoice.findOne({
+        where: { customerId },
+        order: [['createdAt', 'DESC']],
+        include: [
+          { model: Customer, as: 'customer' },
+          { association: 'items' }
+        ]
+      });
     }
 
-    const tempPath = req.file.path;
-    const finalMessage = message || 'Please find attached your invoice.';
+    if (!invoice && invoiceId) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
 
-    // Send PDF via whatsappService
-    const result = await whatsappService.sendPdf(phone, finalMessage, tempPath, customerId || null, messageType);
+    // 2. Fetch Customer & Phone
+    customer = invoice ? invoice.customer : null;
+    if (!customer && customerId) {
+      customer = await Customer.findByPk(customerId);
+    }
 
-    // Clean up uploaded temporary PDF
-    try {
-      if (fs.existsSync(tempPath)) {
-        fs.unlinkSync(tempPath);
+    const phoneVal = customerPhone || customer?.phone;
+    if (!phoneVal) {
+      return res.status(400).json({ success: false, message: 'Customer phone missing' });
+    }
+
+    // 3. Auto Generate PDF if not exists
+    if (!pdfPath && invoice) {
+      const filename = `${invoice.invoiceNumber}.pdf`;
+      const targetPath = path.join(__dirname, '../uploads/invoices', filename);
+      
+      if (!fs.existsSync(targetPath)) {
+        const settings = await getSettings();
+        await generateInvoicePdf(invoice, settings, targetPath);
       }
-    } catch (cleanupErr) {
-      console.error('Failed to clean up temp invoice PDF:', cleanupErr.message);
+      pdfPath = targetPath;
+    }
+
+    if (!pdfPath || !fs.existsSync(pdfPath)) {
+      return res.status(500).json({ success: false, message: 'PDF generation failed' });
+    }
+
+    // 4. Verify Connection Status & API Authorization
+    const WhatsAppSettings = require('../models/WhatsAppSettings');
+    const settings = await WhatsAppSettings.findOne();
+    const provider = settings ? settings.provider : 'WAHA';
+
+    if (!settings || settings.status !== 'Connected') {
+      return res.status(500).json({ success: false, message: 'WAHA disconnected' });
+    }
+
+    const decryptedApiKey = settings.apiKey ? whatsappService.decrypt(settings.apiKey) : '';
+    if (!decryptedApiKey && settings.provider === 'WAHA' && process.env.NODE_ENV === 'production') {
+      return res.status(401).json({ success: false, message: 'API authentication failed' });
+    }
+
+    // 5. Send PDF
+    let apiResponse = null;
+    let status = 'Success';
+    let errorMsg = null;
+
+    try {
+      const result = await whatsappService.sendPdf(phoneVal, messageText, pdfPath, customer?.id || null, messageType);
+      apiResponse = result;
+    } catch (err) {
+      status = 'Failed';
+      errorMsg = err.message;
+      console.error('[WhatsApp send-pdf] Provider Send Error:', err.message);
+    }
+
+    // Console Logging (Detailed)
+    console.log({
+      invoiceId: invoice?.id || invoiceId || null,
+      customerPhone: phoneVal,
+      pdfPath,
+      provider,
+      apiResponse
+    });
+
+    // Write Log to backend/logs/whatsapp.log
+    const logDir = path.join(__dirname, '../logs');
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    const logPath = path.join(logDir, 'whatsapp.log');
+    const logLine = `${new Date().toISOString()} | Customer: ${customer?.name || 'Unknown'} | Invoice: ${invoice?.invoiceNumber || 'N/A'} | Phone: ${phoneVal} | Provider: ${provider} | Status: ${status} | Error: ${errorMsg || 'None'}\n`;
+    fs.appendFileSync(logPath, logLine);
+
+    // Cleanup temp Multer files
+    if (req.file && req.file.path) {
+      try {
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+      } catch (_) {}
+    }
+
+    if (status === 'Failed') {
+      return res.status(500).json({ success: false, message: 'WhatsApp provider error', error: errorMsg });
     }
 
     res.json({
       success: true,
       message: 'Invoice PDF sent successfully via WhatsApp.',
-      messageId: result.messageId,
-      logId: result.logId
+      messageId: apiResponse?.messageId || 'sent',
+      logId: apiResponse?.logId || null
     });
+
   } catch (err) {
-    // Attempt temp file cleanup on error
     if (req.file && req.file.path) {
       try {
         if (fs.existsSync(req.file.path)) {
@@ -182,6 +285,102 @@ exports.sendInvoicePdf = async (req, res, next) => {
       } catch (_) {}
     }
     next(err);
+  }
+};
+
+exports.sendDocument = async (req, res, next) => {
+  const { phone, fileUrl, caption, fileName } = req.body;
+  if (!phone || !fileUrl) {
+    return res.status(400).json({ success: false, message: 'Recipient phone number and file URL are required' });
+  }
+
+  const WhatsAppSettings = require('../models/WhatsAppSettings');
+  const settings = await WhatsAppSettings.findOne();
+  const provider = settings ? settings.provider : 'WAHA';
+
+  if (!settings || settings.status !== 'Connected') {
+    return res.status(500).json({ success: false, message: 'WAHA disconnected' });
+  }
+
+  let localPath = null;
+  let isTemp = false;
+
+  try {
+    if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+      const tempDir = path.join(__dirname, '../uploads/temp');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      const ext = path.extname(fileName || fileUrl) || '.pdf';
+      localPath = path.join(tempDir, `doc-${Date.now()}${ext}`);
+      
+      const response = await axios({
+        method: 'get',
+        url: fileUrl,
+        responseType: 'stream',
+        timeout: 15000
+      });
+      
+      const writer = fs.createWriteStream(localPath);
+      response.data.pipe(writer);
+      
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+      });
+      isTemp = true;
+    } else {
+      const cleanPath = fileUrl.startsWith('/') ? fileUrl.substring(1) : fileUrl;
+      localPath = path.resolve(__dirname, '..', cleanPath);
+      if (!fs.existsSync(localPath)) {
+        return res.status(404).json({ success: false, message: `Local document file not found` });
+      }
+    }
+
+    const ext = path.extname(fileName || fileUrl).toLowerCase();
+    let mimetype = 'application/pdf';
+    if (ext === '.png') mimetype = 'image/png';
+    else if (ext === '.jpg' || ext === '.jpeg') mimetype = 'image/jpeg';
+    else if (ext === '.xlsx') mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+    const jid = whatsappService.formatJid(phone);
+    const fileBuffer = fs.readFileSync(localPath);
+    const base64Data = fileBuffer.toString('base64');
+    
+    const payload = {
+      chatId: jid,
+      caption: caption || '',
+      file: {
+        mimetype,
+        filename: fileName || path.basename(localPath),
+        data: base64Data
+      }
+    };
+
+    const response = await whatsappService.makeProviderRequest('/api/sendFile', payload, settings);
+
+    await WhatsAppLog.create({
+      mobile: phone,
+      messageType: 'Document',
+      messageText: `${caption || ''} (Attachment: ${fileName || 'file'})`,
+      status: 'Sent'
+    });
+
+    res.json({
+      success: true,
+      message: 'Document sent successfully via WhatsApp.',
+      messageId: response.data?.id || 'sent'
+    });
+
+  } catch (err) {
+    console.error('[WhatsApp send-document] error:', err.message);
+    res.status(500).json({ success: false, message: 'WhatsApp provider error', error: err.message });
+  } finally {
+    if (isTemp && localPath && fs.existsSync(localPath)) {
+      try {
+        fs.unlinkSync(localPath);
+      } catch (_) {}
+    }
   }
 };
 
@@ -329,12 +528,10 @@ exports.webhookReceiver = async (req, res, next) => {
   try {
     console.log('--- WhatsApp Webhook received ---', JSON.stringify(req.body));
     
-    // WAHA status webhook details:
-    // Event can be: message.ack or message.status
-    // Body layout: { event: "message.ack", payload: { id: "...", ack: 2 } }
-    // ack levels: 1 = sent, 2 = delivered, 3 = read, 4 = played
     const { event, payload } = req.body;
-    if (payload && payload.id) {
+    
+    // 1. Process Message Status Acknowledgements
+    if (payload && payload.id && (event === 'message.ack' || event === 'message.status')) {
       const msgId = payload.id;
       const ack = payload.ack;
       
@@ -343,14 +540,84 @@ exports.webhookReceiver = async (req, res, next) => {
       if (ack === 3 || ack === 4) mappedStatus = 'Read';
 
       if (mappedStatus) {
-        // Query log record using message ID. Since log messageId is returned on sending,
-        // we can check if it exists in error/notes or log index.
-        // For simple lookup, since it is a WAHA mock or webhook, we can query by mobile or status
-        // OR we match status directly.
-        // Let's check: WhatsAppLog stores the message log. If we map a webhook message identifier
-        // we should record provider messageId in WhatsAppLog.
-        // Let's query by mobile number matching if needed, or by status
         console.log(`Webhook matched message update: ${msgId} status is ${mappedStatus}`);
+      }
+    }
+
+    // 2. Chatbot Auto-responder for Customer Messages
+    if (payload && (event === 'message' || event === 'message.create' || event === 'message.received')) {
+      const msg = payload;
+      const text = (msg.body || msg.text || '').trim();
+      // Extract clean phone number without @c.us suffix
+      const fromPhone = msg.from ? msg.from.split('@')[0] : '';
+      
+      if (text && fromPhone) {
+        const lowerText = text.toLowerCase();
+        
+        // Auto Card Trigger: "Show [Product Name]"
+        if (lowerText.startsWith('show ')) {
+          const productName = text.substring(5).trim();
+          const Product = require('../models/Product');
+          const product = await Product.findOne({
+            where: {
+              name: { [Op.like]: `%${productName}%` }
+            }
+          });
+
+          if (product) {
+            const cardMsg = `🌟 *PRODUCT CARD* 🌟
+----------------------------------
+*Name:* ${product.name}
+*Price:* Rs. ${Number(product.sellingPrice || product.price || 0).toFixed(2)}
+*Stock:* ${product.stock > 0 ? `🟢 In Stock (${Math.round(product.stock)} items)` : '🔴 Out of Stock'}
+${product.benefits ? `\n*Benefits:* ${product.benefits}` : ''}
+${product.ingredients ? `\n*Ingredients:* ${product.ingredients}` : ''}
+${product.description ? `\n*Description:* ${product.description}` : ''}
+----------------------------------
+Amudhasurabiy Organics`;
+
+            try {
+              if (product.image) {
+                const cleanImgPath = product.image.startsWith('/') ? product.image.substring(1) : product.image;
+                const imagePath = path.resolve(__dirname, '..', cleanImgPath);
+                
+                if (fs.existsSync(imagePath)) {
+                  await whatsappService.sendImage(fromPhone, cardMsg, imagePath, null, 'Chatbot Card');
+                } else {
+                  await whatsappService.sendMessage(fromPhone, cardMsg, null, 'Chatbot Card');
+                }
+              } else {
+                await whatsappService.sendMessage(fromPhone, cardMsg, null, 'Chatbot Card');
+              }
+            } catch (replyErr) {
+              console.error('Failed to send product card reply:', replyErr.message);
+            }
+          } else {
+            const notFoundMsg = `Sorry, we couldn't find any product matching "${productName}" in our catalog.`;
+            try {
+              await whatsappService.sendMessage(fromPhone, notFoundMsg, null, 'Chatbot Card');
+            } catch (replyErr) {
+              console.error('Failed to send not-found reply:', replyErr.message);
+            }
+          }
+        } else {
+          // General AI responder using Gemini if key is set
+          if (process.env.GEMINI_API_KEY) {
+            try {
+              const aiController = require('./aiController');
+              const prompt = `
+                A customer sent the following message on WhatsApp: "${text}".
+                
+                Reply back as the AO AI Assistant for Amudhasurabiy Organics. 
+                Keep the response concise (under 2-3 sentences), helpful, friendly, and in pure text format.
+              `;
+              const replyText = await aiController.callGemini(prompt);
+              await whatsappService.sendMessage(fromPhone, replyText, null, 'AI Chatbot Auto Reply');
+            } catch (aiErr) {
+              console.error('AI webhook responder failed:', aiErr.message);
+            }
+          }
+        }
       }
     }
 

@@ -97,6 +97,7 @@ export const settingsApi = {
   update: (data) => client.put('/settings', data),
   uploadLogo: (formData) => client.post('/settings/logo', formData),
   uploadWpLogo: (formData) => client.post('/settings/upload-wp-logo', formData),
+  getLogo: () => client.get('/settings/logo'),
 };
 
 export const analyticsApi = {
@@ -231,7 +232,19 @@ export const aiApi = {
 };
 
 export const integrationsApi = {
-  testConnection: () => client.post('/integrations/test-connection'),
+  list: () => client.get('/integrations'),
+  create: (data) => client.post('/integrations', data),
+  update: (id, data) => client.put(`/integrations/${id}`, data),
+  remove: (id) => client.delete(`/integrations/${id}`),
+  testConnection: (data) => client.post('/integrations/test', data),
+  sync: (data) => client.post('/integrations/sync', data),
+  getLogs: (params) => client.get('/integrations/logs', { params }),
+  getMappings: (params) => client.get('/integrations/mappings', { params }),
+  saveMappings: (data) => client.post('/integrations/mappings', data),
+  getStats: () => client.get('/integrations/stats'),
+  
+  // Legacy WooCommerce endpoints (kept for compatibility)
+  testWooConnection: () => client.post('/integrations/test-connection'),
   connect: (data) => client.post('/integrations/connect', data),
   syncProducts: () => client.post('/integrations/sync/products'),
   importProducts: () => client.post('/integrations/sync/products-import'),
@@ -240,7 +253,7 @@ export const integrationsApi = {
   syncInventory: () => client.post('/integrations/sync/inventory'),
   syncAll: () => client.post('/integrations/sync/all'),
   forceRefreshWooProduct: (id) => client.post(`/integrations/sync/product/${id}`),
-  getStats: () => client.get('/integrations/stats'),
+  getWooStats: () => client.get('/integrations/woo-stats'),
   disconnect: () => client.post('/integrations/disconnect'),
   getSyncLogs: (params) => client.get('/integrations/sync-logs', { params }),
 };
@@ -323,6 +336,7 @@ export const whatsappApi = {
   testConnection: () => client.post('/whatsapp/settings/test'),
   sendPdf: (formData) => client.post('/whatsapp/send-pdf', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   sendText: (data) => client.post('/whatsapp/send-text', data),
+  sendDocument: (data) => client.post('/whatsapp/send-document', data),
   getLogs: (params) => client.get('/whatsapp/logs', { params }),
   getStats: () => client.get('/whatsapp/stats')
 };

@@ -1084,7 +1084,7 @@ export default function OrderNoting() {
                         alt="Logo"
                         onError={(e) => {
                           e.target.onerror = null;
-                          e.target.src = '/favicon.png';
+                          e.target.src = '/default-logo.png';
                         }}
                         style={{
                           height: isCompact ? '38px' : '52px',

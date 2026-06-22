@@ -22,8 +22,8 @@ import RoutePlanner from '../pages/RoutePlanner';
 import CustomerVisits from '../pages/CustomerVisits';
 import MobileCatalog from '../pages/MobileCatalog';
 import FieldOrdering from '../pages/FieldOrdering';
-import DeliveryTracking from '../pages/DeliveryTracking';
 import ReviewPortal from '../pages/ReviewPortal';
+import IntegrationsMarketplace from '../pages/IntegrationsMarketplace';
 
 // CRM Pages
 import CrmDashboard from '../pages/CrmDashboard';
@@ -264,6 +264,14 @@ export default function AppRoutes() {
           element={
             <RoleRoute roles={['Super Admin']}>
               <Settings />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="settings/integrations-marketplace"
+          element={
+            <RoleRoute roles={['Super Admin']}>
+              <IntegrationsMarketplace />
             </RoleRoute>
           }
         />

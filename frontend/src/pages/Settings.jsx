@@ -106,6 +106,9 @@ export default function SettingsPage() {
   const [waLoading, setWaLoading] = useState(false);
   const [waSaving, setWaSaving] = useState(false);
   const [waTesting, setWaTesting] = useState(false);
+  const [showWaErrorModal, setShowWaErrorModal] = useState(false);
+  const [waLastTestResult, setWaLastTestResult] = useState(null);
+  const [waErrorDetails, setWaErrorDetails] = useState('');
 
   const loadWhatsAppSettings = async () => {
     setWaLoading(true);
@@ -141,17 +144,33 @@ export default function SettingsPage() {
 
   const testWhatsAppConnection = async () => {
     setWaTesting(true);
+    setWaLastTestResult(null);
+    setWaErrorDetails('');
     try {
       await whatsappApi.updateSettings(waForm);
       const { data } = await whatsappApi.testConnection();
       if (data.success) {
         toast('✓ WhatsApp Connection Connected Successfully', 'success');
+        setWaLastTestResult({ success: true, message: 'Connected successfully to WhatsApp session.' });
       } else {
         toast(data.message || 'WhatsApp Connection failed', 'error');
+        setWaLastTestResult({ success: false, message: data.message || 'Verification failed. WhatsApp session not initialized.' });
+        setWaErrorDetails(data.details || data.message || 'Verification failed. Make sure your WhatsApp session in WAHA is active and QR code is scanned.');
+        setShowWaErrorModal(true);
       }
       loadWhatsAppSettings();
     } catch (err) {
-      toast(err.response?.data?.message || 'WhatsApp Connection test failed', 'error');
+      const errMsg = err.response?.data?.message || 'WhatsApp Connection test failed';
+      toast(errMsg, 'error');
+      setWaLastTestResult({ success: false, message: errMsg });
+      setWaErrorDetails(
+        err.response?.data?.details || 
+        err.response?.data?.error || 
+        JSON.stringify(err.response?.data) || 
+        err.message || 
+        'Could not reach self-hosted WAHA server. Make sure docker is running and url is correct.'
+      );
+      setShowWaErrorModal(true);
     } finally {
       setWaTesting(false);
     }
@@ -2001,16 +2020,63 @@ export default function SettingsPage() {
                   </small>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.5rem 0' }}>
-                  <div style={{
-                    width: '12px',
-                    height: '12px',
-                    borderRadius: '50%',
-                    backgroundColor: waForm.status === 'Connected' ? '#10b981' : '#ef4444'
-                  }}></div>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#4b5563' }}>
-                    Connection Status: {waForm.status || 'Disconnected'}
-                  </span>
+                {/* Premium WhatsApp Connection Status Card */}
+                <div style={{
+                  background: waForm.status === 'Connected' 
+                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05))' 
+                    : 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.05))',
+                  border: waForm.status === 'Connected' 
+                    ? '1px solid rgba(16, 185, 129, 0.2)' 
+                    : '1px solid rgba(239, 68, 68, 0.2)',
+                  borderRadius: '12px',
+                  padding: '1.25rem',
+                  marginTop: '0.5rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '1.5rem' }}>{waForm.status === 'Connected' ? '✅' : '❌'}</span>
+                      <strong style={{ fontSize: '0.95rem', color: '#1e293b' }}>
+                        WhatsApp Gateway: {waForm.status === 'Connected' ? 'Connected & Active' : 'Disconnected'}
+                      </strong>
+                    </div>
+                    {waForm.status !== 'Connected' && (
+                      <button
+                        type="button"
+                        onClick={() => setShowWaErrorModal(true)}
+                        style={{
+                          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                          color: '#ef4444',
+                          border: '1px solid rgba(239, 68, 68, 0.2)',
+                          padding: '0.35rem 0.75rem',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ⚠️ View Details
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#475569' }}>
+                    <strong>Instance ID:</strong> {waForm.instanceId || 'N/A'} | <strong>Provider:</strong> {waForm.provider || 'WAHA'}
+                  </div>
+                  {waLastTestResult && (
+                    <div style={{ 
+                      fontSize: '0.8rem', 
+                      backgroundColor: 'rgba(255, 255, 255, 0.5)', 
+                      padding: '0.5rem', 
+                      borderRadius: '6px', 
+                      border: '1px solid rgba(0,0,0,0.05)',
+                      color: waLastTestResult.success ? '#16a34a' : '#dc2626'
+                    }}>
+                      <strong>Last Connection Attempt Result:</strong> {waLastTestResult.message || (waLastTestResult.success ? 'Success' : 'Failed')}
+                    </div>
+                  )}
                 </div>
 
                 {isSuperAdmin && (
@@ -2226,6 +2292,63 @@ export default function SettingsPage() {
               )}
             </>
           )}
+        </Modal>
+      )}
+
+      {/* WhatsApp Connection Error Modal */}
+      {showWaErrorModal && (
+        <Modal
+          title="💬 WhatsApp Connection Diagnostic Details"
+          onClose={() => setShowWaErrorModal(false)}
+          footer={
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setShowWaErrorModal(false)}
+            >
+              Close
+            </button>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '1rem', color: '#991b1b' }}>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontWeight: 700, fontSize: '0.95rem' }}>⚠️ GATEWAY CONNECTION FAILURE</h4>
+              <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: '1.4' }}>
+                AO Core ERP tried to communicate with the self-hosted WhatsApp API server but the request was unsuccessful or returned an error state.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <strong style={{ fontSize: '0.9rem', color: '#334155' }}>Diagnostic Steps to Resolve:</strong>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.85rem', color: '#4b5563' }}>
+                <div>1. 🐳 <strong>Check WAHA Docker:</strong> Ensure that the Docker container for WhatsApp HTTP API is active (`docker ps`).</div>
+                <div>2. 🔗 <strong>Verify URL:</strong> Confirm that the URL `{waForm.apiUrl}` is accessible from the server host.</div>
+                <div>3. 📱 <strong>Scan QR Code:</strong> Access the WAHA Web Dashboard and ensure your phone is authenticated and session `{waForm.instanceId}` is marked as `SCAN_QR_CODE` or `CONNECTED`.</div>
+                <div>4. 🔑 <strong>Auth Key:</strong> Check if a protection API key was configured on the container and verify matches the settings.</div>
+              </div>
+            </div>
+
+            {waErrorDetails && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <strong style={{ fontSize: '0.9rem', color: '#334155' }}>Error Message / Stack Trace:</strong>
+                <pre style={{
+                  backgroundColor: '#0f172a',
+                  color: '#38bdf8',
+                  padding: '1rem',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  fontFamily: 'monospace',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  margin: 0,
+                  maxHeight: '200px',
+                  overflowY: 'auto'
+                }}>
+                  {waErrorDetails}
+                </pre>
+              </div>
+            )}
+          </div>
         </Modal>
       )}
     </div>

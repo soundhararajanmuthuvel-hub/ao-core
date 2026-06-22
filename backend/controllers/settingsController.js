@@ -75,3 +75,66 @@ exports.uploadLogoToWordPress = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getSettingsLogo = async (req, res, next) => {
+  try {
+    const settings = await getSettings();
+    res.json({
+      logo: settings.logoUrl || settings.logo || "https://amudhasurabiy.com/wp-content/uploads/2026/05/logo.jpg"
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getCompanyLogoImage = async (req, res, next) => {
+  try {
+    const settings = await getSettings();
+    const logoUrl = settings.logoUrl || settings.logo || "https://amudhasurabiy.com/wp-content/uploads/2026/05/logo.jpg";
+
+    const cacheDir = path.join(__dirname, '../uploads');
+    if (!fs.existsSync(cacheDir)) {
+      fs.mkdirSync(cacheDir, { recursive: true });
+    }
+    const cachePath = path.join(cacheDir, 'company-logo-cached.jpg');
+
+    if (logoUrl.startsWith('/uploads') || logoUrl.startsWith('uploads')) {
+      const cleanPath = logoUrl.startsWith('/') ? logoUrl.substring(1) : logoUrl;
+      const localPath = path.join(__dirname, '..', cleanPath);
+      if (fs.existsSync(localPath)) {
+        res.setHeader('Content-Type', 'image/jpeg');
+        return res.sendFile(localPath);
+      }
+    }
+
+    try {
+      const response = await axios({
+        method: 'get',
+        url: logoUrl,
+        responseType: 'stream',
+        timeout: 5000
+      });
+
+      res.setHeader('Content-Type', 'image/jpeg');
+
+      const fileStream = fs.createWriteStream(cachePath);
+      response.data.pipe(fileStream);
+      response.data.pipe(res);
+    } catch (downloadErr) {
+      console.error('Failed to download logo server-side:', downloadErr.message);
+      if (fs.existsSync(cachePath)) {
+        res.setHeader('Content-Type', 'image/jpeg');
+        return res.sendFile(cachePath);
+      }
+      
+      const defaultPath = path.join(__dirname, '../uploads/default-logo.png');
+      if (fs.existsSync(defaultPath)) {
+        res.setHeader('Content-Type', 'image/png');
+        return res.sendFile(defaultPath);
+      }
+      return res.status(404).send('Logo not found');
+    }
+  } catch (err) {
+    next(err);
+  }
+};

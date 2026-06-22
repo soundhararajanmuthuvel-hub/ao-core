@@ -130,6 +130,15 @@ const connectDB = async () => {
   require('../models/WhatsAppLog');
   require('../models/PackingConversion');
   require('../models/PackingConversionItem');
+  require('../models/IntegrationConnection');
+  require('../models/IntegrationLog');
+  require('../models/IntegrationSyncJob');
+  require('../models/IntegrationWebhook');
+  require('../models/IntegrationFieldMapping');
+  require('../models/IntegrationProduct');
+  require('../models/IntegrationCustomer');
+  require('../models/IntegrationOrder');
+  require('../models/IntegrationCatalogue');
 
   const shouldAlter = false;
   await dropStaleSqliteBackupTables();

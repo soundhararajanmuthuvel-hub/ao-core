@@ -102,11 +102,15 @@ const menuStructure = [
     roles: ['Super Admin', 'admin', 'Sales Manager']
   },
   {
-    type: 'link',
-    to: '/settings',
+    type: 'group',
+    id: 'settings',
     icon: SettingsIcon,
     label: 'Settings',
-    roles: ['Super Admin', 'admin']
+    roles: ['Super Admin', 'admin'],
+    children: [
+      { to: '/settings', label: 'General Settings', roles: ['Super Admin', 'admin'] },
+      { to: '/settings/integrations-marketplace', label: 'Integrations Marketplace', roles: ['Super Admin', 'admin'] }
+    ]
   },
   {
     type: 'link',
@@ -251,7 +255,7 @@ export default function Sidebar({ collapsed, open, onClose }) {
               className="brand-logo-img"
               onError={(e) => {
                 e.target.onerror = null;
-                e.target.src = '/favicon.png';
+                e.target.src = '/default-logo.png';
               }}
             />
           </div>

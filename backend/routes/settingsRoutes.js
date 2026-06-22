@@ -3,7 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/role');
 const { uploadLogo } = require('../middleware/upload');
-const { getSettings, updateSettings, uploadLogo: uploadLogoCtrl, uploadLogoToWordPress } = require('../controllers/settingsController');
+const { getSettings, updateSettings, uploadLogo: uploadLogoCtrl, uploadLogoToWordPress, getSettingsLogo } = require('../controllers/settingsController');
 const {
   getCounts,
   verifyPassword,
@@ -21,6 +21,7 @@ const isSuperAdmin = (req, res, next) => {
   next();
 };
 
+router.get('/logo', getSettingsLogo);
 router.get('/', getSettings);
 router.put('/', auth, authorize('admin'), updateSettings);
 router.post('/logo', auth, authorize('admin'), uploadLogo, uploadLogoCtrl);

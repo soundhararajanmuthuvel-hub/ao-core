@@ -100,6 +100,119 @@ const runReEngagementCheck = async () => {
   }
 };
 
+const runAutoPaymentRemindersCheck = async () => {
+  try {
+    console.log('[Scheduler] Running Auto Payment Reminders activity check...');
+    const whatsappService = require('../services/whatsappService');
+    const count = await whatsappService.runAutoPaymentReminders();
+    console.log(`[Scheduler] Auto Payment Reminders run complete: sent ${count} reminders.`);
+  } catch (err) {
+    console.error('[Scheduler] Auto Payment Reminders check failed:', err.message);
+  }
+};
+
+const processIntegrationJobs = async () => {
+  try {
+    const IntegrationSyncJob = require('../models/IntegrationSyncJob');
+    const integrationController = require('../controllers/integrationController');
+
+    const job = await IntegrationSyncJob.findOne({
+      where: { status: 'Pending' },
+      order: [['createdAt', 'ASC']]
+    });
+
+    if (job) {
+      console.log(`[Queue Worker] Processing integration sync job ${job.id} for connection ${job.connectionId} (${job.entityType})...`);
+      
+      job.status = 'Processing';
+      job.startedAt = new Date();
+      await job.save();
+
+      const req = {
+        body: {
+          id: job.connectionId,
+          entityTypes: [job.entityType]
+        },
+        user: { tenantId: job.tenantId || 1 }
+      };
+
+      const res = {
+        json(data) {
+          console.log(`[Queue Worker] Job ${job.id} completed successfully.`);
+        },
+        status(code) {
+          console.error(`[Queue Worker] Job ${job.id} failed with code ${code}`);
+          return this;
+        }
+      };
+
+      const next = (err) => {
+        if (err) {
+          console.error(`[Queue Worker] Job ${job.id} failed:`, err.message);
+        }
+      };
+
+      await integrationController.syncNow(req, res, next);
+    }
+  } catch (err) {
+    console.error('[Queue Worker] Error running processIntegrationJobs:', err.message);
+  }
+};
+
+const checkAndEnqueueScheduledJobs = async () => {
+  try {
+    const IntegrationConnection = require('../models/IntegrationConnection');
+    const IntegrationSyncJob = require('../models/IntegrationSyncJob');
+    const { Op } = require('sequelize');
+
+    const connections = await IntegrationConnection.findAll({
+      where: {
+        syncFrequency: { [Op.ne]: 'Manual' }
+      }
+    });
+
+    for (const conn of connections) {
+      const freq = conn.syncFrequency;
+      let intervalMs = 60 * 60 * 1000; // Hourly
+      if (freq === 'Daily') intervalMs = 24 * 60 * 60 * 1000;
+      if (freq === 'Weekly') intervalMs = 7 * 24 * 60 * 60 * 1000;
+      if (freq === 'Realtime') intervalMs = 5 * 60 * 1000;
+
+      const lastSync = conn.lastSyncTime ? new Date(conn.lastSyncTime) : new Date(0);
+      const now = new Date();
+      
+      if (now - lastSync >= intervalMs) {
+        console.log(`[Scheduler] Enqueuing scheduled sync jobs for connection ${conn.name} (Frequency: ${freq})`);
+        
+        const entities = ['Product', 'Customer', 'Order', 'Catalogue'];
+        for (const entityType of entities) {
+          const exists = await IntegrationSyncJob.findOne({
+            where: {
+              connectionId: conn.id,
+              entityType,
+              status: 'Pending'
+            }
+          });
+          if (!exists) {
+            await IntegrationSyncJob.create({
+              connectionId: conn.id,
+              entityType,
+              status: 'Pending',
+              triggerType: 'Scheduled',
+              tenantId: conn.tenantId
+            });
+          }
+        }
+
+        conn.lastSyncTime = now;
+        await conn.save();
+      }
+    }
+  } catch (err) {
+    console.error('[Scheduler] Error enqueuing scheduled jobs:', err.message);
+  }
+};
+
 const startScheduler = () => {
   console.log('[Scheduler] Initializing WooCommerce background auto-sync runner (every 1 minute)...');
   setInterval(runAutoSync, 60 * 1000);
@@ -113,20 +226,16 @@ const startScheduler = () => {
   console.log('[Scheduler] Initializing Auto Payment Reminders background runner (every 1 hour)...');
   setInterval(runAutoPaymentRemindersCheck, 60 * 60 * 1000);
 
+  console.log('[Scheduler] Initializing Integrations scheduled jobs checker (every 1 minute)...');
+  setInterval(checkAndEnqueueScheduledJobs, 60 * 1000);
+
+  console.log('[Scheduler] Initializing Integrations queue worker loop (every 15 seconds)...');
+  setInterval(processIntegrationJobs, 15 * 1000);
+
   // Run once shortly after startup
   setTimeout(runReEngagementCheck, 5000);
   setTimeout(runAutoPaymentRemindersCheck, 10000);
-};
-
-const runAutoPaymentRemindersCheck = async () => {
-  try {
-    console.log('[Scheduler] Running Auto Payment Reminders activity check...');
-    const whatsappService = require('../services/whatsappService');
-    const count = await whatsappService.runAutoPaymentReminders();
-    console.log(`[Scheduler] Auto Payment Reminders run complete: sent ${count} reminders.`);
-  } catch (err) {
-    console.error('[Scheduler] Auto Payment Reminders check failed:', err.message);
-  }
+  setTimeout(checkAndEnqueueScheduledJobs, 15000);
 };
 
 module.exports = {
@@ -134,6 +243,8 @@ module.exports = {
   runAutoSync,
   runTrackingAutoCheck,
   runReEngagementCheck,
-  runAutoPaymentRemindersCheck
+  runAutoPaymentRemindersCheck,
+  checkAndEnqueueScheduledJobs,
+  processIntegrationJobs
 };
 
