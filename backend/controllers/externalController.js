@@ -37,13 +37,19 @@ const filterTenant = (model, where, tenantId) => {
 
 // Generic query parser for search, sort, filter, paginate
 const parseQueryParams = (req, searchFields = [], model = null) => {
-  const { page = 1, limit = 10, search, sortBy, sortOrder = 'DESC', startDate, endDate, status, ...filters } = req.query;
+  const { page = 1, limit = 10, search, sortBy, sortOrder = 'DESC', startDate, endDate, status, updated_since, ...filters } = req.query;
   let where = {};
 
   if (startDate || endDate) {
     where.createdAt = {};
     if (startDate) where.createdAt[Op.gte] = new Date(startDate);
     if (endDate) where.createdAt[Op.lte] = new Date(endDate);
+  }
+
+  if (updated_since) {
+    where.updatedAt = {
+      [Op.gte]: new Date(updated_since)
+    };
   }
 
   if (status) {
