@@ -23,4 +23,21 @@ router.post('/inventory-intelligence', auth, inventoryIntelligence);
 router.post('/accounts-assistant', auth, accountsAssistant);
 router.post('/manufacturing-assistant', auth, manufacturingAssistant);
 
+// AI Data Layer endpoints
+const {
+  getCustomerInsights,
+  getProductInsights,
+  getSalesInsights,
+  getInventoryInsights,
+  getManufacturingInsights,
+  getCrmInsights
+} = require('../controllers/aiController');
+
+router.get('/customer-insights', auth, getCustomerInsights);
+router.get('/product-insights', auth, getProductInsights);
+router.get('/sales-insights', auth, getSalesInsights);
+router.get('/inventory-insights', auth, getInventoryInsights);
+router.get('/manufacturing-insights', auth, getManufacturingInsights);
+router.get('/crm-insights', auth, getCrmInsights);
+
 module.exports = router;

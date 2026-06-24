@@ -363,5 +363,28 @@ export const catalogApi = {
   shareWhatsApp: (data) => client.post('/catalog/share/whatsapp', data),
 };
 
+export const developerApi = {
+  getAnalytics: () => client.get('/external/analytics/dashboard'),
+  getAuditLogs: (params) => client.get('/external/audit-logs', { params }),
+  
+  // Webhook settings CRUD
+  listWebhookEndpoints: () => client.get('/external/webhooks/endpoints'),
+  createWebhookEndpoint: (data) => client.post('/external/webhooks/endpoints', data),
+  updateWebhookEndpoint: (id, data) => client.put(`/external/webhooks/endpoints/${id}`, data),
+  deleteWebhookEndpoint: (id) => client.delete(`/external/webhooks/endpoints/${id}`),
+  
+  // Webhook Logs
+  listWebhookLogs: (params) => client.get('/external/webhooks/logs', { params }),
+  retryWebhookLog: (id) => client.post(`/external/webhooks/logs/${id}/retry`),
+
+  // AI insights dashboard calls
+  getCustomerInsights: () => client.get('/ai/customer-insights'),
+  getProductInsights: () => client.get('/ai/product-insights'),
+  getSalesInsights: () => client.get('/ai/sales-insights'),
+  getInventoryInsights: () => client.get('/ai/inventory-insights'),
+  getManufacturingInsights: () => client.get('/ai/manufacturing-insights'),
+  getCrmInsights: () => client.get('/ai/crm-insights'),
+};
+
 
 

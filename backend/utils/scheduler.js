@@ -213,6 +213,33 @@ const checkAndEnqueueScheduledJobs = async () => {
   }
 };
 
+const processWebhookRetries = async () => {
+  try {
+    const WebhookLog = require('../models/WebhookLog');
+    const { dispatchSingleLog } = require('../services/webhookService');
+    const { Op } = require('sequelize');
+
+    const retryLogs = await WebhookLog.findAll({
+      where: {
+        status: ['Pending', 'Retrying'],
+        nextRetryAt: {
+          [Op.lte]: new Date()
+        }
+      },
+      limit: 20
+    });
+
+    if (retryLogs.length > 0) {
+      console.log(`[Webhook Worker] Retrying ${retryLogs.length} failed/queued webhooks...`);
+      for (const log of retryLogs) {
+        await dispatchSingleLog(log);
+      }
+    }
+  } catch (err) {
+    console.error('[Webhook Worker] Error processing webhook retries:', err.message);
+  }
+};
+
 const startScheduler = () => {
   console.log('[Scheduler] Initializing WooCommerce background auto-sync runner (every 1 minute)...');
   setInterval(runAutoSync, 60 * 1000);
@@ -232,10 +259,14 @@ const startScheduler = () => {
   console.log('[Scheduler] Initializing Integrations queue worker loop (every 15 seconds)...');
   setInterval(processIntegrationJobs, 15 * 1000);
 
+  console.log('[Scheduler] Initializing Webhook Retry queue worker loop (every 30 seconds)...');
+  setInterval(processWebhookRetries, 30 * 1000);
+
   // Run once shortly after startup
   setTimeout(runReEngagementCheck, 5000);
   setTimeout(runAutoPaymentRemindersCheck, 10000);
   setTimeout(checkAndEnqueueScheduledJobs, 15000);
+  setTimeout(processWebhookRetries, 8000);
 };
 
 module.exports = {
@@ -245,6 +276,7 @@ module.exports = {
   runReEngagementCheck,
   runAutoPaymentRemindersCheck,
   checkAndEnqueueScheduledJobs,
-  processIntegrationJobs
+  processIntegrationJobs,
+  processWebhookRetries
 };
 

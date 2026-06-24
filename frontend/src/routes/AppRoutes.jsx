@@ -25,6 +25,7 @@ import FieldOrdering from '../pages/FieldOrdering';
 import DeliveryTracking from '../pages/DeliveryTracking';
 import ReviewPortal from '../pages/ReviewPortal';
 import IntegrationsMarketplace from '../pages/IntegrationsMarketplace';
+import DeveloperCenter from '../pages/DeveloperCenter';
 
 // CRM Pages
 import CrmDashboard from '../pages/CrmDashboard';
@@ -273,6 +274,14 @@ export default function AppRoutes() {
           element={
             <RoleRoute roles={['Super Admin']}>
               <IntegrationsMarketplace />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="settings/developer-center"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin']}>
+              <DeveloperCenter />
             </RoleRoute>
           }
         />

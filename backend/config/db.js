@@ -140,11 +140,22 @@ const connectDB = async () => {
   require('../models/IntegrationOrder');
   require('../models/IntegrationCatalogue');
   require('../models/IntegrationExportCredential');
+  require('../models/WebhookEndpoint');
+  require('../models/WebhookLog');
+  require('../models/ApiAuditLog');
 
   const shouldAlter = false;
   await dropStaleSqliteBackupTables();
   await runSqliteSyncSafely({ alter: shouldAlter });
   console.log('Database models synchronized successfully.');
+
+  // Register API Gateway Webhook Hooks
+  try {
+    const { registerWebhookHooks } = require('../services/webhookService');
+    registerWebhookHooks();
+  } catch (webhookHooksErr) {
+    console.error('Failed to register webhook hooks:', webhookHooksErr.message);
+  }
 
   // Safe table alterations helper
   const addColumnIfNotExist = async (tableName, columnName, columnDefSql) => {
@@ -286,6 +297,14 @@ const connectDB = async () => {
   await addColumnIfNotExist('integration_connections', 'conflictStrategy', "VARCHAR(50) DEFAULT 'Latest'");
   await addColumnIfNotExist('integration_connections', 'rateLimitCount', "INTEGER DEFAULT 60");
   await addColumnIfNotExist('integration_connections', 'allowedIps', "VARCHAR(1000) NULL");
+  
+  // Developer credentials v2 enhancements
+  await addColumnIfNotExist('integration_export_credentials', 'description', "VARCHAR(1000) NULL");
+  await addColumnIfNotExist('integration_export_credentials', 'environment', "VARCHAR(50) DEFAULT 'Live'");
+  await addColumnIfNotExist('integration_export_credentials', 'permissions', "TEXT NULL");
+  await addColumnIfNotExist('integration_export_credentials', 'createdBy', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('integration_export_credentials', 'lastUsed', "DATETIME NULL");
+  await addColumnIfNotExist('integration_export_credentials', 'webhookSecret', "VARCHAR(255) NULL");
 
   await addColumnIfNotExist('Invoices', 'packingCost', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('Invoices', 'handlingCost', "DECIMAL(10, 2) DEFAULT 0.00");
