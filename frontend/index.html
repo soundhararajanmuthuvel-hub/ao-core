@@ -11,11 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <script>
       function getApiBaseUrl() {
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        if (isLocal) {
-          return '/api';
-        }
-        return 'https://ao-core-production.up.railway.app/api';
+        return '/api';
       }
 
       function logErrorToServer(data) {
