@@ -788,6 +788,22 @@ exports.recordPayment = async (req, res, next) => {
     );
 
     await t.commit();
+
+    // Trigger Automated WhatsApp Thank You Message
+    if (customerRecord.phone) {
+      try {
+        const whatsappService = require('../services/whatsappService');
+        const thankYouMessage = `Dear ${customerRecord.name},\n\nThank you for your payment of ₹${totalAllocated.toFixed(2)}.\n\nReceived Amount: ₹${totalAllocated.toFixed(2)}\nPrevious Balance: ₹${currentBalance.toFixed(2)}\nCurrent Outstanding: ₹${customerRecord.balance.toFixed(2)}\n\nThank you for doing business with us.\nAmudhasurabiy Organics`;
+        
+        // Dispatched asynchronously in background
+        whatsappService.sendMessage(customerRecord.phone, thankYouMessage, customerRecord.id, 'Thank You Message').catch(err => {
+          console.error('[Auto Thank You Message] Error sending message:', err.message);
+        });
+      } catch (err) {
+        console.error('[Auto Thank You Message] Failed to trigger send:', err.message);
+      }
+    }
+
     res.json({
       message: 'Payment recorded and allocated successfully',
       outstandingBalance: customerRecord.balance,

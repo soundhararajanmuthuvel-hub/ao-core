@@ -26,14 +26,21 @@ if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
         .then((reg) => {
           console.log('Service worker registered:', reg);
+
+          // If there is already a waiting service worker, prompt it to activate
+          if (reg.waiting) {
+            console.log('[PWA] Waiting service worker found. Activating...');
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+
           reg.onupdatefound = () => {
             const installingWorker = reg.installing;
             if (installingWorker) {
               installingWorker.onstatechange = () => {
                 if (installingWorker.state === 'installed') {
                   if (navigator.serviceWorker.controller) {
-                    console.log('New service worker installed; auto-reloading page.');
-                    window.location.reload();
+                    console.log('New service worker installed; prompting skip waiting.');
+                    installingWorker.postMessage({ type: 'SKIP_WAITING' });
                   }
                 }
               };
@@ -41,6 +48,16 @@ if ('serviceWorker' in navigator) {
           };
         })
         .catch((err) => console.error('Service worker registration failed:', err));
+    });
+
+    // Handle controller change to reload client cleanly
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        console.log('[PWA] Controller changed; reloading page to load new assets.');
+        window.location.reload();
+      }
     });
   } else {
     // Unregister service worker in development mode to avoid caching/WebSocket conflicts

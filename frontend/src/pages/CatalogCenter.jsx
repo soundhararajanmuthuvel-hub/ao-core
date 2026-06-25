@@ -26,6 +26,8 @@ export default function CatalogCenter() {
   const [sharePhone, setSharePhone] = useState('');
   const [shareCustomerId, setShareCustomerId] = useState('');
   const [sharing, setSharing] = useState(false);
+  const [showWaSuccessModal, setShowWaSuccessModal] = useState(false);
+  const [waSuccessData, setWaSuccessData] = useState(null);
 
   useEffect(() => {
     const initData = async () => {
@@ -144,8 +146,12 @@ export default function CatalogCenter() {
         format: shareModal.format,
         productId: shareModal.product ? (shareModal.product.id || shareModal.product._id) : null
       };
-      await catalogApi.shareWhatsApp(payload);
+      const { data } = await catalogApi.shareWhatsApp(payload);
       toast('Catalog shared via WhatsApp successfully!', 'success');
+      if (data && data.data) {
+        setWaSuccessData(data.data);
+        setShowWaSuccessModal(true);
+      }
       setShareModal(null);
     } catch (err) {
       console.error(err);
@@ -473,6 +479,108 @@ export default function CatalogCenter() {
         </Modal>
       )}
 
+      {/* WhatsApp Dispatch Success Modal */}
+      {showWaSuccessModal && waSuccessData && (
+        <Modal
+          title="🎉 WhatsApp Sent Successfully"
+          onClose={() => setShowWaSuccessModal(false)}
+          footer={
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setShowWaSuccessModal(false)}
+              style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                padding: '0.5rem 1.5rem',
+                borderRadius: '8px',
+                color: '#fff',
+                fontWeight: 600,
+                boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)',
+                cursor: 'pointer'
+              }}
+            >
+              Okay
+            </button>
+          }
+        >
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+            padding: '0.5rem'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%)',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+              borderRadius: '12px',
+              padding: '1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5)'
+            }}>
+              <span style={{ fontSize: '2.5rem' }}>📱</span>
+              <div>
+                <h4 style={{ margin: 0, color: '#065f46', fontWeight: 700, fontSize: '1.1rem' }}>Message Dispatched</h4>
+                <p style={{ margin: '0.25rem 0 0 0', color: '#047857', fontSize: '0.85rem' }}>
+                  The message has been successfully routed via the CRM WhatsApp gateway.
+                </p>
+              </div>
+            </div>
+
+            <div style={{
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              padding: '1rem',
+              display: 'grid',
+              gridTemplateColumns: '1fr',
+              gap: '0.75rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500 }}>Customer Name:</span>
+                <span style={{ color: '#1e293b', fontSize: '0.85rem', fontWeight: 600 }}>{waSuccessData.customerName}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500 }}>Phone Number:</span>
+                <span style={{ color: '#1e293b', fontSize: '0.85rem', fontWeight: 600 }}>+{waSuccessData.phone}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500 }}>Message Type:</span>
+                <span style={{ 
+                  color: '#2563eb', 
+                  fontSize: '0.8rem', 
+                  fontWeight: 700,
+                  backgroundColor: '#eff6ff',
+                  padding: '0.2rem 0.5rem',
+                  borderRadius: '6px',
+                  border: '1px solid #bfdbfe'
+                }}>{waSuccessData.messageType}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500 }}>Timestamp:</span>
+                <span style={{ color: '#1e293b', fontSize: '0.85rem', fontWeight: 600 }}>
+                  {new Date(waSuccessData.timestamp).toLocaleString()}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500 }}>Reference ID:</span>
+                <span style={{ 
+                  color: '#475569', 
+                  fontSize: '0.8rem', 
+                  fontFamily: 'monospace',
+                  backgroundColor: '#f1f5f9',
+                  padding: '0.2rem 0.4rem',
+                  borderRadius: '4px',
+                  border: '1px solid #e2e8f0'
+                }}>{waSuccessData.referenceId}</span>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

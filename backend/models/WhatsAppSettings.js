@@ -9,12 +9,12 @@ const WhatsAppSettings = sequelize.define('WhatsAppSettings', {
     autoIncrement: true,
   },
   provider: {
-    type: DataTypes.ENUM('WAHA', 'Evolution API', 'UltraMsg', 'Green API', 'Meta Cloud API'),
-    defaultValue: 'WAHA',
+    type: DataTypes.STRING,
+    defaultValue: 'CRM WhatsApp',
   },
   apiUrl: {
     type: DataTypes.STRING,
-    defaultValue: 'http://localhost:3000',
+    defaultValue: 'http://localhost:5000/api/whatsapp/mock-crm',
   },
   apiKey: {
     type: DataTypes.STRING,
@@ -23,6 +23,18 @@ const WhatsAppSettings = sequelize.define('WhatsAppSettings', {
   instanceId: {
     type: DataTypes.STRING,
     defaultValue: 'default',
+  },
+  crmBaseUrl: {
+    type: DataTypes.STRING,
+    defaultValue: 'http://localhost:5000/api/whatsapp/mock-crm',
+  },
+  crmApiKey: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  crmSecret: {
+    type: DataTypes.STRING,
+    allowNull: true,
   },
   webhookUrl: {
     type: DataTypes.STRING,

@@ -344,7 +344,11 @@ export const whatsappApi = {
   sendText: (data) => client.post('/whatsapp/send-text', data),
   sendDocument: (data) => client.post('/whatsapp/send-document', data),
   getLogs: (params) => client.get('/whatsapp/logs', { params }),
-  getStats: () => client.get('/whatsapp/stats')
+  getStats: () => client.get('/whatsapp/stats'),
+  sendTestMessage: () => client.post('/whatsapp/settings/test-message'),
+  sendTestCatalogue: () => client.post('/whatsapp/settings/test-catalogue'),
+  sendTestInvoice: () => client.post('/whatsapp/settings/test-invoice'),
+  retryFailedLogs: () => client.post('/whatsapp/logs/retry-failed')
 };
 
 export const databaseApi = {

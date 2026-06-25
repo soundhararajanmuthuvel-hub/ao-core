@@ -39,6 +39,18 @@ const WhatsAppLog = sequelize.define('WhatsAppLog', {
   error: {
     type: DataTypes.TEXT,
     allowNull: true,
+  },
+  invoice: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  catalogue: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  response: {
+    type: DataTypes.TEXT,
+    allowNull: true,
   }
 });
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ao-erp-cache-v1';
+const CACHE_NAME = 'ao-erp-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -10,6 +10,7 @@ const ASSETS_TO_CACHE = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
+      console.log('[Service Worker] Caching app shell and assets...');
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
@@ -22,7 +23,8 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
+          if (cache.startsWith('ao-erp-cache-') && cache !== CACHE_NAME) {
+            console.log('[Service Worker] Cleaning outdated cache:', cache);
             return caches.delete(cache);
           }
         })
@@ -30,6 +32,13 @@ self.addEventListener('activate', (event) => {
     })
   );
   self.clients.claim();
+});
+
+// Client Message Event for direct skip waiting
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Fetch Event

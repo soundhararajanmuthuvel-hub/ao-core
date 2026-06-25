@@ -306,6 +306,14 @@ const connectDB = async () => {
   await addColumnIfNotExist('integration_export_credentials', 'lastUsed', "DATETIME NULL");
   await addColumnIfNotExist('integration_export_credentials', 'webhookSecret', "VARCHAR(255) NULL");
 
+  // WhatsApp settings & log enhancements
+  await addColumnIfNotExist('WhatsAppSettings', 'crmBaseUrl', "VARCHAR(1000) DEFAULT ''");
+  await addColumnIfNotExist('WhatsAppSettings', 'crmApiKey', "VARCHAR(1000) DEFAULT ''");
+  await addColumnIfNotExist('WhatsAppSettings', 'crmSecret', "VARCHAR(1000) DEFAULT ''");
+  await addColumnIfNotExist('WhatsAppLogs', 'invoice', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('WhatsAppLogs', 'catalogue', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('WhatsAppLogs', 'response', "TEXT NULL");
+
   await addColumnIfNotExist('Invoices', 'packingCost', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('Invoices', 'handlingCost', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('Invoices', 'courierCost', "DECIMAL(10, 2) DEFAULT 0.00");

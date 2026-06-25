@@ -10,8 +10,16 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <script>
+      function getApiBaseUrl() {
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (isLocal) {
+          return '/api';
+        }
+        return 'https://ao-core-production.up.railway.app/api';
+      }
+
       function logErrorToServer(data) {
-        fetch('/api/client-error', {
+        fetch(getApiBaseUrl() + '/client-error', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)

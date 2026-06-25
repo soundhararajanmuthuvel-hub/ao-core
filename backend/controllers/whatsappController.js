@@ -13,29 +13,29 @@ exports.getSettings = async (req, res, next) => {
     let settings = await WhatsAppSettings.findOne();
     if (!settings) {
       settings = await WhatsAppSettings.create({
-        provider: 'WAHA',
-        apiUrl: 'http://localhost:3000',
-        apiKey: '',
-        instanceId: 'default',
+        crmBaseUrl: 'http://localhost:5000/api/whatsapp/mock-crm',
         status: 'Disconnected'
       });
     }
 
-    // Decrypt fields if requested by Super Admin, otherwise mask them
     const isSuperAdmin = req.user && req.user.role === 'Super Admin';
-    const apiKeyDecrypted = whatsappService.decrypt(settings.apiKey) || '';
-    const instanceIdDecrypted = whatsappService.decrypt(settings.instanceId) || '';
+    const apiKeyDecrypted = whatsappService.decrypt(settings.crmApiKey) || '';
+    const secretDecrypted = whatsappService.decrypt(settings.crmSecret) || '';
 
     res.json({
       success: true,
       settings: {
         id: settings.id,
-        provider: settings.provider,
-        apiUrl: settings.apiUrl,
-        apiKey: isSuperAdmin ? apiKeyDecrypted : (settings.apiKey ? '********' : ''),
-        instanceId: isSuperAdmin ? instanceIdDecrypted : (settings.instanceId ? '********' : ''),
+        crmBaseUrl: settings.crmBaseUrl || '',
+        crmApiKey: isSuperAdmin ? apiKeyDecrypted : (settings.crmApiKey ? '********' : ''),
+        crmSecret: isSuperAdmin ? secretDecrypted : (settings.crmSecret ? '********' : ''),
         webhookUrl: settings.webhookUrl || '',
-        status: settings.status
+        status: settings.status,
+        // Legacy fallbacks for compatibility
+        provider: settings.provider || 'CRM WhatsApp',
+        apiUrl: settings.crmBaseUrl || '',
+        apiKey: isSuperAdmin ? apiKeyDecrypted : (settings.crmApiKey ? '********' : ''),
+        instanceId: isSuperAdmin ? secretDecrypted : (settings.crmSecret ? '********' : '')
       }
     });
   } catch (err) {
@@ -49,22 +49,31 @@ exports.updateSettings = async (req, res, next) => {
       return res.status(403).json({ message: 'Access denied: Only Super Admin can edit WhatsApp settings' });
     }
 
-    const { provider, apiUrl, apiKey, instanceId, webhookUrl } = req.body;
+    const { crmBaseUrl, crmApiKey, crmSecret, webhookUrl, provider, apiUrl, apiKey, instanceId } = req.body;
     let settings = await WhatsAppSettings.findOne();
     if (!settings) {
       settings = new WhatsAppSettings();
     }
 
-    settings.provider = provider || 'WAHA';
-    settings.apiUrl = apiUrl || 'http://localhost:3000';
+    settings.crmBaseUrl = crmBaseUrl || apiUrl || 'http://localhost:5000/api/whatsapp/mock-crm';
     settings.webhookUrl = webhookUrl || '';
-    
-    // Encrypt apiKey & instanceId if provided and not masked
-    if (apiKey && apiKey !== '********') {
-      settings.apiKey = whatsappService.encrypt(apiKey);
+    settings.provider = provider || 'CRM WhatsApp';
+    settings.apiUrl = settings.crmBaseUrl; // sync legacy
+
+    if (crmApiKey && crmApiKey !== '********') {
+      settings.crmApiKey = whatsappService.encrypt(crmApiKey);
+      settings.apiKey = settings.crmApiKey; // sync legacy
+    } else if (apiKey && apiKey !== '********') {
+      settings.crmApiKey = whatsappService.encrypt(apiKey);
+      settings.apiKey = settings.crmApiKey;
     }
-    if (instanceId && instanceId !== '********') {
-      settings.instanceId = whatsappService.encrypt(instanceId);
+
+    if (crmSecret && crmSecret !== '********') {
+      settings.crmSecret = whatsappService.encrypt(crmSecret);
+      settings.instanceId = settings.crmSecret; // sync legacy
+    } else if (instanceId && instanceId !== '********') {
+      settings.crmSecret = whatsappService.encrypt(instanceId);
+      settings.instanceId = settings.crmSecret;
     }
 
     await settings.save();
@@ -75,8 +84,7 @@ exports.updateSettings = async (req, res, next) => {
       message: 'WhatsApp configurations saved successfully.',
       settings: {
         id: settings.id,
-        provider: settings.provider,
-        apiUrl: settings.apiUrl,
+        crmBaseUrl: settings.crmBaseUrl,
         webhookUrl: settings.webhookUrl,
         status: settings.status
       }
@@ -97,33 +105,53 @@ exports.testConnection = async (req, res, next) => {
       return res.status(404).json({ message: 'WhatsApp configurations not found. Please save settings first.' });
     }
 
-    const apiKeyDecrypted = whatsappService.decrypt(settings.apiKey);
-    const headers = {};
-    if (apiKeyDecrypted) {
-      headers['Authorization'] = `Bearer ${apiKeyDecrypted}`;
+    const crmBaseUrl = settings.crmBaseUrl || 'http://localhost:5000/api/whatsapp/mock-crm';
+    const crmApiKey = settings.crmApiKey ? whatsappService.decrypt(settings.crmApiKey) : '';
+    const crmSecret = settings.crmSecret ? whatsappService.decrypt(settings.crmSecret) : '';
+
+    if (!crmApiKey) {
+      return res.status(400).json({ success: false, message: 'API Key Missing' });
     }
 
-    // Ping provider. For WAHA, we call GET /api/sessions
-    const pingUrl = `${settings.apiUrl}/api/sessions`;
     let isConnected = false;
     let details = '';
 
-    try {
-      const response = await axios.get(pingUrl, { headers, timeout: 5000 });
-      if (response.status === 200) {
-        isConnected = true;
-        details = 'Successfully connected to WhatsApp API Provider service.';
-      } else {
-        details = `Unexpected response code from server: ${response.status}`;
-      }
-    } catch (pingErr) {
-      console.warn('WhatsApp Settings test ping failed:', pingErr.message);
-      // For fallback offline testing: if it is a local address we can mock connection success
-      if (settings.apiUrl.includes('localhost') || settings.apiUrl.includes('127.0.0.1')) {
-        isConnected = true;
-        details = 'Demo connection simulated successfully for localhost address.';
-      } else {
-        details = `Connection failed: ${pingErr.message}`;
+    if (crmBaseUrl.includes('localhost') || crmBaseUrl.includes('127.0.0.1')) {
+      isConnected = true;
+      details = 'Connection simulated successfully for mock CRM address.';
+    } else {
+      try {
+        const pingUrl = crmBaseUrl.endsWith('/') ? `${crmBaseUrl}status` : `${crmBaseUrl}/status`;
+        const headers = {
+          'X-CRM-API-KEY': crmApiKey,
+          'X-CRM-SECRET': crmSecret
+        };
+        const response = await axios.get(pingUrl, { headers, timeout: 5000 });
+        if (response.status === 200) {
+          isConnected = true;
+          details = 'Successfully connected to Custom CRM WhatsApp API.';
+        } else {
+          details = `Unexpected response code: ${response.status}`;
+        }
+      } catch (pingErr) {
+        console.warn('CRM WhatsApp status ping failed, attempting base GET:', pingErr.message);
+        try {
+          const response = await axios.get(crmBaseUrl, {
+            headers: {
+              'X-CRM-API-KEY': crmApiKey,
+              'X-CRM-SECRET': crmSecret
+            },
+            timeout: 5000
+          });
+          if (response.status === 200) {
+            isConnected = true;
+            details = 'Successfully connected to Custom CRM WhatsApp API.';
+          } else {
+            details = `CRM API Rejected Request: Status ${response.status}`;
+          }
+        } catch (baseErr) {
+          details = `Network Error: Connection failed (${baseErr.message})`;
+        }
       }
     }
 
@@ -141,7 +169,6 @@ exports.testConnection = async (req, res, next) => {
 };
 
 exports.sendInvoicePdf = async (req, res, next) => {
-  const startTime = Date.now();
   const invoiceId = req.body.invoiceId || req.body.saleId;
   const customerPhone = req.body.phone || req.body.customerPhone;
   const messageText = req.body.message || 'Please find attached your invoice.';
@@ -154,11 +181,17 @@ exports.sendInvoicePdf = async (req, res, next) => {
   const { getSettings } = require('../utils/helpers');
   const { generateInvoicePdf } = require('../utils/invoiceGenerator');
 
-  let invoice = null;
-  let customer = null;
-
   try {
-    // 1. Fetch Invoice
+    // Validations
+    const settings = await WhatsAppSettings.findOne();
+    if (!settings || settings.status !== 'Connected') {
+      return res.status(400).json({ success: false, message: 'CRM Not Connected' });
+    }
+    if (!settings.crmApiKey) {
+      return res.status(400).json({ success: false, message: 'API Key Missing' });
+    }
+
+    let invoice = null;
     if (invoiceId) {
       invoice = await Invoice.findByPk(invoiceId, {
         include: [
@@ -180,81 +213,39 @@ exports.sendInvoicePdf = async (req, res, next) => {
     }
 
     if (!invoice && invoiceId) {
-      return res.status(404).json({ success: false, message: 'Invoice not found' });
+      return res.status(404).json({ success: false, message: 'Invoice Not Found' });
     }
 
-    // 2. Fetch Customer & Phone
-    customer = invoice ? invoice.customer : null;
+    let customer = invoice ? invoice.customer : null;
     if (!customer && customerId) {
       customer = await Customer.findByPk(customerId);
     }
 
     const phoneVal = customerPhone || customer?.phone;
     if (!phoneVal) {
-      return res.status(400).json({ success: false, message: 'Customer phone missing' });
+      return res.status(400).json({ success: false, message: 'Customer Phone Missing' });
     }
 
-    // 3. Auto Generate PDF if not exists
     if (!pdfPath && invoice) {
       const filename = `${invoice.invoiceNumber}.pdf`;
       const targetPath = path.join(__dirname, '../uploads/invoices', filename);
-      
       if (!fs.existsSync(targetPath)) {
-        const settings = await getSettings();
-        await generateInvoicePdf(invoice, settings, targetPath);
+        const companySettings = await getSettings();
+        try {
+          await generateInvoicePdf(invoice, companySettings, targetPath);
+        } catch (pdfErr) {
+          console.error('Invoice PDF generation failed:', pdfErr.message);
+          return res.status(500).json({ success: false, message: 'PDF Generation Failed' });
+        }
       }
       pdfPath = targetPath;
     }
 
     if (!pdfPath || !fs.existsSync(pdfPath)) {
-      return res.status(500).json({ success: false, message: 'PDF generation failed' });
+      return res.status(500).json({ success: false, message: 'PDF Generation Failed' });
     }
 
-    // 4. Verify Connection Status & API Authorization
-    const WhatsAppSettings = require('../models/WhatsAppSettings');
-    const settings = await WhatsAppSettings.findOne();
-    const provider = settings ? settings.provider : 'WAHA';
-
-    if (!settings || settings.status !== 'Connected') {
-      return res.status(500).json({ success: false, message: 'WAHA disconnected' });
-    }
-
-    const decryptedApiKey = settings.apiKey ? whatsappService.decrypt(settings.apiKey) : '';
-    if (!decryptedApiKey && settings.provider === 'WAHA' && process.env.NODE_ENV === 'production') {
-      return res.status(401).json({ success: false, message: 'API authentication failed' });
-    }
-
-    // 5. Send PDF
-    let apiResponse = null;
-    let status = 'Success';
-    let errorMsg = null;
-
-    try {
-      const result = await whatsappService.sendPdf(phoneVal, messageText, pdfPath, customer?.id || null, messageType);
-      apiResponse = result;
-    } catch (err) {
-      status = 'Failed';
-      errorMsg = err.message;
-      console.error('[WhatsApp send-pdf] Provider Send Error:', err.message);
-    }
-
-    // Console Logging (Detailed)
-    console.log({
-      invoiceId: invoice?.id || invoiceId || null,
-      customerPhone: phoneVal,
-      pdfPath,
-      provider,
-      apiResponse
-    });
-
-    // Write Log to backend/logs/whatsapp.log
-    const logDir = path.join(__dirname, '../logs');
-    if (!fs.existsSync(logDir)) {
-      fs.mkdirSync(logDir, { recursive: true });
-    }
-    const logPath = path.join(logDir, 'whatsapp.log');
-    const logLine = `${new Date().toISOString()} | Customer: ${customer?.name || 'Unknown'} | Invoice: ${invoice?.invoiceNumber || 'N/A'} | Phone: ${phoneVal} | Provider: ${provider} | Status: ${status} | Error: ${errorMsg || 'None'}\n`;
-    fs.appendFileSync(logPath, logLine);
+    const result = await whatsappService.sendPdf(phoneVal, messageText, pdfPath, customer?.id || null, messageType, invoice?.id || null);
 
     // Cleanup temp Multer files
     if (req.file && req.file.path) {
@@ -265,17 +256,7 @@ exports.sendInvoicePdf = async (req, res, next) => {
       } catch (_) {}
     }
 
-    if (status === 'Failed') {
-      return res.status(500).json({ success: false, message: 'WhatsApp provider error', error: errorMsg });
-    }
-
-    res.json({
-      success: true,
-      message: 'Invoice PDF sent successfully via WhatsApp.',
-      messageId: apiResponse?.messageId || 'sent',
-      logId: apiResponse?.logId || null
-    });
-
+    res.json(result);
   } catch (err) {
     if (req.file && req.file.path) {
       try {
@@ -283,6 +264,10 @@ exports.sendInvoicePdf = async (req, res, next) => {
           fs.unlinkSync(req.file.path);
         }
       } catch (_) {}
+    }
+    let errMsg = err.message;
+    if (errMsg === 'Network Error' || errMsg === 'CRM API Rejected Request' || errMsg === 'CRM Not Connected' || errMsg === 'API Key Missing' || errMsg === 'Customer Phone Missing') {
+      return res.status(500).json({ success: false, message: errMsg });
     }
     next(err);
   }
@@ -294,18 +279,18 @@ exports.sendDocument = async (req, res, next) => {
     return res.status(400).json({ success: false, message: 'Recipient phone number and file URL are required' });
   }
 
-  const WhatsAppSettings = require('../models/WhatsAppSettings');
-  const settings = await WhatsAppSettings.findOne();
-  const provider = settings ? settings.provider : 'WAHA';
-
-  if (!settings || settings.status !== 'Connected') {
-    return res.status(500).json({ success: false, message: 'WAHA disconnected' });
-  }
-
-  let localPath = null;
-  let isTemp = false;
-
   try {
+    const settings = await WhatsAppSettings.findOne();
+    if (!settings || settings.status !== 'Connected') {
+      return res.status(400).json({ success: false, message: 'CRM Not Connected' });
+    }
+    if (!settings.crmApiKey) {
+      return res.status(400).json({ success: false, message: 'API Key Missing' });
+    }
+
+    let localPath = null;
+    let isTemp = false;
+
     if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
       const tempDir = path.join(__dirname, '../uploads/temp');
       if (!fs.existsSync(tempDir)) {
@@ -337,72 +322,173 @@ exports.sendDocument = async (req, res, next) => {
       }
     }
 
-    const ext = path.extname(fileName || fileUrl).toLowerCase();
-    let mimetype = 'application/pdf';
-    if (ext === '.png') mimetype = 'image/png';
-    else if (ext === '.jpg' || ext === '.jpeg') mimetype = 'image/jpeg';
-    else if (ext === '.xlsx') mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const cleanPhone = whatsappService.formatPhone(phone);
+    const result = await whatsappService.sendPdf(cleanPhone, caption || '', localPath, null, 'Document');
 
-    const jid = whatsappService.formatJid(phone);
-    const fileBuffer = fs.readFileSync(localPath);
-    const base64Data = fileBuffer.toString('base64');
-    
-    const payload = {
-      chatId: jid,
-      caption: caption || '',
-      file: {
-        mimetype,
-        filename: fileName || path.basename(localPath),
-        data: base64Data
-      }
-    };
-
-    const response = await whatsappService.makeProviderRequest('/api/sendFile', payload, settings);
-
-    await WhatsAppLog.create({
-      mobile: phone,
-      messageType: 'Document',
-      messageText: `${caption || ''} (Attachment: ${fileName || 'file'})`,
-      status: 'Sent'
-    });
-
-    res.json({
-      success: true,
-      message: 'Document sent successfully via WhatsApp.',
-      messageId: response.data?.id || 'sent'
-    });
-
-  } catch (err) {
-    console.error('[WhatsApp send-document] error:', err.message);
-    res.status(500).json({ success: false, message: 'WhatsApp provider error', error: err.message });
-  } finally {
     if (isTemp && localPath && fs.existsSync(localPath)) {
       try {
         fs.unlinkSync(localPath);
       } catch (_) {}
     }
+
+    res.json(result);
+  } catch (err) {
+    let errMsg = err.message;
+    if (errMsg === 'Network Error' || errMsg === 'CRM API Rejected Request' || errMsg === 'CRM Not Connected' || errMsg === 'API Key Missing' || errMsg === 'Customer Phone Missing') {
+      return res.status(500).json({ success: false, message: errMsg });
+    }
+    next(err);
   }
 };
 
 exports.sendQuickText = async (req, res, next) => {
   try {
-    const { phone, message, customerId, messageType = 'Greeting' } = req.body;
-    if (!phone || !message) {
-      return res.status(400).json({ message: 'Phone number and message text are required' });
+    const { phone, message, customerId, messageType = 'Greeting', invoiceId } = req.body;
+    
+    // Validations
+    const settings = await WhatsAppSettings.findOne();
+    if (!settings || settings.status !== 'Connected') {
+      return res.status(400).json({ success: false, message: 'CRM Not Connected' });
+    }
+    if (!settings.crmApiKey) {
+      return res.status(400).json({ success: false, message: 'API Key Missing' });
+    }
+    if (!phone) {
+      return res.status(400).json({ success: false, message: 'Customer Phone Missing' });
     }
 
-    const result = await whatsappService.sendMessage(phone, message, customerId || null, messageType);
+    const result = await whatsappService.sendMessage(phone, message, customerId || null, messageType, invoiceId || null);
     
+    res.json(result);
+  } catch (err) {
+    let errMsg = err.message;
+    if (errMsg === 'Network Error' || errMsg === 'CRM API Rejected Request' || errMsg === 'CRM Not Connected' || errMsg === 'API Key Missing' || errMsg === 'Customer Phone Missing') {
+      return res.status(500).json({ success: false, message: errMsg });
+    }
+    next(err);
+  }
+};
+
+exports.sendTestMessage = async (req, res, next) => {
+  try {
+    const settings = await getActiveSettingsOrThrow();
+    const testPhone = settings.phone || '917010602115';
+    const testMsg = `Test WhatsApp text message from AO Core ERP at ${new Date().toLocaleString()}`;
+
+    const result = await whatsappService.sendMessage(testPhone, testMsg, null, 'Test Message');
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.sendTestCatalogue = async (req, res, next) => {
+  try {
+    const settings = await getActiveSettingsOrThrow();
+    const IntegrationCatalogue = require('../models/IntegrationCatalogue');
+    const catalogue = await IntegrationCatalogue.findOne();
+    if (!catalogue) {
+      return res.status(404).json({ success: false, message: 'Catalogue Not Found' });
+    }
+
+    const testPhone = settings.phone || '917010602115';
+    const testMsg = `Test Catalogue PDF message from AO Core ERP at ${new Date().toLocaleString()}`;
+    const testPdfPath = catalogue.pdfUrl || path.join(__dirname, '../uploads/temp/amudhasurabiy_brochure.pdf');
+
+    if (!fs.existsSync(testPdfPath)) {
+      const tempDir = path.dirname(testPdfPath);
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      fs.writeFileSync(testPdfPath, 'Mock Catalogue Data');
+    }
+
+    const result = await whatsappService.sendPdf(testPhone, testMsg, testPdfPath, null, 'Catalogue');
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.sendTestInvoice = async (req, res, next) => {
+  try {
+    const settings = await getActiveSettingsOrThrow();
+    const Invoice = require('../models/Invoice');
+    const invoice = await Invoice.findOne({ order: [['createdAt', 'DESC']] });
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: 'Invoice Not Found' });
+    }
+
+    const testPhone = settings.phone || '917010602115';
+    const testMsg = `Test Invoice PDF message from AO Core ERP at ${new Date().toLocaleString()}`;
+    const targetPath = path.join(__dirname, '../uploads/invoices', `${invoice.invoiceNumber}.pdf`);
+
+    if (!fs.existsSync(targetPath)) {
+      try {
+        const companySettings = await require('../utils/helpers').getSettings();
+        await require('../utils/invoiceGenerator').generateInvoicePdf(invoice, companySettings, targetPath);
+      } catch (pdfErr) {
+        return res.status(500).json({ success: false, message: 'PDF Generation Failed' });
+      }
+    }
+
+    const result = await whatsappService.sendPdf(testPhone, testMsg, targetPath, null, 'Invoice', invoice.id);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.retryFailed = async (req, res, next) => {
+  try {
+    const failedLogs = await WhatsAppLog.findAll({ where: { status: 'Failed' } });
+    if (failedLogs.length === 0) {
+      return res.json({ success: true, message: 'No failed messages found to retry.' });
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const log of failedLogs) {
+      try {
+        if (log.messageText.includes('PDF Attachment:') || log.messageType === 'Invoice' || log.messageType === 'Catalogue') {
+          let pdfPath = '';
+          if (log.invoice) {
+            pdfPath = path.join(__dirname, '../uploads/invoices', `${log.invoice}.pdf`);
+          } else {
+            pdfPath = path.join(__dirname, '../uploads/temp/amudhasurabiy_brochure.pdf');
+          }
+          await whatsappService.sendPdf(log.mobile, log.messageText.split(' (PDF Attachment:')[0], pdfPath, log.customerId, log.messageType);
+        } else {
+          await whatsappService.sendMessage(log.mobile, log.messageText, log.customerId, log.messageType);
+        }
+        successCount++;
+        log.status = 'Sent';
+        await log.save();
+      } catch (err) {
+        failCount++;
+        log.error = `Retry failed: ${err.message}`;
+        await log.save();
+      }
+    }
+
     res.json({
       success: true,
-      message: 'WhatsApp text message dispatched.',
-      messageId: result.messageId,
-      logId: result.logId
+      message: `Retried ${failedLogs.length} messages. Success: ${successCount}, Failed: ${failCount}`
     });
   } catch (err) {
     next(err);
   }
 };
+
+async function getActiveSettingsOrThrow() {
+  const settings = await WhatsAppSettings.findOne();
+  if (!settings || settings.status !== 'Connected') {
+    throw new Error('CRM Not Connected');
+  }
+  if (!settings.crmApiKey) {
+    throw new Error('API Key Missing');
+  }
+  return settings;
+}
 
 exports.getLogs = async (req, res, next) => {
   try {
@@ -485,7 +571,6 @@ exports.getStats = async (req, res, next) => {
       }
     });
 
-    // 7 Day Activity Chart Data
     const activityList = [];
     for (let i = 6; i >= 0; i--) {
       const start = new Date();
@@ -527,202 +612,33 @@ exports.getStats = async (req, res, next) => {
 exports.webhookReceiver = async (req, res, next) => {
   try {
     console.log('--- WhatsApp Webhook received ---', JSON.stringify(req.body));
-    
-    const { event, payload } = req.body;
-    
-    // 1. Process Message Status Acknowledgements
-    if (payload && payload.id && (event === 'message.ack' || event === 'message.status')) {
-      const msgId = payload.id;
-      const ack = payload.ack;
-      
-      let mappedStatus = null;
-      if (ack === 2) mappedStatus = 'Delivered';
-      if (ack === 3 || ack === 4) mappedStatus = 'Read';
+    const { referenceId, status, error, messageId, ack, event, payload } = req.body;
+    const msgId = referenceId || messageId || (payload && payload.id);
+    const msgStatus = status || (payload && payload.status);
 
-      if (mappedStatus) {
-        console.log(`Webhook matched message update: ${msgId} status is ${mappedStatus}`);
-      }
-    }
-
-    // 2. Chatbot Auto-responder for Customer Messages
-    if (payload && (event === 'message' || event === 'message.create' || event === 'message.received')) {
-      const msg = payload;
-      const text = (msg.body || msg.text || '').trim();
-      // Extract clean phone number without @c.us suffix
-      const fromPhone = msg.from ? msg.from.split('@')[0] : '';
-      
-      if (text && fromPhone) {
-        const lowerText = text.toLowerCase();
-        
-        if (lowerText === 'my balance') {
-          try {
-            const customerObj = await Customer.findOne({
-              where: {
-                [Op.or]: [
-                  { phone: fromPhone },
-                  { phone: { [Op.like]: `%${fromPhone}%` } }
-                ]
-              }
-            });
-
-            if (customerObj) {
-              const Invoice = require('../models/Invoice');
-              const Payment = require('../models/Payment');
-
-              const invoices = await Invoice.findAll({ where: { customerId: customerObj.id } });
-              const totalSales = invoices.reduce((sum, inv) => sum + Number(inv.grandTotal || inv.total || 0), 0);
-
-              const payments = await Payment.findAll({ where: { customerId: customerObj.id } });
-              const receivedAmount = payments.reduce((sum, pay) => sum + Number(pay.amount || 0), 0);
-              const pendingAmount = totalSales - receivedAmount;
-
-              const replyText = `📄 *Your Ledger Balance Summary* 📄
-----------------------------------
-*Customer:* ${customerObj.name}
-*Total Billing:* Rs. ${totalSales.toFixed(2)}
-*Total Paid:* Rs. ${receivedAmount.toFixed(2)}
-*Outstanding Balance:* Rs. ${pendingAmount.toFixed(2)}
-
-${pendingAmount > 0 ? '⚠️ Please clear your pending dues at the earliest. Thank you!' : '✅ Your account is fully settled. Thank you!'}
-----------------------------------
-Amudhasurabiy Organics`;
-
-              await whatsappService.sendMessage(fromPhone, replyText, null, 'Chatbot Ledger Balance');
-            } else {
-              await whatsappService.sendMessage(fromPhone, `Sorry, we could not find a customer profile associated with your phone number (${fromPhone}). Please contact our support team.`, null, 'Chatbot Ledger Balance');
-            }
-          } catch (err) {
-            console.error('Chatbot ledger balance reply failed:', err.message);
-          }
-        } else if (lowerText === 'show catalogue' || lowerText === 'show catalog') {
-          try {
-            const IntegrationCatalogue = require('../models/IntegrationCatalogue');
-            const catalogue = await IntegrationCatalogue.findOne();
-            
-            let brochurePath = null;
-            if (catalogue && catalogue.pdfUrl) {
-              brochurePath = catalogue.pdfUrl;
-            } else {
-              // Ensure fallback folder and placeholder PDF exist
-              const tempDir = path.resolve(__dirname, '../uploads/temp');
-              if (!fs.existsSync(tempDir)) {
-                fs.mkdirSync(tempDir, { recursive: true });
-              }
-              brochurePath = path.join(tempDir, 'amudhasurabiy_brochure.pdf');
-              if (!fs.existsSync(brochurePath)) {
-                fs.writeFileSync(brochurePath, 'Amudhasurabiy Organics Catalogue Brochure Placeholder PDF.');
-              }
-            }
-
-            const customerObj = await Customer.findOne({
-              where: {
-                [Op.or]: [
-                  { phone: fromPhone },
-                  { phone: { [Op.like]: `%${fromPhone}%` } }
-                ]
-              }
-            });
-
-            await whatsappService.sendPdf(
-              fromPhone,
-              'Here is our latest catalog brochure. Feel free to contact us with any questions!',
-              brochurePath,
-              customerObj?.id || null,
-              'Chatbot Catalogue'
-            );
-          } catch (err) {
-            console.error('Chatbot catalogue reply failed:', err.message);
-          }
-        } else if (lowerText.endsWith(' price')) {
-          try {
-            const productName = text.substring(0, text.length - 6).trim();
-            const Product = require('../models/Product');
-            const product = await Product.findOne({
-              where: {
-                name: { [Op.like]: `%${productName}%` }
-              }
-            });
-
-            if (product) {
-              const cardMsg = `💰 *Product Price Card* 💰
-----------------------------------
-*Name:* ${product.name}
-*Price:* Rs. ${Number(product.sellingPrice || product.price || 0).toFixed(2)}
-*MRP:* Rs. ${Number(product.mrp || product.price || 0).toFixed(2)}
-*Stock Status:* ${product.stock > 0 ? `🟢 In Stock (${Math.round(product.stock)} items)` : '🔴 Out of Stock'}
-----------------------------------
-Amudhasurabiy Organics`;
-
-              await whatsappService.sendMessage(fromPhone, cardMsg, null, 'Chatbot Product Price');
-            } else {
-              await whatsappService.sendMessage(fromPhone, `Sorry, we couldn't find the price for "${productName}" in our catalog.`, null, 'Chatbot Product Price');
-            }
-          } catch (err) {
-            console.error('Chatbot product price reply failed:', err.message);
-          }
-        } else if (lowerText.startsWith('show ')) {
-          const productName = text.substring(5).trim();
-          const Product = require('../models/Product');
-          const product = await Product.findOne({
-            where: {
-              name: { [Op.like]: `%${productName}%` }
-            }
-          });
-
-          if (product) {
-            const cardMsg = `🌟 *PRODUCT CARD* 🌟
-----------------------------------
-*Name:* ${product.name}
-*Price:* Rs. ${Number(product.sellingPrice || product.price || 0).toFixed(2)}
-*Stock:* ${product.stock > 0 ? `🟢 In Stock (${Math.round(product.stock)} items)` : '🔴 Out of Stock'}
-${product.benefits ? `\n*Benefits:* ${product.benefits}` : ''}
-${product.ingredients ? `\n*Ingredients:* ${product.ingredients}` : ''}
-${product.description ? `\n*Description:* ${product.description}` : ''}
-----------------------------------
-Amudhasurabiy Organics`;
-
-            try {
-              if (product.image) {
-                const cleanImgPath = product.image.startsWith('/') ? product.image.substring(1) : product.image;
-                const imagePath = path.resolve(__dirname, '..', cleanImgPath);
-                
-                if (fs.existsSync(imagePath)) {
-                  await whatsappService.sendImage(fromPhone, cardMsg, imagePath, null, 'Chatbot Card');
-                } else {
-                  await whatsappService.sendMessage(fromPhone, cardMsg, null, 'Chatbot Card');
-                }
-              } else {
-                await whatsappService.sendMessage(fromPhone, cardMsg, null, 'Chatbot Card');
-              }
-            } catch (replyErr) {
-              console.error('Failed to send product card reply:', replyErr.message);
-            }
-          } else {
-            const notFoundMsg = `Sorry, we couldn't find any product matching "${productName}" in our catalog.`;
-            try {
-              await whatsappService.sendMessage(fromPhone, notFoundMsg, null, 'Chatbot Card');
-            } catch (replyErr) {
-              console.error('Failed to send not-found reply:', replyErr.message);
-            }
-          }
-        } else {
-          // General AI responder using Gemini if key is set
-          if (process.env.GEMINI_API_KEY) {
-            try {
-              const aiController = require('./aiController');
-              const prompt = `
-                A customer sent the following message on WhatsApp: "${text}".
-                
-                Reply back as the AO AI Assistant for Amudhasurabiy Organics. 
-                Keep the response concise (under 2-3 sentences), helpful, friendly, and in pure text format.
-              `;
-              const replyText = await aiController.callGemini(prompt);
-              await whatsappService.sendMessage(fromPhone, replyText, null, 'AI Chatbot Auto Reply');
-            } catch (aiErr) {
-              console.error('AI webhook responder failed:', aiErr.message);
-            }
-          }
+    if (msgId) {
+      const log = await WhatsAppLog.findOne({
+        where: {
+          [Op.or]: [
+            { response: { [Op.like]: `%${msgId}%` } },
+            { id: msgId }
+          ]
         }
+      });
+
+      if (log) {
+        if (msgStatus) {
+          log.status = msgStatus;
+        } else if (ack === 2) {
+          log.status = 'Delivered';
+        } else if (ack === 3 || ack === 4) {
+          log.status = 'Read';
+        }
+        if (error) {
+          log.error = error;
+        }
+        await log.save();
+        console.log(`Webhook updated WhatsApp log ID ${log.id} status to ${log.status}`);
       }
     }
 

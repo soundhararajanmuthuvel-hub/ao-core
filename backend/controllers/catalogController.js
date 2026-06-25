@@ -145,8 +145,27 @@ exports.sendCatalogWhatsApp = async (req, res, next) => {
   try {
     const { phone, customerId, pricingType = 'retail', category = 'All', format = 'pdf', productId } = req.body;
 
+    const WhatsAppSettings = require('../models/WhatsAppSettings');
+    const waSettings = await WhatsAppSettings.findOne();
+    if (!waSettings || waSettings.status !== 'Connected') {
+      return res.status(400).json({ success: false, message: 'CRM Not Connected' });
+    }
+    if (!waSettings.crmApiKey) {
+      return res.status(400).json({ success: false, message: 'API Key Missing' });
+    }
+
     if (!phone) {
-      return res.status(400).json({ message: 'Phone number is required' });
+      return res.status(400).json({ success: false, message: 'Customer Phone Missing' });
+    }
+
+    let customerName = 'Customer';
+    let customerObj = null;
+    if (customerId) {
+      customerObj = await Customer.findByPk(customerId);
+      if (!customerObj) {
+        return res.status(404).json({ success: false, message: 'Customer Not Found' });
+      }
+      customerName = customerObj.name;
     }
 
     const settings = await getSettings();
@@ -154,20 +173,17 @@ exports.sendCatalogWhatsApp = async (req, res, next) => {
     const contactPhone = settings.phone || '7010602115';
     const website = settings.websiteUrl || 'www.amudhasurabiy.com';
 
-    let customerName = 'Customer';
-    if (customerId) {
-      const customer = await Customer.findByPk(customerId);
-      if (customer) {
-        customerName = customer.name;
-      }
-    }
-
     const messageText = `Hello ${customerName},\n\nThank you for your interest.\n\nPlease find our latest product catalog attached.\n\nRegards,\n${companyName}\n\nPhone: ${contactPhone}\nWebsite: ${website}`;
-
     const cacheDir = getCacheDir();
 
+    let result;
     if (format === 'pdf') {
-      // 1. Generate / retrieve PDF from cache
+      const IntegrationCatalogue = require('../models/IntegrationCatalogue');
+      const catalogue = await IntegrationCatalogue.findOne();
+      if (!catalogue) {
+        return res.status(404).json({ success: false, message: 'Catalogue Not Found' });
+      }
+
       const cacheFilename = `catalog_PDF_${category.replace(/[^a-zA-Z0-9]/g, '_')}_${pricingType}.pdf`;
       const pdfPath = path.join(cacheDir, cacheFilename);
 
@@ -180,54 +196,51 @@ exports.sendCatalogWhatsApp = async (req, res, next) => {
           where: query,
           order: [['category', 'ASC'], ['name', 'ASC']]
         });
-        const pdfBuffer = await catalogGenerator.buildPdfCatalog(products, settings, pricingType);
-        fs.writeFileSync(pdfPath, pdfBuffer);
+        try {
+          const pdfBuffer = await catalogGenerator.buildPdfCatalog(products, settings, pricingType);
+          fs.writeFileSync(pdfPath, pdfBuffer);
+        } catch (pdfErr) {
+          console.error('Catalogue PDF build failed:', pdfErr.message);
+          return res.status(500).json({ success: false, message: 'PDF Generation Failed' });
+        }
       }
 
-      // Send PDF document via whatsappService
-      const result = await whatsappService.sendPdf(phone, messageText, pdfPath, customerId || null, 'Greeting');
-
+      result = await whatsappService.sendPdf(phone, messageText, pdfPath, customerId || null, 'Catalogue');
       await logActivity(req.user.id, 'share', 'catalog', `Sent PDF catalog (${category} / ${pricingType}) to ${customerName} (${phone})`);
-
-      res.json({
-        success: true,
-        message: 'Product catalog PDF sent successfully via WhatsApp.',
-        messageId: result.messageId,
-        logId: result.logId
-      });
     } else {
-      // Image format (SVG catalog)
+      // Image format
       if (!productId) {
-        return res.status(400).json({ message: 'Product ID is required for image catalog sharing' });
+        return res.status(400).json({ success: false, message: 'Product ID is required for image catalog sharing' });
       }
 
       const product = await Product.findByPk(productId);
       if (!product) {
-        return res.status(404).json({ message: 'Product not found' });
+        return res.status(404).json({ success: false, message: 'Catalogue Not Found' });
       }
 
       const cacheFilename = `catalog_IMG_${productId}_1080x1080_${pricingType}.svg`;
       const svgPath = path.join(cacheDir, cacheFilename);
 
       if (!fs.existsSync(svgPath)) {
-        const svgString = await catalogGenerator.buildSvgCatalog(product, settings, '1080x1080', pricingType);
-        fs.writeFileSync(svgPath, svgString, 'utf-8');
+        try {
+          const svgString = await catalogGenerator.buildSvgCatalog(product, settings, '1080x1080', pricingType);
+          fs.writeFileSync(svgPath, svgString, 'utf-8');
+        } catch (svgErr) {
+          return res.status(500).json({ success: false, message: 'PDF Generation Failed' });
+        }
       }
 
-      // Send text message with a public link to the product card
       const publicLinkMessage = `${messageText}\n\nView product online: https://erp.amudhasurabiy.com/catalog?search=${encodeURIComponent(product.name)}`;
-      const result = await whatsappService.sendMessage(phone, publicLinkMessage, customerId || null, 'Greeting');
-
+      result = await whatsappService.sendImage(phone, publicLinkMessage, svgPath, customerId || null, 'Product Card');
       await logActivity(req.user.id, 'share', 'catalog', `Sent product image catalog link for ${product.name} to ${customerName} (${phone})`);
-
-      res.json({
-        success: true,
-        message: 'Product catalog details shared successfully via WhatsApp.',
-        messageId: result.messageId,
-        logId: result.logId
-      });
     }
+
+    res.json(result);
   } catch (err) {
+    let errMsg = err.message;
+    if (errMsg === 'Network Error' || errMsg === 'CRM API Rejected Request' || errMsg === 'CRM Not Connected' || errMsg === 'API Key Missing' || errMsg === 'Customer Phone Missing') {
+      return res.status(400).json({ success: false, message: errMsg });
+    }
     next(err);
   }
 };

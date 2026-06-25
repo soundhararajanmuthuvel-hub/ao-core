@@ -7,7 +7,7 @@ import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePWA } from '../context/PWAContext';
 
@@ -31,6 +31,7 @@ export default function SettingsPage() {
   const { user, logout, updateTourCompleted } = useAuth();
   const isSuperAdmin = user?.role === 'Super Admin';
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const tabParam = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState(tabParam || 'profile');
   const { isInstallable, isInstalled, installApp } = usePWA();
@@ -109,6 +110,101 @@ export default function SettingsPage() {
   const [showWaErrorModal, setShowWaErrorModal] = useState(false);
   const [waLastTestResult, setWaLastTestResult] = useState(null);
   const [waErrorDetails, setWaErrorDetails] = useState('');
+
+  const [showWaSuccessModal, setShowWaSuccessModal] = useState(false);
+  const [waSuccessData, setWaSuccessData] = useState(null);
+  const [waTestingMsg, setWaTestingMsg] = useState(false);
+  const [waTestingCat, setWaTestingCat] = useState(false);
+  const [waTestingInv, setWaTestingInv] = useState(false);
+  const [waRetrying, setWaRetrying] = useState(false);
+
+  const handleSendTestMessage = async () => {
+    setWaTestingMsg(true);
+    try {
+      const { data } = await whatsappApi.sendTestMessage();
+      if (data.success) {
+        toast('✓ Test message sent successfully!', 'success');
+        setWaSuccessData(data.data || {
+          customerName: 'Test Contact',
+          phone: waForm.crmBaseUrl ? 'Gateway Config' : '917010602115',
+          messageType: 'Test Message',
+          timestamp: new Date().toISOString(),
+          referenceId: data.messageId || 'test-ref-id'
+        });
+        setShowWaSuccessModal(true);
+      } else {
+        toast(data.message || 'Failed to send test message', 'error');
+      }
+    } catch (err) {
+      toast(err.response?.data?.message || 'Failed to send test message', 'error');
+    } finally {
+      setWaTestingMsg(false);
+    }
+  };
+
+  const handleSendTestCatalogue = async () => {
+    setWaTestingCat(true);
+    try {
+      const { data } = await whatsappApi.sendTestCatalogue();
+      if (data.success) {
+        toast('✓ Test catalogue sent successfully!', 'success');
+        setWaSuccessData(data.data || {
+          customerName: 'Test Contact',
+          phone: waForm.crmBaseUrl ? 'Gateway Config' : '917010602115',
+          messageType: 'Catalogue PDF',
+          timestamp: new Date().toISOString(),
+          referenceId: data.messageId || 'test-ref-id'
+        });
+        setShowWaSuccessModal(true);
+      } else {
+        toast(data.message || 'Failed to send test catalogue', 'error');
+      }
+    } catch (err) {
+      toast(err.response?.data?.message || 'Failed to send test catalogue', 'error');
+    } finally {
+      setWaTestingCat(false);
+    }
+  };
+
+  const handleSendTestInvoice = async () => {
+    setWaTestingInv(true);
+    try {
+      const { data } = await whatsappApi.sendTestInvoice();
+      if (data.success) {
+        toast('✓ Test invoice sent successfully!', 'success');
+        setWaSuccessData(data.data || {
+          customerName: 'Test Contact',
+          phone: waForm.crmBaseUrl ? 'Gateway Config' : '917010602115',
+          messageType: 'Invoice PDF',
+          timestamp: new Date().toISOString(),
+          referenceId: data.messageId || 'test-ref-id'
+        });
+        setShowWaSuccessModal(true);
+      } else {
+        toast(data.message || 'Failed to send test invoice', 'error');
+      }
+    } catch (err) {
+      toast(err.response?.data?.message || 'Failed to send test invoice', 'error');
+    } finally {
+      setWaTestingInv(false);
+    }
+  };
+
+  const handleRetryFailedLogs = async () => {
+    setWaRetrying(true);
+    try {
+      const { data } = await whatsappApi.retryFailedLogs();
+      if (data.success) {
+        toast(data.message || 'Retried failed logs successfully!', 'success');
+      } else {
+        toast(data.message || 'Failed to retry logs', 'error');
+      }
+    } catch (err) {
+      toast(err.response?.data?.message || 'Failed to retry logs', 'error');
+    } finally {
+      setWaRetrying(false);
+    }
+  };
 
   const loadWhatsAppSettings = async () => {
     setWaLoading(true);
@@ -651,7 +747,7 @@ export default function SettingsPage() {
             color: activeTab === 'whatsapp' ? '#ff9800' : '#64748b',
           }}
         >
-          💬 WhatsApp Integration
+          💬 CRM WhatsApp
         </button>
         <button
           type="button"
@@ -1935,73 +2031,57 @@ export default function SettingsPage() {
         {activeTab === 'whatsapp' && (
           <div className="card" style={{ maxWidth: 600, padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              💬 WhatsApp Integration Configurations
+              💬 CRM WhatsApp Configurations
             </h3>
             <p style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-              Configure your self-hosted WAHA (WhatsApp HTTP API) or third-party WhatsApp Gateway credentials. 
+              Configure your Custom CRM WhatsApp gateway credentials. 
               Only Super Admin users can modify these settings.
             </p>
 
             {waLoading ? <LoadingSpinner /> : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div className="form-group">
-                  <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>WhatsApp API Provider</label>
-                  <select 
-                    className="form-control" 
-                    value={waForm.provider || 'WAHA'} 
-                    onChange={(e) => setWaForm({ ...waForm, provider: e.target.value })}
-                    disabled={!isSuperAdmin || waSaving}
-                  >
-                    <option value="WAHA">WAHA (WhatsApp HTTP API)</option>
-                    <option value="Evolution API">Evolution API</option>
-                    <option value="UltraMsg">UltraMsg</option>
-                    <option value="Green API">Green API</option>
-                    <option value="Meta Cloud API">Meta Cloud API</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>API Base URL</label>
+                  <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>CRM Base URL</label>
                   <input 
                     type="url"
                     className="form-control" 
-                    placeholder="e.g. http://localhost:3000"
-                    value={waForm.apiUrl || ''} 
-                    onChange={(e) => setWaForm({ ...waForm, apiUrl: e.target.value })}
+                    placeholder="e.g. http://localhost:5000/api/whatsapp/mock-crm"
+                    value={waForm.crmBaseUrl || waForm.apiUrl || ''} 
+                    onChange={(e) => setWaForm({ ...waForm, crmBaseUrl: e.target.value, apiUrl: e.target.value })}
                     disabled={!isSuperAdmin || waSaving}
                   />
                   <small style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
-                    Enter the URL of your WAHA instance or provider gateway endpoint.
+                    Enter the URL of your Custom CRM integration endpoint.
                   </small>
                 </div>
 
                 <div className="form-group">
-                  <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>API Key (Token)</label>
+                  <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>CRM API Key</label>
                   <input 
                     type="password"
                     className="form-control" 
-                    placeholder={waForm.apiKey ? '********' : 'Enter API Key / Token'}
-                    value={waForm.apiKey || ''} 
-                    onChange={(e) => setWaForm({ ...waForm, apiKey: e.target.value })}
+                    placeholder={waForm.crmApiKey || waForm.apiKey ? '********' : 'Enter CRM API Key'}
+                    value={waForm.crmApiKey || waForm.apiKey || ''} 
+                    onChange={(e) => setWaForm({ ...waForm, crmApiKey: e.target.value, apiKey: e.target.value })}
                     disabled={!isSuperAdmin || waSaving}
                   />
                   <small style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
-                    Token or Bearer Authorization key for gateway API request header protection.
+                    API Key for authenticating with the Custom CRM gateway.
                   </small>
                 </div>
 
                 <div className="form-group">
-                  <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>Instance ID / Session Name</label>
+                  <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>CRM Secret Key</label>
                   <input 
-                    type="text"
+                    type="password"
                     className="form-control" 
-                    placeholder="e.g. default"
-                    value={waForm.instanceId || ''} 
-                    onChange={(e) => setWaForm({ ...waForm, instanceId: e.target.value })}
+                    placeholder={waForm.crmSecret || waForm.instanceId ? '********' : 'Enter CRM Secret Key'}
+                    value={waForm.crmSecret || waForm.instanceId || ''} 
+                    onChange={(e) => setWaForm({ ...waForm, crmSecret: e.target.value, instanceId: e.target.value })}
                     disabled={!isSuperAdmin || waSaving}
                   />
                   <small style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
-                    Unique session name registered inside the WhatsApp provider backend.
+                    Secret Key used for secure gateway validation.
                   </small>
                 </div>
 
@@ -2063,7 +2143,7 @@ export default function SettingsPage() {
                     )}
                   </div>
                   <div style={{ fontSize: '0.85rem', color: '#475569' }}>
-                    <strong>Instance ID:</strong> {waForm.instanceId || 'N/A'} | <strong>Provider:</strong> {waForm.provider || 'WAHA'}
+                    <strong>Gateway Address:</strong> {waForm.crmBaseUrl || waForm.apiUrl || 'N/A'}
                   </div>
                   {waLastTestResult && (
                     <div style={{ 
@@ -2100,6 +2180,84 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 )}
+
+                {/* CRM WhatsApp Test Center */}
+                <div style={{
+                  borderTop: '1px solid #e2e8f0',
+                  paddingTop: '1.5rem',
+                  marginTop: '1.5rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem'
+                }}>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>
+                    🛠️ CRM WhatsApp Test Center
+                  </h4>
+                  <p style={{ color: '#64748b', fontSize: '0.8rem', margin: 0 }}>
+                    Perform diagnostic triggers to test message formats, check delivery logs, and retry failed transmissions.
+                  </p>
+                  
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                    gap: '0.75rem',
+                    marginTop: '0.5rem'
+                  }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleSendTestMessage}
+                      disabled={waTestingMsg || waForm.status !== 'Connected'}
+                      style={{ fontSize: '0.8rem', padding: '0.5rem', fontWeight: 600 }}
+                    >
+                      {waTestingMsg ? 'Sending...' : '💬 Send Test Message'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleSendTestCatalogue}
+                      disabled={waTestingCat || waForm.status !== 'Connected'}
+                      style={{ fontSize: '0.8rem', padding: '0.5rem', fontWeight: 600 }}
+                    >
+                      {waTestingCat ? 'Sending...' : '📁 Test Catalogue'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleSendTestInvoice}
+                      disabled={waTestingInv || waForm.status !== 'Connected'}
+                      style={{ fontSize: '0.8rem', padding: '0.5rem', fontWeight: 600 }}
+                    >
+                      {waTestingInv ? 'Sending...' : '📄 Test Invoice'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => navigate('/crm/whatsapp-logs')}
+                      style={{ fontSize: '0.8rem', padding: '0.5rem', fontWeight: 600, backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569' }}
+                    >
+                      📊 View Logs
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleRetryFailedLogs}
+                      disabled={waRetrying}
+                      style={{ fontSize: '0.8rem', padding: '0.5rem', fontWeight: 600, backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#ef4444' }}
+                    >
+                      {waRetrying ? 'Retrying...' : '🔄 Retry Failed'}
+                    </button>
+                  </div>
+                  {waForm.status !== 'Connected' && (
+                    <small style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: 500 }}>
+                      ⚠️ Connect the gateway to enable test message, catalogue, and invoice dispatch features.
+                    </small>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -2314,17 +2472,16 @@ export default function SettingsPage() {
             <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '1rem', color: '#991b1b' }}>
               <h4 style={{ margin: '0 0 0.5rem 0', fontWeight: 700, fontSize: '0.95rem' }}>⚠️ GATEWAY CONNECTION FAILURE</h4>
               <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: '1.4' }}>
-                AO Core ERP tried to communicate with the self-hosted WhatsApp API server but the request was unsuccessful or returned an error state.
+                AO Core ERP tried to communicate with the Custom CRM WhatsApp API server but the request was unsuccessful or returned an error state.
               </p>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <strong style={{ fontSize: '0.9rem', color: '#334155' }}>Diagnostic Steps to Resolve:</strong>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.85rem', color: '#4b5563' }}>
-                <div>1. 🐳 <strong>Check WAHA Docker:</strong> Ensure that the Docker container for WhatsApp HTTP API is active (`docker ps`).</div>
-                <div>2. 🔗 <strong>Verify URL:</strong> Confirm that the URL `{waForm.apiUrl}` is accessible from the server host.</div>
-                <div>3. 📱 <strong>Scan QR Code:</strong> Access the WAHA Web Dashboard and ensure your phone is authenticated and session `{waForm.instanceId}` is marked as `SCAN_QR_CODE` or `CONNECTED`.</div>
-                <div>4. 🔑 <strong>Auth Key:</strong> Check if a protection API key was configured on the container and verify matches the settings.</div>
+                <div>1. 🔑 <strong>Verify API Key & Secret:</strong> Make sure your API Key and Secret are entered correctly in the settings.</div>
+                <div>2. 🔗 <strong>Verify URL:</strong> Confirm that the CRM Base URL `{waForm.crmBaseUrl || waForm.apiUrl}` is correct and accessible from the server host.</div>
+                <div>3. 🔌 <strong>Check CRM Status:</strong> Verify that the Custom CRM service is active and hasn't rate-limited or blocked your key.</div>
               </div>
             </div>
 
@@ -2348,6 +2505,109 @@ export default function SettingsPage() {
                 </pre>
               </div>
             )}
+          </div>
+        </Modal>
+      )}
+
+      {/* WhatsApp Dispatch Success Modal */}
+      {showWaSuccessModal && waSuccessData && (
+        <Modal
+          title="🎉 WhatsApp Sent Successfully"
+          onClose={() => setShowWaSuccessModal(false)}
+          footer={
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setShowWaSuccessModal(false)}
+              style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                padding: '0.5rem 1.5rem',
+                borderRadius: '8px',
+                color: '#fff',
+                fontWeight: 600,
+                boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)',
+                cursor: 'pointer'
+              }}
+            >
+              Okay
+            </button>
+          }
+        >
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+            padding: '0.5rem'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%)',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+              borderRadius: '12px',
+              padding: '1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5)'
+            }}>
+              <span style={{ fontSize: '2.5rem' }}>📱</span>
+              <div>
+                <h4 style={{ margin: 0, color: '#065f46', fontWeight: 700, fontSize: '1.1rem' }}>Message Dispatched</h4>
+                <p style={{ margin: '0.25rem 0 0 0', color: '#047857', fontSize: '0.85rem' }}>
+                  The message has been successfully routed via the CRM WhatsApp gateway.
+                </p>
+              </div>
+            </div>
+
+            <div style={{
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              padding: '1rem',
+              display: 'grid',
+              gridTemplateColumns: '1fr',
+              gap: '0.75rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500 }}>Customer Name:</span>
+                <span style={{ color: '#1e293b', fontSize: '0.85rem', fontWeight: 600 }}>{waSuccessData.customerName}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500 }}>Phone Number:</span>
+                <span style={{ color: '#1e293b', fontSize: '0.85rem', fontWeight: 600 }}>+{waSuccessData.phone}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500 }}>Message Type:</span>
+                <span style={{ 
+                  color: '#2563eb', 
+                  fontSize: '0.8rem', 
+                  fontWeight: 700,
+                  backgroundColor: '#eff6ff',
+                  padding: '0.2rem 0.5rem',
+                  borderRadius: '6px',
+                  border: '1px solid #bfdbfe'
+                }}>{waSuccessData.messageType}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500 }}>Timestamp:</span>
+                <span style={{ color: '#1e293b', fontSize: '0.85rem', fontWeight: 600 }}>
+                  {new Date(waSuccessData.timestamp).toLocaleString()}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500 }}>Reference ID:</span>
+                <span style={{ 
+                  color: '#475569', 
+                  fontSize: '0.8rem', 
+                  fontFamily: 'monospace',
+                  backgroundColor: '#f1f5f9',
+                  padding: '0.2rem 0.4rem',
+                  borderRadius: '4px',
+                  border: '1px solid #e2e8f0'
+                }}>{waSuccessData.referenceId}</span>
+              </div>
+            </div>
           </div>
         </Modal>
       )}
