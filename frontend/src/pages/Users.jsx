@@ -5,7 +5,7 @@ import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import LoadingSpinner from '../components/LoadingSpinner';
 
-const empty = { name: '', email: '', password: '', role: 'staff', isActive: true };
+const empty = { name: '', email: '', password: '', role: 'Super Admin', isActive: true };
 
 export default function Users() {
   const { toast } = useToast();
@@ -78,7 +78,20 @@ export default function Users() {
           <div className="form-group"><label>Name</label><input className="form-control" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
           <div className="form-group"><label>Email</label><input className="form-control" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
           <div className="form-group"><label>Password {modal === 'edit' && '(leave blank to keep)'}</label><input type="password" className="form-control" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
-          <div className="form-group"><label>Role</label><select className="form-control" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}><option value="admin">Admin</option><option value="staff">Staff</option></select></div>
+          <div className="form-group">
+            <label>Role</label>
+            <select className="form-control" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+              <option value="Super Admin">Super Admin</option>
+              <option value="Manufacturing Manager">Manufacturing Manager</option>
+              <option value="Billing Executive">Billing Executive</option>
+              <option value="Store Keeper">Store Keeper</option>
+              <option value="Dispatch Executive">Dispatch Executive</option>
+              <option value="Sales Executive">Sales Executive</option>
+              <option value="Sales Manager">Sales Manager</option>
+              <option value="Salesman">Salesman</option>
+              <option value="Delivery Staff">Delivery Staff</option>
+            </select>
+          </div>
           <div className="form-group"><label><input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} /> Active</label></div>
         </Modal>
       )}
