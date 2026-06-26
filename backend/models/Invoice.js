@@ -145,6 +145,66 @@ const Invoice = sequelize.define('Invoice', {
     defaultValue: false,
     allowNull: false,
   },
+  invoiceType: {
+    type: DataTypes.STRING,
+    defaultValue: 'NON_GST',
+  },
+  gstMode: {
+    type: DataTypes.STRING,
+    defaultValue: 'None',
+  },
+  sellerGSTIN: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  customerGSTIN: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  placeOfSupply: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  gstApplicable: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  isGSTReportable: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  isGSTPortalExported: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  exportedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  hsnSummary: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  taxableAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  cgstAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  sgstAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  igstAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  totalGST: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
 });
 
 // Associations

@@ -125,7 +125,7 @@ const mapPurchaseGstRow = (purchase) => {
     const qty = Number(item.qty || 0);
     const unitPrice = Number(item.unitPrice || 0);
     const taxableAmount = roundMoney(qty * unitPrice);
-    const taxAmount = roundMoney(item.taxAmount || Number(item.lineTotal || 0) - taxableAmount);
+    const taxAmount = roundMoney(item.taxAmount !== undefined && item.taxAmount !== null ? Number(item.taxAmount) : Number(item.lineTotal || 0) - taxableAmount);
     return {
       id: item.id,
       productId: item.productId,
@@ -133,7 +133,7 @@ const mapPurchaseGstRow = (purchase) => {
       sku: item.product?.sku || '',
       qty,
       unitPrice,
-      gstPercent: Number(item.gstPercent || item.product?.gstPercent || 0),
+      gstPercent: item.gstPercent !== undefined && item.gstPercent !== null ? Number(item.gstPercent) : Number(item.product?.gstPercent || 0),
       taxableAmount,
       taxAmount,
       cgstAmount: roundMoney(item.cgstAmount || 0),
@@ -1292,11 +1292,19 @@ exports.procurementReport = async (req, res, next) => {
   }
 };
 
-const loadSalesGstRows = async ({ from, to } = {}) => {
+const loadSalesGstRows = async (filters = {}) => {
+  const { from, to, month, quarter, financialYear, customerId, customer, gstNumber, state, hsn } = filters;
+  
   const query = {
     is_historical_data: { [Op.ne]: true },
-    gstTotal: { [Op.gt]: 0 }
+    [Op.or]: [
+      { invoiceType: 'GST' },
+      { customerGSTIN: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }] } },
+      { '$customer.gstNumber$': { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }] } }
+    ]
   };
+
+  // Date filters
   if (from || to) {
     query.date = {};
     if (from) {
@@ -1311,20 +1319,106 @@ const loadSalesGstRows = async ({ from, to } = {}) => {
     }
   }
 
+  // Month filter (YYYY-MM format)
+  if (month) {
+    const year = parseInt(month.split('-')[0], 10);
+    const monthIndex = parseInt(month.split('-')[1], 10) - 1;
+    const start = new Date(year, monthIndex, 1);
+    const end = new Date(year, monthIndex + 1, 0, 23, 59, 59, 999);
+    query.date = {
+      [Op.gte]: start,
+      [Op.lte]: end
+    };
+  }
+
+  // Quarter filter
+  if (quarter) {
+    const currentYear = new Date().getFullYear();
+    let qYear = currentYear;
+    if (financialYear) {
+      const parts = financialYear.split('-');
+      qYear = parseInt(parts[0], 10);
+    }
+    let start, end;
+    if (quarter === 'Q1') {
+      start = new Date(qYear, 3, 1);
+      end = new Date(qYear, 5, 30, 23, 59, 59, 999);
+    } else if (quarter === 'Q2') {
+      start = new Date(qYear, 6, 1);
+      end = new Date(qYear, 8, 30, 23, 59, 59, 999);
+    } else if (quarter === 'Q3') {
+      start = new Date(qYear, 9, 1);
+      end = new Date(qYear, 11, 31, 23, 59, 59, 999);
+    } else if (quarter === 'Q4') {
+      start = new Date(qYear + 1, 0, 1);
+      end = new Date(qYear + 1, 2, 31, 23, 59, 59, 999);
+    }
+    if (start && end) {
+      query.date = {
+        [Op.gte]: start,
+        [Op.lte]: end
+      };
+    }
+  }
+
+  // Financial Year filter
+  if (financialYear && !quarter) {
+    const parts = financialYear.split('-');
+    const startYear = parseInt(parts[0], 10);
+    const endYear = startYear + 1;
+    const start = new Date(startYear, 3, 1);
+    const end = new Date(endYear, 2, 31, 23, 59, 59, 999);
+    query.date = {
+      [Op.gte]: start,
+      [Op.lte]: end
+    };
+  }
+
+  // Customer filters
+  if (customerId) {
+    query.customerId = customerId;
+  }
+
+  // Place of supply / State filter
+  if (state) {
+    query.placeOfSupply = { [Op.like]: `%${state}%` };
+  }
+
+  // Customer GSTIN filter
+  if (gstNumber) {
+    query.customerGSTIN = { [Op.like]: `%${gstNumber}%` };
+  }
+
+  const include = [
+    {
+      model: Customer,
+      as: 'customer',
+      attributes: ['id', 'name', 'gstNumber', 'state', 'pincode', 'gstBillingMode', 'customerCode'],
+      where: {}
+    },
+    {
+      model: InvoiceItem,
+      as: 'items',
+      required: hsn ? true : false,
+      include: [
+        {
+          model: Product,
+          as: 'product',
+          attributes: ['id', 'name', 'sku', 'gstPercent', 'gstClass'],
+          where: hsn ? { gstClass: hsn } : undefined,
+          required: hsn ? true : false
+        }
+      ]
+    }
+  ];
+
+  if (customer) {
+    include[0].where.name = { [Op.like]: `%${customer}%` };
+  }
+
   const invoices = await Invoice.findAll({
     where: query,
-    include: [
-      {
-        model: Customer,
-        as: 'customer',
-        attributes: ['id', 'name', 'gstNumber', 'state', 'pincode', 'gstBillingMode', 'customerCode']
-      },
-      {
-        model: InvoiceItem,
-        as: 'items',
-        include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'sku', 'gstPercent', 'gstClass'] }]
-      }
-    ],
+    include: include,
     order: [['date', 'DESC'], ['id', 'DESC']]
   });
 
@@ -1333,7 +1427,7 @@ const loadSalesGstRows = async ({ from, to } = {}) => {
       const qty = Number(item.qty || 0);
       const unitPrice = Number(item.unitPrice || 0);
       const lineTotal = Number(item.lineTotal || 0);
-      const gstPercent = Number(item.gstPercent || 0);
+      const gstPercent = item.gstPercent !== undefined && item.gstPercent !== null ? Number(item.gstPercent) : Number(item.product?.gstPercent || 0);
 
       let taxableAmount = lineTotal;
       let taxAmount = 0;
@@ -1344,6 +1438,9 @@ const loadSalesGstRows = async ({ from, to } = {}) => {
       } else if (inv.gstBillingMode === 'exclusive') {
         taxableAmount = lineTotal;
         taxAmount = lineTotal * (gstPercent / 100);
+      } else {
+        taxableAmount = lineTotal;
+        taxAmount = 0;
       }
 
       const custStateCode = inv.customer?.state ? getStateCodeByName(inv.customer.state) : '';
@@ -1383,22 +1480,22 @@ const loadSalesGstRows = async ({ from, to } = {}) => {
       customerId: inv.customerId,
       customerCode: inv.customer?.customerCode || '',
       customerName: inv.customer?.name || 'Walk-in Customer',
-      customerGstNumber: inv.customer?.gstNumber || '',
-      customerState: inv.customer?.state || '',
+      customerGstNumber: inv.customerGSTIN || inv.customer?.gstNumber || '',
+      customerState: inv.placeOfSupply || inv.customer?.state || '',
       gstBillingMode: inv.gstBillingMode || 'exclusive',
       paymentMethod: inv.paymentMethod,
       paymentStatus: inv.paymentStatus,
       shippingCharge: Number(inv.shippingCharge || 0),
       grandTotal: Number(inv.grandTotal || 0),
       date: inv.date,
-      taxableAmount: roundMoney(taxableAmount),
-      cgstAmount: roundMoney(cgstAmount),
-      sgstAmount: roundMoney(sgstAmount),
-      igstAmount: roundMoney(igstAmount),
-      gstTotal: roundMoney(gstTotal),
+      taxableAmount: roundMoney(Number(inv.taxableAmount) || Number(inv.taxableValue) || taxableAmount),
+      cgstAmount: roundMoney(Number(inv.cgstAmount) || cgstAmount),
+      sgstAmount: roundMoney(Number(inv.sgstAmount) || sgstAmount),
+      igstAmount: roundMoney(Number(inv.igstAmount) || igstAmount),
+      gstTotal: roundMoney(Number(inv.totalGST) || Number(inv.gstTotal) || gstTotal),
       items
     };
-  });
+  }).filter(r => r.gstTotal > 0);
 };
 
 exports.salesGstr1Report = async (req, res, next) => {
@@ -1407,36 +1504,268 @@ exports.salesGstr1Report = async (req, res, next) => {
 
     if (req.query.export === 'excel') {
       const wb = new ExcelJS.Workbook();
-      const ws = wb.addWorksheet('GSTR-1 Report');
-      ws.columns = [
+
+      // --- 1. B2B Sheet ---
+      const wsB2b = wb.addWorksheet('B2B');
+      wsB2b.columns = [
+        { header: 'GSTIN/UIN of Recipient', key: 'gstin', width: 22 },
+        { header: 'Receiver Name', key: 'receiverName', width: 25 },
         { header: 'Invoice Number', key: 'invoiceNumber', width: 18 },
-        { header: 'Date', key: 'date', width: 15 },
-        { header: 'Customer Name', key: 'customerName', width: 25 },
-        { header: 'GSTIN', key: 'customerGstNumber', width: 20 },
-        { header: 'Taxable Value', key: 'taxableAmount', width: 15 },
-        { header: 'CGST', key: 'cgstAmount', width: 12 },
-        { header: 'SGST', key: 'sgstAmount', width: 12 },
-        { header: 'IGST', key: 'igstAmount', width: 12 },
-        { header: 'GST Total', key: 'gstTotal', width: 15 },
-        { header: 'Invoice Value', key: 'grandTotal', width: 15 },
-        { header: 'Billing State', key: 'customerState', width: 18 }
+        { header: 'Invoice Date', key: 'date', width: 15 },
+        { header: 'Invoice Value', key: 'value', width: 15 },
+        { header: 'Place Of Supply', key: 'pos', width: 18 },
+        { header: 'Reverse Charge', key: 'reverseCharge', width: 15 },
+        { header: 'Invoice Type', key: 'invoiceType', width: 15 },
+        { header: 'Rate (%)', key: 'rate', width: 12 },
+        { header: 'Taxable Value', key: 'taxableValue', width: 15 },
+        { header: 'CGST', key: 'cgst', width: 12 },
+        { header: 'SGST', key: 'sgst', width: 12 },
+        { header: 'IGST', key: 'igst', width: 12 }
       ];
 
-      rows.forEach(r => ws.addRow({
-        invoiceNumber: r.invoiceNumber,
-        date: formatReportDate(r.date),
-        customerName: r.customerName,
-        customerGstNumber: r.customerGstNumber,
-        taxableAmount: r.taxableAmount,
-        cgstAmount: r.cgstAmount,
-        sgstAmount: r.sgstAmount,
-        igstAmount: r.igstAmount,
-        gstTotal: r.gstTotal,
-        grandTotal: r.grandTotal,
-        customerState: r.customerState
-      }));
+      const b2bRows = [];
+      rows.forEach(r => {
+        if (r.customerGstNumber && r.customerGstNumber.trim() !== '') {
+          const rateGroups = {};
+          r.items.forEach(item => {
+            const rate = item.gstPercent;
+            if (!rateGroups[rate]) {
+              rateGroups[rate] = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
+            }
+            rateGroups[rate].taxable += item.taxableAmount;
+            rateGroups[rate].cgst += item.cgstAmount;
+            rateGroups[rate].sgst += item.sgstAmount;
+            rateGroups[rate].igst += item.igstAmount;
+          });
+          
+          Object.keys(rateGroups).forEach(rate => {
+            b2bRows.push({
+              gstin: r.customerGstNumber,
+              receiverName: r.customerName,
+              invoiceNumber: r.invoiceNumber,
+              date: formatReportDate(r.date),
+              value: r.grandTotal,
+              pos: r.customerState,
+              reverseCharge: 'N',
+              invoiceType: 'Regular',
+              rate: Number(rate),
+              taxableValue: roundMoney(rateGroups[rate].taxable),
+              cgst: roundMoney(rateGroups[rate].cgst),
+              sgst: roundMoney(rateGroups[rate].sgst),
+              igst: roundMoney(rateGroups[rate].igst)
+            });
+          });
+        }
+      });
+      b2bRows.forEach(row => wsB2b.addRow(row));
 
-      return sendExcel(res, wb, 'gstr-1-report.xlsx');
+      // --- 2. B2CL Sheet ---
+      const wsB2cl = wb.addWorksheet('B2CL');
+      wsB2cl.columns = [
+        { header: 'Invoice Number', key: 'invoiceNumber', width: 18 },
+        { header: 'Invoice Date', key: 'date', width: 15 },
+        { header: 'Invoice Value', key: 'value', width: 15 },
+        { header: 'Place Of Supply', key: 'pos', width: 18 },
+        { header: 'Rate (%)', key: 'rate', width: 12 },
+        { header: 'Taxable Value', key: 'taxableValue', width: 15 },
+        { header: 'IGST Amount', key: 'igst', width: 15 }
+      ];
+
+      const b2clRows = [];
+      rows.forEach(r => {
+        const isUnregistered = (!r.customerGstNumber || r.customerGstNumber.trim() === '');
+        const custStateCode = r.customerState ? getStateCodeByName(r.customerState) : '';
+        const isInterState = custStateCode && custStateCode !== '33';
+        const isLarge = r.grandTotal > 250000;
+        
+        if (isUnregistered && isInterState && isLarge) {
+          const rateGroups = {};
+          r.items.forEach(item => {
+            const rate = item.gstPercent;
+            if (!rateGroups[rate]) {
+              rateGroups[rate] = { taxable: 0, igst: 0 };
+            }
+            rateGroups[rate].taxable += item.taxableAmount;
+            rateGroups[rate].igst += item.igstAmount;
+          });
+          
+          Object.keys(rateGroups).forEach(rate => {
+            b2clRows.push({
+              invoiceNumber: r.invoiceNumber,
+              date: formatReportDate(r.date),
+              value: r.grandTotal,
+              pos: r.customerState,
+              rate: Number(rate),
+              taxableValue: roundMoney(rateGroups[rate].taxable),
+              igst: roundMoney(rateGroups[rate].igst)
+            });
+          });
+        }
+      });
+      b2clRows.forEach(row => wsB2cl.addRow(row));
+
+      // --- 3. B2CS Sheet ---
+      const wsB2cs = wb.addWorksheet('B2CS');
+      wsB2cs.columns = [
+        { header: 'Type', key: 'type', width: 12 },
+        { header: 'Place Of Supply', key: 'pos', width: 18 },
+        { header: 'Rate (%)', key: 'rate', width: 12 },
+        { header: 'Taxable Value', key: 'taxableValue', width: 15 },
+        { header: 'CGST', key: 'cgst', width: 12 },
+        { header: 'SGST', key: 'sgst', width: 12 },
+        { header: 'IGST', key: 'igst', width: 12 }
+      ];
+
+      const b2csMap = {};
+      rows.forEach(r => {
+        const isUnregistered = (!r.customerGstNumber || r.customerGstNumber.trim() === '');
+        const custStateCode = r.customerState ? getStateCodeByName(r.customerState) : '';
+        const isInterState = custStateCode && custStateCode !== '33';
+        const isLarge = r.grandTotal > 250000;
+        
+        if (isUnregistered && (!isInterState || !isLarge)) {
+          const pos = r.customerState || 'Tamil Nadu';
+          r.items.forEach(item => {
+            const rate = item.gstPercent;
+            const key = `${pos}::${rate}`;
+            if (!b2csMap[key]) {
+              b2csMap[key] = {
+                type: 'OE',
+                pos,
+                rate: Number(rate),
+                taxableValue: 0,
+                cgst: 0,
+                sgst: 0,
+                igst: 0
+              };
+            }
+            b2csMap[key].taxableValue += item.taxableAmount;
+            b2csMap[key].cgst += item.cgstAmount;
+            b2csMap[key].sgst += item.sgstAmount;
+            b2csMap[key].igst += item.igstAmount;
+          });
+        }
+      });
+      const b2csRows = Object.values(b2csMap).map(row => {
+        row.taxableValue = roundMoney(row.taxableValue);
+        row.cgst = roundMoney(row.cgst);
+        row.sgst = roundMoney(row.sgst);
+        row.igst = roundMoney(row.igst);
+        return row;
+      });
+      b2csRows.forEach(row => wsB2cs.addRow(row));
+
+      // --- 4. HSN Sheet ---
+      const wsHsn = wb.addWorksheet('HSN');
+      wsHsn.columns = [
+        { header: 'HSN', key: 'hsn', width: 15 },
+        { header: 'Description', key: 'description', width: 25 },
+        { header: 'UQC', key: 'uqc', width: 12 },
+        { header: 'Total Quantity', key: 'qty', width: 15 },
+        { header: 'Total Value', key: 'totalValue', width: 15 },
+        { header: 'Taxable Value', key: 'taxableValue', width: 15 },
+        { header: 'CGST', key: 'cgst', width: 12 },
+        { header: 'SGST', key: 'sgst', width: 12 },
+        { header: 'IGST', key: 'igst', width: 12 },
+        { header: 'Total GST', key: 'totalGst', width: 15 }
+      ];
+
+      const hsnMap = {};
+      rows.forEach(r => {
+        r.items.forEach(item => {
+          const hsn = item.gstClass || '0000';
+          const rate = item.gstPercent;
+          const key = `${hsn}::${rate}`;
+          if (!hsnMap[key]) {
+            hsnMap[key] = {
+              hsn,
+              description: `GST Class ${hsn}`,
+              uqc: 'UQC',
+              qty: 0,
+              totalValue: 0,
+              taxableValue: 0,
+              cgst: 0,
+              sgst: 0,
+              igst: 0,
+              totalGst: 0
+            };
+          }
+          hsnMap[key].qty += item.qty;
+          hsnMap[key].taxableValue += item.taxableAmount;
+          hsnMap[key].cgst += item.cgstAmount;
+          hsnMap[key].sgst += item.sgstAmount;
+          hsnMap[key].igst += item.igstAmount;
+          hsnMap[key].totalGst += item.taxAmount;
+          hsnMap[key].totalValue += item.lineTotal;
+        });
+      });
+      const hsnRows = Object.values(hsnMap).map(row => {
+        row.qty = roundMoney(row.qty);
+        row.totalValue = roundMoney(row.totalValue);
+        row.taxableValue = roundMoney(row.taxableValue);
+        row.cgst = roundMoney(row.cgst);
+        row.sgst = roundMoney(row.sgst);
+        row.igst = roundMoney(row.igst);
+        row.totalGst = roundMoney(row.totalGst);
+        return row;
+      });
+      hsnRows.forEach(row => wsHsn.addRow(row));
+
+      // --- 5. Documents Sheet ---
+      const wsDocs = wb.addWorksheet('Documents');
+      wsDocs.columns = [
+        { header: 'Nature of Document', key: 'docType', width: 28 },
+        { header: 'Sr. No. From', key: 'from', width: 18 },
+        { header: 'Sr. No. To', key: 'to', width: 18 },
+        { header: 'Total Number', key: 'total', width: 15 },
+        { header: 'Cancelled', key: 'cancelled', width: 12 },
+        { header: 'Net Issued', key: 'net', width: 15 }
+      ];
+
+      let minInvoiceNum = '';
+      let maxInvoiceNum = '';
+      let totalCount = rows.length;
+      
+      if (rows.length > 0) {
+        const sortedInvoices = [...rows].sort((a, b) => a.invoiceNumber.localeCompare(b.invoiceNumber));
+        minInvoiceNum = sortedInvoices[0].invoiceNumber;
+        maxInvoiceNum = sortedInvoices[sortedInvoices.length - 1].invoiceNumber;
+      }
+      const docsRows = [{
+        docType: 'Invoices for outward supply',
+        from: minInvoiceNum,
+        to: maxInvoiceNum,
+        total: totalCount,
+        cancelled: 0,
+        net: totalCount
+      }];
+      docsRows.forEach(row => wsDocs.addRow(row));
+
+      // --- 6. Summary Sheet ---
+      const wsSummary = wb.addWorksheet('Summary');
+      wsSummary.columns = [
+        { header: 'Section / Sheet Name', key: 'section', width: 25 },
+        { header: 'Total Taxable Value', key: 'taxable', width: 20 },
+        { header: 'Total CGST', key: 'cgst', width: 15 },
+        { header: 'Total SGST', key: 'sgst', width: 15 },
+        { header: 'Total IGST', key: 'igst', width: 15 }
+      ];
+
+      const summaryRows = [
+        { section: 'B2B Total', taxable: b2bRows.reduce((s, r) => s + r.taxableValue, 0), cgst: b2bRows.reduce((s, r) => s + r.cgst, 0), sgst: b2bRows.reduce((s, r) => s + r.sgst, 0), igst: b2bRows.reduce((s, r) => s + r.igst, 0) },
+        { section: 'B2CL Total', taxable: b2clRows.reduce((s, r) => s + r.taxableValue, 0), cgst: 0, sgst: 0, igst: b2clRows.reduce((s, r) => s + r.igst, 0) },
+        { section: 'B2CS Total', taxable: b2csRows.reduce((s, r) => s + r.taxableValue, 0), cgst: b2csRows.reduce((s, r) => s + r.cgst, 0), sgst: b2csRows.reduce((s, r) => s + r.sgst, 0), igst: b2csRows.reduce((s, r) => s + r.igst, 0) },
+        { section: 'HSN Total', taxable: hsnRows.reduce((s, r) => s + r.taxableValue, 0), cgst: hsnRows.reduce((s, r) => s + r.cgst, 0), sgst: hsnRows.reduce((s, r) => s + r.sgst, 0), igst: hsnRows.reduce((s, r) => s + r.igst, 0) }
+      ];
+      summaryRows.forEach(row => {
+        row.taxable = roundMoney(row.taxable);
+        row.cgst = roundMoney(row.cgst);
+        row.sgst = roundMoney(row.sgst);
+        row.igst = roundMoney(row.igst);
+        wsSummary.addRow(row);
+      });
+
+      return sendExcel(res, wb, 'gstr-1-portal-report.xlsx');
     }
 
     if (req.query.export === 'csv') {
@@ -1638,16 +1967,36 @@ exports.salesGstSummaryReport = async (req, res, next) => {
     const sales = await loadSalesGstRows(req.query);
     const purchases = await loadPurchaseGstRows(req.query);
 
-    const totalLiability = sales.reduce((sum, item) => sum + item.gstTotal, 0);
-    const totalItc = purchases.reduce((sum, item) => sum + item.gstTotal, 0);
+    const cgstLiability = sales.reduce((sum, item) => sum + (item.cgstAmount || 0), 0);
+    const sgstLiability = sales.reduce((sum, item) => sum + (item.sgstAmount || 0), 0);
+    const igstLiability = sales.reduce((sum, item) => sum + (item.igstAmount || 0), 0);
+    const totalLiability = cgstLiability + sgstLiability + igstLiability;
+
+    const cgstItc = purchases.reduce((sum, item) => sum + (item.cgstAmount || 0), 0);
+    const sgstItc = purchases.reduce((sum, item) => sum + (item.sgstAmount || 0), 0);
+    const igstItc = purchases.reduce((sum, item) => sum + (item.igstAmount || 0), 0);
+    const totalItc = cgstItc + sgstItc + igstItc;
+
+    const netCgstPayable = cgstLiability - cgstItc;
+    const netSgstPayable = sgstLiability - sgstItc;
+    const netIgstPayable = igstLiability - igstItc;
     const netGstPayable = totalLiability - totalItc;
 
     res.json({
       success: true,
       report: 'GST Summary',
       data: {
+        cgstLiability: roundMoney(cgstLiability),
+        sgstLiability: roundMoney(sgstLiability),
+        igstLiability: roundMoney(igstLiability),
         totalLiability: roundMoney(totalLiability),
+        cgstItc: roundMoney(cgstItc),
+        sgstItc: roundMoney(sgstItc),
+        igstItc: roundMoney(igstItc),
         totalItc: roundMoney(totalItc),
+        netCgstPayable: roundMoney(netCgstPayable),
+        netSgstPayable: roundMoney(netSgstPayable),
+        netIgstPayable: roundMoney(netIgstPayable),
         netGstPayable: roundMoney(netGstPayable),
         salesCount: sales.length,
         purchasesCount: purchases.length

@@ -1305,35 +1305,59 @@ export default function ReportsPage() {
                     </div>
 
                     <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px' }}>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>Summary Matrix</h3>
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>Report Type</th>
-                            <th>Count</th>
-                            <th style={{ textAlign: 'right' }}>Tax Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td>Sales (Liability)</td>
-                            <td>{gstSummaryData.salesCount} Invoices</td>
-                            <td style={{ textAlign: 'right', fontWeight: 600, color: '#2563eb' }}>{formatCurrency(gstSummaryData.totalLiability)}</td>
-                          </tr>
-                          <tr>
-                            <td>Purchases (ITC)</td>
-                            <td>{gstSummaryData.purchasesCount} Receipts</td>
-                            <td style={{ textAlign: 'right', fontWeight: 600, color: '#16a34a' }}>{formatCurrency(gstSummaryData.totalItc)}</td>
-                          </tr>
-                          <tr style={{ borderTop: '2px solid #e2e8f0', fontWeight: 700 }}>
-                            <td>Net Due / Credit Balance</td>
-                            <td>—</td>
-                            <td style={{ textAlign: 'right', color: gstSummaryData.netGstPayable > 0 ? '#dc2626' : '#10b981' }}>
-                              {formatCurrency(gstSummaryData.netGstPayable)}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>
+                        📋 GSTR-3B Monthly Return Summary
+                      </h3>
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>Details of Tax Stream</th>
+                              <th style={{ textAlign: 'right' }}>CGST</th>
+                              <th style={{ textAlign: 'right' }}>SGST</th>
+                              <th style={{ textAlign: 'right' }}>IGST</th>
+                              <th style={{ textAlign: 'right' }}>Total Tax Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td style={{ fontWeight: 600 }}>1. Outward Taxable Supplies (Liability)</td>
+                              <td style={{ textAlign: 'right', color: '#2563eb' }}>{formatCurrency(gstSummaryData.cgstLiability || 0)}</td>
+                              <td style={{ textAlign: 'right', color: '#2563eb' }}>{formatCurrency(gstSummaryData.sgstLiability || 0)}</td>
+                              <td style={{ textAlign: 'right', color: '#2563eb' }}>{formatCurrency(gstSummaryData.igstLiability || 0)}</td>
+                              <td style={{ textAlign: 'right', fontWeight: 700, color: '#2563eb' }}>{formatCurrency(gstSummaryData.totalLiability || 0)}</td>
+                            </tr>
+                            <tr>
+                              <td style={{ fontWeight: 600 }}>2. Eligible Input Tax Credit (ITC)</td>
+                              <td style={{ textAlign: 'right', color: '#16a34a' }}>{formatCurrency(gstSummaryData.cgstItc || 0)}</td>
+                              <td style={{ textAlign: 'right', color: '#16a34a' }}>{formatCurrency(gstSummaryData.sgstItc || 0)}</td>
+                              <td style={{ textAlign: 'right', color: '#16a34a' }}>{formatCurrency(gstSummaryData.igstItc || 0)}</td>
+                              <td style={{ textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>{formatCurrency(gstSummaryData.totalItc || 0)}</td>
+                            </tr>
+                            <tr style={{ borderTop: '2px solid #e2e8f0', fontWeight: 700, backgroundColor: '#f8fafc' }}>
+                              <td>3. Net Tax Payable / Credit Carry-forward</td>
+                              <td style={{ textAlign: 'right', color: (gstSummaryData.netCgstPayable || 0) > 0 ? '#dc2626' : '#10b981' }}>
+                                {formatCurrency(gstSummaryData.netCgstPayable || 0)}
+                              </td>
+                              <td style={{ textAlign: 'right', color: (gstSummaryData.netSgstPayable || 0) > 0 ? '#dc2626' : '#10b981' }}>
+                                {formatCurrency(gstSummaryData.netSgstPayable || 0)}
+                              </td>
+                              <td style={{ textAlign: 'right', color: (gstSummaryData.netIgstPayable || 0) > 0 ? '#dc2626' : '#10b981' }}>
+                                {formatCurrency(gstSummaryData.netIgstPayable || 0)}
+                              </td>
+                              <td style={{ textAlign: 'right', fontWeight: 800, color: (gstSummaryData.netGstPayable || 0) > 0 ? '#dc2626' : '#10b981' }}>
+                                {formatCurrency(gstSummaryData.netGstPayable || 0)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.25rem', fontSize: '0.85rem', color: '#64748b' }}>
+                        <span>📊 Based on <strong>{gstSummaryData.salesCount}</strong> sales invoices and <strong>{gstSummaryData.purchasesCount}</strong> purchase receipts.</span>
+                        <span style={{ fontWeight: 600, color: gstSummaryData.netGstPayable > 0 ? '#dc2626' : '#10b981' }}>
+                          {gstSummaryData.netGstPayable > 0 ? '⚠️ Net Tax Payable to Govt.' : '✓ Net Credit Carry-forward Available'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )}

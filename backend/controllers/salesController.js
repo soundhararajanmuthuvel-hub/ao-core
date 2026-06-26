@@ -8,6 +8,7 @@ const User = require('../models/User');
 const Shipment = require('../models/Shipment');
 const { calcInvoiceTotals, getNextInvoiceNumber, logActivity, getSettings, createNotification } = require('../utils/helpers');
 const { updateStock } = require('../utils/stockService');
+const { isValidGstin, getStateCodeByName } = require('../utils/gst');
 
 exports.getSales = async (req, res, next) => {
   try {
@@ -131,7 +132,10 @@ exports.createSale = async (req, res, next) => {
     // 1. Load settings to determine WooCommerce, Shipping, and GST rules
     const settings = await getSettings({ transaction: t });
 
-    // 2. Resolve GST billing mode
+    // 2. Resolve GST details and Validate GST properties
+    const customerGst = (customerRecord.gstNumber || '').trim().toUpperCase();
+    const invoiceType = customerGst ? 'GST' : 'NON_GST';
+
     let gstBillingMode = customerRecord.gstBillingMode;
     if (!gstBillingMode || gstBillingMode === 'default') {
       if (customerType === 'White Label') {
@@ -148,6 +152,26 @@ exports.createSale = async (req, res, next) => {
       gstBillingMode = req.body.gstBillingMode;
     }
 
+    let gstMode = 'None';
+    if (invoiceType === 'GST') {
+      // Validate customer GSTIN
+      if (!isValidGstin(customerGst)) {
+        throw new Error(`Invalid Customer GSTIN format: ${customerGst}. Must be 15 characters conforming to Indian GSTIN standards.`);
+      }
+
+      // Validate matching state code
+      const customerGstStateCode = customerGst.slice(0, 2);
+      const expectedStateCode = getStateCodeByName(customerRecord.state);
+      if (expectedStateCode && customerGstStateCode !== expectedStateCode) {
+        throw new Error(`Customer GSTIN state code prefix (${customerGstStateCode}) does not match the customer's state (${customerRecord.state}, code: ${expectedStateCode}).`);
+      }
+
+      gstMode = (gstBillingMode === 'inclusive') ? 'Inclusive' : 'Exclusive';
+    } else {
+      gstMode = 'None';
+      gstBillingMode = 'no_gst'; // force no_gst calculation for Non-GST customers
+    }
+
     const specialPricing = customerRecord.specialPricing || {};
 
     // 3. Enrich Items and calculate weight
@@ -156,7 +180,19 @@ exports.createSale = async (req, res, next) => {
     for (const item of items) {
       const product = await Product.findByPk(item.product, { transaction: t });
       if (!product) throw new Error(`Product not found: ${item.product}`);
-      
+
+      // If GST invoice, validate HSN (gstClass) and positive GST percentage
+      if (invoiceType === 'GST') {
+        const hsnCode = String(product.gstClass || '').trim();
+        if (!/^\d{4}$|^\d{6}$|^\d{8}$/.test(hsnCode)) {
+          throw new Error(`Product ${product.name} must have a valid 4, 6, or 8 digit numeric HSN Code (got "${hsnCode}").`);
+        }
+        const itemGstPercent = Number(item.gstPercent) || Number(product.gstPercent || 0);
+        if (itemGstPercent <= 0) {
+          throw new Error(`GST percentage for product ${product.name} must be a positive number (got ${itemGstPercent}%).`);
+        }
+      }
+
       const stockAvailable = Number(product.stock || 0);
       const requestedQty = Number(item.qty);
 
@@ -376,6 +412,89 @@ exports.createSale = async (req, res, next) => {
     const dueDate = new Date(invoiceDate);
     dueDate.setDate(dueDate.getDate() + days);
 
+    // Calculate Indian GST parameters
+    const companyGSTIN = (settings.gstNumber || '').trim().toUpperCase();
+    const companyStateCode = (settings.stateCode || companyGSTIN.slice(0, 2)).trim().padStart(2, '0');
+    const customerGSTIN = customerGst;
+    const customerStateCode = customerGSTIN.slice(0, 2);
+    const isIntraState = (invoiceType === 'GST' && companyStateCode && customerStateCode && companyStateCode === customerStateCode);
+
+    let invoiceTaxableAmount = 0;
+    let invoiceTotalGST = 0;
+    let invoiceCgstAmount = 0;
+    let invoiceSgstAmount = 0;
+    let invoiceIgstAmount = 0;
+    let hsnSummaryString = null;
+
+    if (invoiceType === 'GST') {
+      const summaryMap = {};
+      for (const item of enrichedItems) {
+        const prod = item.productId ? await Product.findByPk(item.productId, { transaction: t }) : null;
+        const hsn = (prod && prod.gstClass) ? String(prod.gstClass).trim() : '0000';
+        const qty = Number(item.qty || 0);
+        const unitPrice = Number(item.unitPrice || 0);
+        const gstPercent = Number(item.gstPercent || 0);
+        
+        let taxable = 0;
+        let gst = 0;
+        if (gstBillingMode === 'inclusive') {
+          const lineTotal = qty * unitPrice;
+          taxable = lineTotal / (1 + gstPercent / 100);
+          gst = lineTotal - taxable;
+        } else if (gstBillingMode === 'no_gst') {
+          taxable = qty * unitPrice;
+          gst = 0;
+        } else { // exclusive
+          taxable = qty * unitPrice;
+          gst = (taxable * gstPercent) / 100;
+        }
+        
+        if (!summaryMap[hsn]) {
+          summaryMap[hsn] = {
+            hsn,
+            taxable: 0,
+            gstRate: gstPercent,
+            cgst: 0,
+            sgst: 0,
+            igst: 0,
+            totalGst: 0
+          };
+        }
+        
+        summaryMap[hsn].taxable += taxable;
+        summaryMap[hsn].totalGst += gst;
+      }
+      
+      const hsnList = Object.values(summaryMap).map(hsnItem => {
+        hsnItem.taxable = Number(hsnItem.taxable.toFixed(2));
+        hsnItem.totalGst = Number(hsnItem.totalGst.toFixed(2));
+        if (isIntraState) {
+          hsnItem.cgst = Number((hsnItem.totalGst / 2).toFixed(2));
+          hsnItem.sgst = Number((hsnItem.totalGst / 2).toFixed(2));
+          hsnItem.igst = 0;
+        } else {
+          hsnItem.cgst = 0;
+          hsnItem.sgst = 0;
+          hsnItem.igst = hsnItem.totalGst;
+        }
+        return hsnItem;
+      });
+      
+      hsnSummaryString = JSON.stringify(hsnList);
+      invoiceTaxableAmount = Number(hsnList.reduce((sum, h) => sum + h.taxable, 0).toFixed(2));
+      invoiceTotalGST = Number(hsnList.reduce((sum, h) => sum + h.totalGst, 0).toFixed(2));
+      
+      if (isIntraState) {
+        invoiceCgstAmount = Number((invoiceTotalGST / 2).toFixed(2));
+        invoiceSgstAmount = Number((invoiceTotalGST / 2).toFixed(2));
+        invoiceIgstAmount = 0;
+      } else {
+        invoiceCgstAmount = 0;
+        invoiceSgstAmount = 0;
+        invoiceIgstAmount = invoiceTotalGST;
+      }
+    }
+
     const sale = await Invoice.create(
       {
         invoiceNumber,
@@ -408,9 +527,24 @@ exports.createSale = async (req, res, next) => {
         roundOff: totals.roundOff,
         taxableValue: totals.subtotal,
         wooOrderId: req.body.wooOrderId || null,
+        invoiceType,
+        gstMode,
+        sellerGSTIN: invoiceType === 'GST' ? (settings.gstNumber || null) : null,
+        customerGSTIN: invoiceType === 'GST' ? (customerGst || null) : null,
+        placeOfSupply: invoiceType === 'GST' ? (customerRecord.state || null) : null,
+        gstApplicable: invoiceType === 'GST',
+        isGSTReportable: invoiceType === 'GST',
+        isGSTPortalExported: false,
+        hsnSummary: hsnSummaryString,
+        taxableAmount: invoiceTaxableAmount,
+        cgstAmount: invoiceCgstAmount,
+        sgstAmount: invoiceSgstAmount,
+        igstAmount: invoiceIgstAmount,
+        totalGST: invoiceTotalGST,
       },
       { transaction: t }
     );
+
 
     for (const item of enrichedItems) {
       await InvoiceItem.create(
@@ -1065,7 +1199,10 @@ exports.updateSale = async (req, res, next) => {
     // 1. Load settings to determine WooCommerce, Shipping, and GST rules
     const settings = await getSettings({ transaction: t });
 
-    // 2. Resolve GST billing mode
+    // 2. Resolve GST details and Validate GST properties
+    const customerGst = (customerRecord.gstNumber || '').trim().toUpperCase();
+    const invoiceType = customerGst ? 'GST' : 'NON_GST';
+
     let gstBillingMode = customerRecord.gstBillingMode;
     if (!gstBillingMode || gstBillingMode === 'default') {
       if (customerType === 'White Label') {
@@ -1080,6 +1217,26 @@ exports.updateSale = async (req, res, next) => {
     }
     if (req.body.gstBillingMode) {
       gstBillingMode = req.body.gstBillingMode;
+    }
+
+    let gstMode = 'None';
+    if (invoiceType === 'GST') {
+      // Validate customer GSTIN
+      if (!isValidGstin(customerGst)) {
+        throw new Error(`Invalid Customer GSTIN format: ${customerGst}. Must be 15 characters conforming to Indian GSTIN standards.`);
+      }
+
+      // Validate matching state code
+      const customerGstStateCode = customerGst.slice(0, 2);
+      const expectedStateCode = getStateCodeByName(customerRecord.state);
+      if (expectedStateCode && customerGstStateCode !== expectedStateCode) {
+        throw new Error(`Customer GSTIN state code prefix (${customerGstStateCode}) does not match the customer's state (${customerRecord.state}, code: ${expectedStateCode}).`);
+      }
+
+      gstMode = (gstBillingMode === 'inclusive') ? 'Inclusive' : 'Exclusive';
+    } else {
+      gstMode = 'None';
+      gstBillingMode = 'no_gst'; // force no_gst calculation for Non-GST customers
     }
 
     const specialPricing = customerRecord.specialPricing || {};
@@ -1106,6 +1263,18 @@ exports.updateSale = async (req, res, next) => {
       const product = item.product ? await Product.findByPk(item.product, { transaction: t }) : null;
       
       if (product) {
+        // If GST invoice, validate HSN (gstClass) and positive GST percentage
+        if (invoiceType === 'GST') {
+          const hsnCode = String(product.gstClass || '').trim();
+          if (!/^\d{4}$|^\d{6}$|^\d{8}$/.test(hsnCode)) {
+            throw new Error(`Product ${product.name} must have a valid 4, 6, or 8 digit numeric HSN Code (got "${hsnCode}").`);
+          }
+          const itemGstPercent = Number(item.gstPercent) || Number(product.gstPercent || 0);
+          if (itemGstPercent <= 0) {
+            throw new Error(`GST percentage for product ${product.name} must be a positive number (got ${itemGstPercent}%).`);
+          }
+        }
+
         const stockAvailable = Number(product.stock || 0);
         const requestedQty = Number(item.qty);
 
@@ -1377,6 +1546,89 @@ exports.updateSale = async (req, res, next) => {
       auditDetails += ' ' + changes.join('. ') + '.';
     }
 
+    // Calculate Indian GST parameters
+    const companyGSTIN = (settings.gstNumber || '').trim().toUpperCase();
+    const companyStateCode = (settings.stateCode || companyGSTIN.slice(0, 2)).trim().padStart(2, '0');
+    const customerGSTIN = customerGst;
+    const customerStateCode = customerGSTIN.slice(0, 2);
+    const isIntraState = (invoiceType === 'GST' && companyStateCode && customerStateCode && companyStateCode === customerStateCode);
+
+    let invoiceTaxableAmount = 0;
+    let invoiceTotalGST = 0;
+    let invoiceCgstAmount = 0;
+    let invoiceSgstAmount = 0;
+    let invoiceIgstAmount = 0;
+    let hsnSummaryString = null;
+
+    if (invoiceType === 'GST') {
+      const summaryMap = {};
+      for (const item of enrichedItems) {
+        const prod = item.productId ? await Product.findByPk(item.productId, { transaction: t }) : null;
+        const hsn = (prod && prod.gstClass) ? String(prod.gstClass).trim() : '0000';
+        const qty = Number(item.qty || 0);
+        const unitPrice = Number(item.unitPrice || 0);
+        const gstPercent = Number(item.gstPercent || 0);
+        
+        let taxable = 0;
+        let gst = 0;
+        if (gstBillingMode === 'inclusive') {
+          const lineTotal = qty * unitPrice;
+          taxable = lineTotal / (1 + gstPercent / 100);
+          gst = lineTotal - taxable;
+        } else if (gstBillingMode === 'no_gst') {
+          taxable = qty * unitPrice;
+          gst = 0;
+        } else { // exclusive
+          taxable = qty * unitPrice;
+          gst = (taxable * gstPercent) / 100;
+        }
+        
+        if (!summaryMap[hsn]) {
+          summaryMap[hsn] = {
+            hsn,
+            taxable: 0,
+            gstRate: gstPercent,
+            cgst: 0,
+            sgst: 0,
+            igst: 0,
+            totalGst: 0
+          };
+        }
+        
+        summaryMap[hsn].taxable += taxable;
+        summaryMap[hsn].totalGst += gst;
+      }
+      
+      const hsnList = Object.values(summaryMap).map(hsnItem => {
+        hsnItem.taxable = Number(hsnItem.taxable.toFixed(2));
+        hsnItem.totalGst = Number(hsnItem.totalGst.toFixed(2));
+        if (isIntraState) {
+          hsnItem.cgst = Number((hsnItem.totalGst / 2).toFixed(2));
+          hsnItem.sgst = Number((hsnItem.totalGst / 2).toFixed(2));
+          hsnItem.igst = 0;
+        } else {
+          hsnItem.cgst = 0;
+          hsnItem.sgst = 0;
+          hsnItem.igst = hsnItem.totalGst;
+        }
+        return hsnItem;
+      });
+      
+      hsnSummaryString = JSON.stringify(hsnList);
+      invoiceTaxableAmount = Number(hsnList.reduce((sum, h) => sum + h.taxable, 0).toFixed(2));
+      invoiceTotalGST = Number(hsnList.reduce((sum, h) => sum + h.totalGst, 0).toFixed(2));
+      
+      if (isIntraState) {
+        invoiceCgstAmount = Number((invoiceTotalGST / 2).toFixed(2));
+        invoiceSgstAmount = Number((invoiceTotalGST / 2).toFixed(2));
+        invoiceIgstAmount = 0;
+      } else {
+        invoiceCgstAmount = 0;
+        invoiceSgstAmount = 0;
+        invoiceIgstAmount = invoiceTotalGST;
+      }
+    }
+
     // 9. Update the Invoice itself
     const oldCustomerId = sale.customerId;
     const newCustomerId = customerRecord.id;
@@ -1410,9 +1662,23 @@ exports.updateSale = async (req, res, next) => {
         loadingCost,
         roundOff: totals.roundOff,
         taxableValue: totals.subtotal,
+        invoiceType,
+        gstMode,
+        sellerGSTIN: invoiceType === 'GST' ? (settings.gstNumber || null) : null,
+        customerGSTIN: invoiceType === 'GST' ? (customerGst || null) : null,
+        placeOfSupply: invoiceType === 'GST' ? (customerRecord.state || null) : null,
+        gstApplicable: invoiceType === 'GST',
+        isGSTReportable: invoiceType === 'GST',
+        hsnSummary: hsnSummaryString,
+        taxableAmount: invoiceTaxableAmount,
+        cgstAmount: invoiceCgstAmount,
+        sgstAmount: invoiceSgstAmount,
+        igstAmount: invoiceIgstAmount,
+        totalGST: invoiceTotalGST,
       },
       { transaction: t }
     );
+
 
     // 10. Update outstanding balance for customers
     await recomputeCustomerBalance(oldCustomerId, t);

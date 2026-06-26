@@ -5,12 +5,13 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
   if (!sale) return null;
 
   // Determine GST Split: Intra-state (CGST + SGST) vs Inter-state (IGST)
-  const customerGst = sale.customer?.gstNumber || '';
-  const companyGst = settings?.gstDetails || '';
-  // Check if first 2 digits (state code) of GSTIN match
+  const customerGst = sale.customer?.gstNumber || sale.customerGSTIN || '';
+  const companyGst = settings?.gstNumber || settings?.gstDetails || '';
+  
+  const isGstInvoice = sale.invoiceType ? (sale.invoiceType === 'GST') : !!customerGst;
   const isIntrastate = customerGst && companyGst && customerGst.substring(0, 2) === companyGst.substring(0, 2);
 
-  const totalGst = Number(sale.gstTotal || 0);
+  const totalGst = Number(sale.gstTotal || sale.totalGST || 0);
   let cgst = 0, sgst = 0, igst = 0;
   if (totalGst > 0) {
     if (isIntrastate || !customerGst) { // default to local if no GSTIN provided
@@ -56,7 +57,7 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
             {settings?.companyName || 'AO Core'}
           </h1>
           <p style={{ margin: '0 0 0.15rem 0', color: '#64748b' }}>{settings?.address}</p>
-          {settings?.gstDetails && <p style={{ margin: '0 0 0.15rem 0', color: '#64748b' }}>GSTIN: {settings.gstDetails}</p>}
+          {isGstInvoice && companyGst && <p style={{ margin: '0 0 0.15rem 0', color: '#64748b' }}>GSTIN: {companyGst}</p>}
           {settings?.phone && <p style={{ margin: 0, color: '#64748b' }}>Phone: {settings.phone}</p>}
         </div>
       </header>
@@ -72,7 +73,8 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
         <p style={{ margin: '0 0 0.25rem 0' }}><strong>Bill To:</strong> {sale.customer?.name}</p>
         <p style={{ margin: '0 0 0.25rem 0', color: '#475569' }}>Phone: {sale.customer?.phone} {sale.customer?.email && `| Email: ${sale.customer.email}`}</p>
         <p style={{ margin: '0 0 0.25rem 0', color: '#475569' }}>{sale.customer?.address}</p>
-        {sale.customer?.gstNumber && <p style={{ margin: 0, color: '#475569' }}>GSTIN: {sale.customer.gstNumber}</p>}
+        {isGstInvoice && customerGst && <p style={{ margin: '0 0 0.25rem 0', color: '#475569' }}>GSTIN: {customerGst}</p>}
+        {isGstInvoice && sale.placeOfSupply && <p style={{ margin: 0, color: '#475569' }}>Place of Supply: {sale.placeOfSupply}</p>}
       </div>
 
       <table className="invoice-template-table" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
@@ -80,9 +82,10 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
           <tr style={{ borderBottom: `2px solid ${primaryColor}`, textAlign: 'left' }}>
             <th style={{ padding: '0.4rem 0.25rem' }}>#</th>
             <th style={{ padding: '0.4rem 0.25rem' }}>Item</th>
+            {isGstInvoice && <th style={{ padding: '0.4rem 0.25rem' }}>HSN</th>}
             <th style={{ padding: '0.4rem 0.25rem', textAlign: 'center' }}>Qty</th>
             <th style={{ padding: '0.4rem 0.25rem', textAlign: 'right' }}>Rate</th>
-            <th style={{ padding: '0.4rem 0.25rem', textAlign: 'center' }}>GST</th>
+            {isGstInvoice && <th style={{ padding: '0.4rem 0.25rem', textAlign: 'center' }}>GST</th>}
             <th style={{ padding: '0.4rem 0.25rem', textAlign: 'right' }}>Amount</th>
           </tr>
         </thead>
@@ -98,6 +101,7 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
                   </div>
                 )}
               </td>
+              {isGstInvoice && <td style={{ padding: '0.4rem 0.25rem' }}>{item.product?.gstClass || '0000'}</td>}
               <td style={{ padding: '0.4rem 0.25rem', textAlign: 'center' }}>
                 {Number(item.qty).toFixed(0)}
                 {Number(item.freeQty) > 0 && (
@@ -107,7 +111,7 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
                 )}
               </td>
               <td style={{ padding: '0.4rem 0.25rem', textAlign: 'right' }}>₹{Number(item.unitPrice).toFixed(2)}</td>
-              <td style={{ padding: '0.4rem 0.25rem', textAlign: 'center' }}>{item.gstPercent || 0}%</td>
+              {isGstInvoice && <td style={{ padding: '0.4rem 0.25rem', textAlign: 'center' }}>{item.gstPercent || 0}%</td>}
               <td style={{ padding: '0.4rem 0.25rem', textAlign: 'right' }}>₹{Number(item.lineTotal).toFixed(2)}</td>
             </tr>
           ))}
@@ -116,28 +120,40 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
 
       <div className="invoice-template-totals" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginTop: '1rem' }}>
         <div style={{ width: format === 'Thermal' ? '100%' : '250px', display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.9rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Taxable Value:</span>
-            <span>₹{Number(sale.subtotal).toFixed(2)}</span>
-          </div>
           
-          {cgst > 0 && (
+          {isGstInvoice ? (
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>CGST:</span>
-              <span>₹{cgst.toFixed(2)}</span>
+              <span>Taxable Value:</span>
+              <span>₹{Number(sale.taxableAmount || sale.subtotal).toFixed(2)}</span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Subtotal:</span>
+              <span>₹{Number(sale.subtotal).toFixed(2)}</span>
             </div>
           )}
-          {sgst > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>SGST:</span>
-              <span>₹{sgst.toFixed(2)}</span>
-            </div>
-          )}
-          {igst > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>IGST:</span>
-              <span>₹{igst.toFixed(2)}</span>
-            </div>
+          
+          {isGstInvoice && (
+            <>
+              {cgst > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>CGST:</span>
+                  <span>₹{cgst.toFixed(2)}</span>
+                </div>
+              )}
+              {sgst > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>SGST:</span>
+                  <span>₹{sgst.toFixed(2)}</span>
+                </div>
+              )}
+              {igst > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>IGST:</span>
+                  <span>₹{igst.toFixed(2)}</span>
+                </div>
+              )}
+            </>
           )}
 
           {Number(sale.shippingCharge) > 0 && (
@@ -192,9 +208,69 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
         </div>
       </div>
 
+      {isGstInvoice && sale.hsnSummary && (
+        <div style={{ marginTop: '1.5rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.75rem' }}>
+          <p style={{ margin: '0 0 0.35rem 0', fontSize: '0.85rem', fontWeight: 'bold' }}>HSN Tax Summary</p>
+          <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #cbd5e1', textAlign: 'left', color: '#64748b' }}>
+                <th style={{ padding: '0.25rem' }}>HSN</th>
+                <th style={{ padding: '0.25rem' }}>Taxable Value</th>
+                <th style={{ padding: '0.25rem' }}>Rate</th>
+                {cgst > 0 && <th style={{ padding: '0.25rem' }}>CGST</th>}
+                {sgst > 0 && <th style={{ padding: '0.25rem' }}>SGST</th>}
+                {igst > 0 && <th style={{ padding: '0.25rem' }}>IGST</th>}
+                <th style={{ padding: '0.25rem', textAlign: 'right' }}>Total Tax</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                try {
+                  const hsnList = JSON.parse(sale.hsnSummary);
+                  if (Array.isArray(hsnList)) {
+                    return hsnList.map((h, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.25rem' }}>{h.hsn}</td>
+                        <td style={{ padding: '0.25rem' }}>₹{Number(h.taxable).toFixed(2)}</td>
+                        <td style={{ padding: '0.25rem' }}>{h.gstRate}%</td>
+                        {cgst > 0 && <td style={{ padding: '0.25rem' }}>₹{Number(h.cgst).toFixed(2)}</td>}
+                        {sgst > 0 && <td style={{ padding: '0.25rem' }}>₹{Number(h.sgst).toFixed(2)}</td>}
+                        {igst > 0 && <td style={{ padding: '0.25rem' }}>₹{Number(h.igst).toFixed(2)}</td>}
+                        <td style={{ padding: '0.25rem', textAlign: 'right' }}>₹{Number(h.totalGst).toFixed(2)}</td>
+                      </tr>
+                    ));
+                  }
+                } catch (e) {
+                  console.error(e);
+                }
+                return null;
+              })()}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {isGstInvoice && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem', fontSize: '0.75rem' }}>
+          <div style={{ flex: 1, paddingRight: '1rem' }}>
+            <p style={{ margin: '0 0 0.25rem 0', fontWeight: 'bold' }}>GST Declaration:</p>
+            <p style={{ margin: 0, color: '#64748b' }}>We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.</p>
+            {settings?.bankDetails && (
+              <div style={{ marginTop: '0.5rem' }}>
+                <strong>Bank Details:</strong> {settings.bankDetails}
+              </div>
+            )}
+          </div>
+          <div style={{ width: '180px', textAlign: 'center' }}>
+            <p style={{ margin: '0 0 2.5rem 0', color: '#64748b' }}>For {settings?.companyName || 'AO Core'}</p>
+            <div style={{ borderTop: '1px solid #94a3b8', paddingTop: '0.25rem', fontWeight: 'bold' }}>Authorized Signatory</div>
+          </div>
+        </div>
+      )}
+
       <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.8rem', color: '#64748b' }}>
         <p style={{ margin: '0 0 0.25rem 0' }}>Payment Mode: <strong style={{ textTransform: 'uppercase' }}>{sale.paymentMethod}</strong> — Status: <strong style={{ textTransform: 'uppercase' }}>{String(sale.paymentStatus).toLowerCase() === 'partial' ? 'PARTIALLY PAID' : String(sale.paymentStatus).toUpperCase()}</strong></p>
-        {sale.gstBillingMode && <p style={{ margin: '0 0 0.5rem 0' }}>Tax Invoicing: GST {sale.gstBillingMode.toUpperCase()}</p>}
+        {isGstInvoice && sale.gstBillingMode && <p style={{ margin: '0 0 0.5rem 0' }}>Tax Invoicing: GST {sale.gstBillingMode.toUpperCase()}</p>}
         <p className="invoice-footer" style={{ margin: 0, fontWeight: 600 }}>Thank you for your business!</p>
       </div>
     </div>

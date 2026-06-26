@@ -276,6 +276,18 @@ const Settings = sequelize.define('Settings', {
     type: DataTypes.INTEGER,
     defaultValue: 13,
   },
+  pan: {
+    type: DataTypes.STRING,
+    defaultValue: '',
+  },
+  stateCode: {
+    type: DataTypes.STRING,
+    defaultValue: '',
+  },
+  bankDetails: {
+    type: DataTypes.TEXT,
+    defaultValue: '',
+  },
 });
 
 makeMongooseCompatible(Settings);

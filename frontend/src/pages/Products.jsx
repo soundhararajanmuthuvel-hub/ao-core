@@ -33,7 +33,7 @@ const getProductTypeStyle = (type) => {
   }
 };
 
-const empty = { name: '', sku: '', barcode: '', category: 'General', stock: 0, lowStockThreshold: 10, reorderQty: 100, preferredSupplierId: '', unit: 'pcs', purchasePrice: 0, sellingPrice: 0, gstPercent: 0, supplier: '', productType: 'BULK_PRODUCT', parentProductId: '', packSize: '', conversionFactor: 1.0000 };
+const empty = { name: '', sku: '', barcode: '', category: 'General', stock: 0, lowStockThreshold: 10, reorderQty: 100, preferredSupplierId: '', unit: 'pcs', purchasePrice: 0, sellingPrice: 0, gstPercent: 0, gstClass: '', supplier: '', productType: 'BULK_PRODUCT', parentProductId: '', packSize: '', conversionFactor: 1.0000 };
 
 export default function Products() {
   const { toast } = useToast();
@@ -215,6 +215,13 @@ export default function Products() {
   };
 
   const save = async () => {
+    if (form.gstClass) {
+      const hsnClean = String(form.gstClass).trim();
+      if (hsnClean !== '' && !/^\d{4}$|^\d{6}$|^\d{8}$/.test(hsnClean)) {
+        toast('HSN Code must be exactly 4, 6, or 8 digits', 'error');
+        return;
+      }
+    }
     const fd = new FormData();
     Object.entries(form).forEach(([k, v]) => { 
       if (k !== '_id' && k !== 'image' && k !== '__v' && k !== 'packSizes') {
@@ -691,6 +698,10 @@ export default function Products() {
             <div className="form-group">
               <label>GST Percent (%)</label>
               <input type="number" className="form-control" value={form.gstPercent ?? 0} onChange={(e) => setForm({ ...form, gstPercent: Number(e.target.value) })} />
+            </div>
+            <div className="form-group">
+              <label>HSN Code</label>
+              <input type="text" className="form-control" placeholder="4, 6 or 8 digits" value={form.gstClass || ''} onChange={(e) => setForm({ ...form, gstClass: e.target.value })} />
             </div>
             <div className="form-group"><label>Image</label><input type="file" accept="image/*" onChange={(e) => setImage(e.target.files[0])} /></div>
             
@@ -1183,6 +1194,7 @@ function ProductVariantManagement({ allProducts, loadProducts, toast }) {
     wholesalePrice: 0,
     sellingPrice: 0,
     gstPercent: 0,
+    gstClass: '',
   });
 
   const parentProducts = allProducts.filter(p => p.productType === 'BULK_PRODUCT');
@@ -1203,6 +1215,7 @@ function ProductVariantManagement({ allProducts, loadProducts, toast }) {
         wholesalePrice: Number(variant.wholesalePrice || 0),
         sellingPrice: Number(variant.sellingPrice || 0),
         gstPercent: Number(variant.gstPercent || 0),
+        gstClass: variant.gstClass || '',
       });
       setShowModal('edit');
     } else {
@@ -1216,6 +1229,7 @@ function ProductVariantManagement({ allProducts, loadProducts, toast }) {
         wholesalePrice: 0,
         sellingPrice: 0,
         gstPercent: selectedParent ? Number(selectedParent.gstPercent || 0) : 0,
+        gstClass: selectedParent ? selectedParent.gstClass || '' : '',
       });
       setShowModal('create');
     }
@@ -1225,6 +1239,13 @@ function ProductVariantManagement({ allProducts, loadProducts, toast }) {
     if (!form.packSize || !form.sku) {
       toast('Please enter Variant Name/Size and SKU', 'warning');
       return;
+    }
+    if (form.gstClass) {
+      const hsnClean = String(form.gstClass).trim();
+      if (hsnClean !== '' && !/^\d{4}$|^\d{6}$|^\d{8}$/.test(hsnClean)) {
+        toast('HSN Code must be exactly 4, 6, or 8 digits', 'error');
+        return;
+      }
     }
     try {
       const payload = {
@@ -1237,6 +1258,7 @@ function ProductVariantManagement({ allProducts, loadProducts, toast }) {
         wholesalePrice: Number(form.wholesalePrice),
         sellingPrice: Number(form.sellingPrice),
         gstPercent: Number(form.gstPercent),
+        gstClass: form.gstClass,
         parentProductId: Number(selectedParent.id || selectedParent._id),
         productType: 'RETAIL_PACK',
         unit: 'pcs',
@@ -1494,6 +1516,15 @@ function ProductVariantManagement({ allProducts, loadProducts, toast }) {
                 className="form-control"
                 value={form.gstPercent}
                 onChange={(e) => setForm({ ...form, gstPercent: Number(e.target.value) })}
+              />
+            </div>
+            <div className="form-group">
+              <label>HSN Code</label>
+              <input
+                className="form-control"
+                placeholder="4, 6 or 8 digits"
+                value={form.gstClass || ''}
+                onChange={(e) => setForm({ ...form, gstClass: e.target.value })}
               />
             </div>
           </div>

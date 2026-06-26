@@ -43,7 +43,8 @@ async function runTests() {
       name: 'GST Test Customer',
       email: 'gst-test@example.com',
       state: 'Tamil Nadu', // Code 33
-      status: 'Active'
+      status: 'Active',
+      gstNumber: '33AAAAA1111A1Z1'
     });
     const product = await Product.create({
       name: 'Test Product',
@@ -65,7 +66,10 @@ async function runTests() {
       status: 'Confirmed',
       is_historical_data: false,
       gstBillingMode: 'exclusive',
-      type: 'invoice'
+      type: 'invoice',
+      invoiceType: 'GST',
+      customerGSTIN: '33AAAAA1111A1Z1',
+      placeOfSupply: 'Tamil Nadu'
     });
     await InvoiceItem.create({
       invoiceId: invLiveWithGst.id,
@@ -87,7 +91,10 @@ async function runTests() {
       status: 'Confirmed',
       is_historical_data: false,
       gstBillingMode: 'exclusive',
-      type: 'invoice'
+      type: 'invoice',
+      invoiceType: 'GST',
+      customerGSTIN: '33AAAAA1111A1Z1',
+      placeOfSupply: 'Tamil Nadu'
     });
     await InvoiceItem.create({
       invoiceId: invLiveZeroGst.id,
@@ -109,7 +116,10 @@ async function runTests() {
       status: 'Confirmed',
       is_historical_data: true,
       gstBillingMode: 'exclusive',
-      type: 'invoice'
+      type: 'invoice',
+      invoiceType: 'GST',
+      customerGSTIN: '33AAAAA1111A1Z1',
+      placeOfSupply: 'Tamil Nadu'
     });
     await InvoiceItem.create({
       invoiceId: invHistWithGst.id,

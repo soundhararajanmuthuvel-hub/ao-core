@@ -319,6 +319,27 @@ const connectDB = async () => {
   await addColumnIfNotExist('Invoices', 'courierCost', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('Invoices', 'loadingCost', "DECIMAL(10, 2) DEFAULT 0.00");
 
+  // Indian GST Enhancements
+  await addColumnIfNotExist('Invoices', 'invoiceType', "VARCHAR(50) DEFAULT 'NON_GST'");
+  await addColumnIfNotExist('Invoices', 'gstMode', "VARCHAR(50) DEFAULT 'None'");
+  await addColumnIfNotExist('Invoices', 'sellerGSTIN', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Invoices', 'customerGSTIN', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Invoices', 'placeOfSupply', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Invoices', 'gstApplicable', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('Invoices', 'isGSTReportable', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('Invoices', 'isGSTPortalExported', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('Invoices', 'exportedAt', "DATETIME NULL");
+  await addColumnIfNotExist('Invoices', 'hsnSummary', "TEXT NULL");
+  await addColumnIfNotExist('Invoices', 'taxableAmount', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Invoices', 'cgstAmount', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Invoices', 'sgstAmount', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Invoices', 'igstAmount', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Invoices', 'totalGST', "DECIMAL(10, 2) DEFAULT 0.00");
+
+  await addColumnIfNotExist('Settings', 'pan', "VARCHAR(255) DEFAULT ''");
+  await addColumnIfNotExist('Settings', 'stateCode', "VARCHAR(255) DEFAULT ''");
+  await addColumnIfNotExist('Settings', 'bankDetails', "TEXT NULL");
+
   await addColumnIfNotExist('Products', 'parentProductId', "INTEGER NULL");
   await addColumnIfNotExist('Products', 'packSize', "VARCHAR(255) NULL");
   await addColumnIfNotExist('Products', 'conversionFactor', "DECIMAL(10, 4) DEFAULT 1.0000");
