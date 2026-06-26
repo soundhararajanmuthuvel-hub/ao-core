@@ -8,6 +8,7 @@ import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 import { motion, AnimatePresence } from 'framer-motion';
 import UserTour from '../components/UserTour';
 import { usePWA } from '../context/PWAContext';
+import SalesmanApp from '../pages/SalesmanApp';
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -17,6 +18,10 @@ export default function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  if (user?.role === 'Salesman') {
+    return <SalesmanApp />;
+  }
 
   const { settings } = useSettings();
   const { isInstallable, isInstalled, installApp } = usePWA();
