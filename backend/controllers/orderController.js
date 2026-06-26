@@ -396,6 +396,14 @@ exports.markPacked = async (req, res, next) => {
     const dueDate = new Date(invoiceDate);
     dueDate.setDate(dueDate.getDate() + days);
 
+    let resolvedChannel = 'Retail Shop';
+    if (customerType === 'White Label') resolvedChannel = 'White Label';
+    else if (customerType === 'Organic Store') resolvedChannel = 'Organic Store';
+    else if (customerType === 'Retail Shop') resolvedChannel = 'Retail Shop';
+    else if (customerType === 'D2C Customer') resolvedChannel = 'D2C';
+    else if (customerType === 'Distributor') resolvedChannel = 'Distributor';
+    else if (customerType === 'Wholesaler') resolvedChannel = 'Wholesale';
+
     const invoice = await Invoice.create({
       invoiceNumber,
       customerId: customerRecord.id,
@@ -409,7 +417,7 @@ exports.markPacked = async (req, res, next) => {
       paymentStatus: 'pending',
       amountPaid: 0,
       customerType,
-      salesChannel: customerType,
+      salesChannel: resolvedChannel,
       createdById: req.user.id,
       status: 'Confirmed',
       gstBillingMode,
