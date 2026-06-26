@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { catalogApi } from '../api';
-import { resolveAssetUrl } from '../utils/url';
+import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function PublicCatalog() {
@@ -111,9 +111,9 @@ export default function PublicCatalog() {
         boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
       }}>
         <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-          {settings.logoUrl || settings.logo ? (
+          {settings ? (
             <img 
-              src={resolveAssetUrl(settings.logoUrl || settings.logo)} 
+              src={getActiveLogoUrl(settings)} 
               alt="Logo" 
               style={{ height: '70px', objectFit: 'contain', marginBottom: '0.5rem', filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.2))' }} 
               onError={(e) => { e.target.style.display = 'none'; }}

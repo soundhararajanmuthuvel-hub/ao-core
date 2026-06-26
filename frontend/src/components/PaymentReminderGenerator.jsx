@@ -4,6 +4,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { motion, AnimatePresence } from 'framer-motion';
 import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
+import client from '../api/client';
 import Modal from './Modal';
 import { useToast } from '../context/ToastContext';
 
@@ -88,8 +89,8 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
   // Convert image URL to Base64 to bypass CORS in html2canvas
   const getBase64Image = async (url) => {
     try {
-      const response = await fetch(url);
-      const blob = await response.blob();
+      const response = await client.get(url, { responseType: 'blob' });
+      const blob = response.data;
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result);

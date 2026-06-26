@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { developerApi, integrationsApi } from '../api';
+import { API_BASE_URL } from '../utils/url';
 import { useToast } from '../context/ToastContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Modal from '../components/Modal';
@@ -112,7 +113,7 @@ export default function DeveloperCenter() {
   const [playgroundResponse, setPlaygroundResponse] = useState(null);
   const [playgroundLoading, setPlaygroundLoading] = useState(false);
 
-  const developerBaseUrl = window.location.origin + '/api/external';
+  const developerBaseUrl = API_BASE_URL.replace(/\/api$/, '') + '/api/external';
 
   // --- ACTIONS & DATA LOADERS ---
   

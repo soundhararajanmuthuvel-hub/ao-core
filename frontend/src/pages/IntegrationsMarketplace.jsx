@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { integrationsApi } from '../api';
+import { API_BASE_URL } from '../utils/url';
 import { useToast } from '../context/ToastContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Modal from '../components/Modal';
@@ -623,7 +624,7 @@ export default function IntegrationsMarketplace() {
     }
   };
 
-  const developerBaseUrl = window.location.origin + '/api/external';
+  const developerBaseUrl = API_BASE_URL.replace(/\/api$/, '') + '/api/external';
 
   return (
     <div className="page animate-fade-in" style={{ padding: '1.5rem', fontFamily: 'Inter, sans-serif' }}>

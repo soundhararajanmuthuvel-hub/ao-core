@@ -9,31 +9,54 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const normalizeOrigin = (value) => value?.trim().replace(/\/$/, '');
+const allowedOrigins = [
+  "https://erp.amudhasurabiy.com",
+  "https://www.erp.amudhasurabiy.com",
+  "https://ao-core.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:5173",
+  "http://localhost:5050",
+  "http://127.0.0.1:5050"
+];
 
 const corsOptions = {
-  origin: [
-    "https://erp.amudhasurabiy.com",
-    "https://ao-core.vercel.app",
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:5173"
-  ],
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    const isAllowed = allowedOrigins.includes(origin) || 
+                      /^http:\/\/localhost:\d+$/.test(origin) || 
+                      /^http:\/\/127\.0\.0\.1:\d+$/.test(origin);
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
 };
 
 /* =========================
    MIDDLEWARE
-========================= */
+ ========================= */
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
+
+// Explicit preflight handler to guarantee OPTIONS requests never fall through or 404
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  next();
+});
+
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/api/assets/company-logo', require('./controllers/settingsController').getCompanyLogoImage);
+app.get('/api/company/logo', require('./controllers/settingsController').getCompanyLogoImage);
 
 /* =========================
    ROOT ROUTE

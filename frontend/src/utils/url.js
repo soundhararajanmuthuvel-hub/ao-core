@@ -9,11 +9,14 @@ const getRawApiUrl = () => {
     if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
       return envUrl.replace(/\/$/, '');
     }
-    // Default to relative path in production for proxied/same-origin setups
-    return '';
+    // Fallback to production backend address
+    return 'https://erp.api.amudhasurabiy.com';
   } else {
-    // In local development, use VITE_API_URL or default to localhost:5000
-    return envUrl || 'http://localhost:5000';
+    // In local development, use VITE_API_URL if defined, otherwise default to relative path to utilize Vite dev server proxy
+    if (envUrl) {
+      return envUrl.replace(/\/$/, '');
+    }
+    return '';
   }
 };
 
@@ -50,5 +53,6 @@ export const resolveAssetUrl = (assetPath) => {
 };
 
 export const getActiveLogoUrl = (settings) => {
-  return `${API_BASE_URL}/assets/company-logo`;
+  const origin = API_BASE_URL.replace(/\/api$/, '');
+  return `${origin}/api/company/logo`;
 };

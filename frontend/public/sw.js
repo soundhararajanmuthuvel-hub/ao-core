@@ -43,8 +43,9 @@ self.addEventListener('message', (event) => {
 
 // Fetch Event
 self.addEventListener('fetch', (event) => {
-  // Only handle HTTP/HTTPS protocols (avoid chrome-extension issues)
-  if (!event.request.url.startsWith(self.location.origin)) {
+  // Only handle HTTP/HTTPS protocols (avoid chrome-extension and external requests)
+  const isApiRequest = event.request.url.includes('/api/');
+  if (!event.request.url.startsWith(self.location.origin) && !isApiRequest) {
     return;
   }
 

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { API_BASE_URL } from '../utils/url';
+import client from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
 import '../styles/shipping.css';
 
@@ -28,7 +27,7 @@ export default function PublicTracking() {
     if (!isPoll) setLoading(true);
     setError('');
     try {
-      const { data } = await axios.get(`${API_BASE_URL}/shipping/public/track/${code}`);
+      const { data } = await client.get(`/shipping/public/track/${code}`);
       setShipment(data.shipment);
     } catch (err) {
       if (!isPoll) {
