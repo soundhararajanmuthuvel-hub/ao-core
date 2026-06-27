@@ -117,10 +117,10 @@ exports.createProduct = async (req, res, next) => {
     const data = { ...req.body };
     if (req.file) data.image = `/uploads/products/${req.file.filename}`;
     
-    if (data.preferredSupplierId === '') {
+    if (data.preferredSupplierId === '' || data.preferredSupplierId === 'null' || data.preferredSupplierId === null) {
       data.preferredSupplierId = null;
     }
-    if (data.parentProductId === '') {
+    if (data.parentProductId === '' || data.parentProductId === 'null' || data.parentProductId === null) {
       data.parentProductId = null;
     }
     
@@ -157,10 +157,10 @@ exports.updateProduct = async (req, res, next) => {
     const data = { ...req.body };
     if (req.file) data.image = `/uploads/products/${req.file.filename}`;
     
-    if (data.preferredSupplierId === '') {
+    if (data.preferredSupplierId === '' || data.preferredSupplierId === 'null' || data.preferredSupplierId === null) {
       data.preferredSupplierId = null;
     }
-    if (data.parentProductId === '') {
+    if (data.parentProductId === '' || data.parentProductId === 'null' || data.parentProductId === null) {
       data.parentProductId = null;
     }
     
