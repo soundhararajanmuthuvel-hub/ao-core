@@ -228,6 +228,10 @@ export default function Products() {
         let val = (v === null || v === undefined) ? '' : v;
         if (val === 'Invalid date' || val === 'Invalid Date') {
           val = '';
+        } else if (val instanceof Date && isNaN(val.getTime())) {
+          val = '';
+        } else if (typeof val === 'string' && (val.includes('Invalid date') || val.includes('Invalid Date'))) {
+          val = '';
         }
         fd.append(k, val); 
       }
