@@ -123,12 +123,17 @@ exports.createProduct = async (req, res, next) => {
     if (data.parentProductId === '' || data.parentProductId === 'null' || data.parentProductId === null) {
       data.parentProductId = null;
     }
-    if (data.woocommerce_last_modified === '' || data.woocommerce_last_modified === 'null' || data.woocommerce_last_modified === 'Invalid date' || data.woocommerce_last_modified === 'Invalid Date' || data.woocommerce_last_modified === null) {
-      data.woocommerce_last_modified = null;
-    }
-    if (data.lastModifiedDate === '' || data.lastModifiedDate === 'null' || data.lastModifiedDate === 'Invalid date' || data.lastModifiedDate === 'Invalid Date' || data.lastModifiedDate === null) {
-      data.lastModifiedDate = null;
-    }
+    const dateFields = [
+      'woocommerce_last_modified',
+      'lastModifiedDate',
+      'lastSyncTimestamp',
+      'lastWooUpdateTimestamp'
+    ];
+    dateFields.forEach(field => {
+      if (data[field] === '' || data[field] === 'null' || data[field] === 'Invalid date' || data[field] === 'Invalid Date' || data[field] === null) {
+        data[field] = null;
+      }
+    });
     
     let packSizesData = [];
     if (data.packSizes) {
@@ -169,12 +174,17 @@ exports.updateProduct = async (req, res, next) => {
     if (data.parentProductId === '' || data.parentProductId === 'null' || data.parentProductId === null) {
       data.parentProductId = null;
     }
-    if (data.woocommerce_last_modified === '' || data.woocommerce_last_modified === 'null' || data.woocommerce_last_modified === 'Invalid date' || data.woocommerce_last_modified === 'Invalid Date' || data.woocommerce_last_modified === null) {
-      data.woocommerce_last_modified = null;
-    }
-    if (data.lastModifiedDate === '' || data.lastModifiedDate === 'null' || data.lastModifiedDate === 'Invalid date' || data.lastModifiedDate === 'Invalid Date' || data.lastModifiedDate === null) {
-      data.lastModifiedDate = null;
-    }
+    const dateFields = [
+      'woocommerce_last_modified',
+      'lastModifiedDate',
+      'lastSyncTimestamp',
+      'lastWooUpdateTimestamp'
+    ];
+    dateFields.forEach(field => {
+      if (data[field] === '' || data[field] === 'null' || data[field] === 'Invalid date' || data[field] === 'Invalid Date' || data[field] === null) {
+        data[field] = null;
+      }
+    });
     
     let packSizesData = [];
     if (data.packSizes) {
