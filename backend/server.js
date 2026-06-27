@@ -183,6 +183,33 @@ const startServer = async () => {
     } catch (cleanErr) {
       console.error('Failed to clean up seeded ABC Malt data:', cleanErr);
     }
+
+    // Seed CRM API Key
+    try {
+      const IntegrationExportCredential = require('./models/IntegrationExportCredential');
+      const crmApiKey = 'ao_live_2b2ff0efaa001a57a4fbd643ec64c121eff339f4f2067464';
+      const existingKey = await IntegrationExportCredential.findOne({ where: { apiKey: crmApiKey } });
+      if (!existingKey) {
+        await IntegrationExportCredential.create({
+          name: 'Cusman CRM Integration',
+          description: 'Auto-generated key for Cusman CRM sync',
+          apiKey: crmApiKey,
+          apiSecret: 'whsec_2b2ff0efaa001a57a4fbd643ec64c121eff339f4f2067464',
+          status: 'Active',
+          environment: 'Live',
+          permissions: JSON.stringify({
+            Products: ['Read', 'Create', 'Update', 'Delete'],
+            Customers: ['Read', 'Create', 'Update', 'Delete'],
+            Orders: ['Read', 'Create', 'Update', 'Delete'],
+            Invoices: ['Read', 'Create', 'Update', 'Delete']
+          }),
+          tenantId: 1
+        });
+        console.log('✓ Seeded CRM Integration API Key successfully');
+      }
+    } catch (seedCrmErr) {
+      console.error('CRM API Key seeding failed:', seedCrmErr);
+    }
     
     // Initialize background WooCommerce auto-sync scheduler
     const { startScheduler } = require('./utils/scheduler');

@@ -339,19 +339,8 @@ exports.getAuditLogs = async (req, res, next) => {
 
 exports.getHealth = async (req, res, next) => {
   try {
-    let dbStatus = 'connected';
-    try {
-      const connectDB = require('../config/db');
-      await connectDB.sequelize.authenticate();
-    } catch (e) {
-      dbStatus = 'disconnected';
-    }
     res.json({
-      success: true,
-      status: "online",
-      database: dbStatus,
-      version: "2.0.0",
-      serverTime: new Date().toISOString()
+      status: "online"
     });
   } catch (err) {
     next(err);
@@ -365,10 +354,44 @@ exports.getHealth = async (req, res, next) => {
 // --- PRODUCTS ---
 exports.getProducts = async (req, res, next) => {
   try {
-    const { where, limit, offset, order, page } = parseQueryParams(req, ['name', 'sku', 'category', 'brand'], Product);
+    const params = parseQueryParams(req, ['name', 'sku', 'category', 'brand'], Product);
+    if (!req.query.limit) {
+      delete params.limit;
+      delete params.offset;
+    }
 
-    const { count, rows } = await Product.findAndCountAll({ where, limit, offset, order });
-    sendStandardResponse(res, rows, count, page, limit);
+    const rows = await Product.findAll({
+      where: params.where,
+      order: params.order
+    });
+
+    const mapped = rows.map(p => {
+      let imageUrl = '';
+      if (p.image) {
+        if (p.image.startsWith('http')) {
+          imageUrl = p.image;
+        } else {
+          const serverUrl = process.env.SERVER_URL || 'https://ao-core-production.up.railway.app';
+          imageUrl = `${serverUrl.replace(/\/$/, '')}${p.image.startsWith('/') ? '' : '/'}${p.image}`;
+        }
+      } else {
+        imageUrl = 'https://ao-core-production.up.railway.app/default-logo.png';
+      }
+
+      return {
+        name: p.name || '',
+        sku: p.sku || '',
+        price: Number(p.sellingPrice || p.price || 0),
+        stock: Number(p.stock || 0),
+        category: p.category || 'General',
+        brand: p.brand || 'Amudhasurabiy',
+        description: p.description || p.shortDescription || p.name || '',
+        benefits: p.shortDescription || 'Premium organic quality product',
+        imageUrl
+      };
+    });
+
+    res.json(mapped);
   } catch (err) {
     next(err);
   }
@@ -416,10 +439,38 @@ exports.deleteProduct = async (req, res, next) => {
 // --- CUSTOMERS ---
 exports.getCustomers = async (req, res, next) => {
   try {
-    const { where, limit, offset, order, page } = parseQueryParams(req, ['name', 'phone', 'email', 'businessName'], Customer);
+    const params = parseQueryParams(req, ['name', 'phone', 'email', 'businessName'], Customer);
+    if (!req.query.limit) {
+      delete params.limit;
+      delete params.offset;
+    }
 
-    const { count, rows } = await Customer.findAndCountAll({ where, limit, offset, order });
-    sendStandardResponse(res, rows, count, page, limit);
+    const rows = await Customer.findAll({
+      where: params.where,
+      order: params.order
+    });
+
+    const mapped = rows.map(c => {
+      let city = 'N/A';
+      if (c.address) {
+        const parts = c.address.split(',').map(p => p.trim());
+        if (parts.length > 1) {
+          city = parts[parts.length - 2];
+        } else {
+          city = c.address.trim();
+        }
+      }
+      return {
+        name: c.name || '',
+        phone: c.phone || '',
+        city: city || 'N/A',
+        company: c.businessName || c.name || '',
+        tags: c.customerType || 'Retail Shop',
+        outstandingAmount: Number(c.balance || 0)
+      };
+    });
+
+    res.json(mapped);
   } catch (err) {
     next(err);
   }
@@ -467,10 +518,41 @@ exports.deleteCustomer = async (req, res, next) => {
 // --- ORDERS ---
 exports.getOrders = async (req, res, next) => {
   try {
-    const { where, limit, offset, order, page } = parseQueryParams(req, ['orderNumber', 'customerName', 'phone'], Order);
+    const params = parseQueryParams(req, ['orderNumber', 'customerName', 'phone'], Order);
+    if (!req.query.limit) {
+      delete params.limit;
+      delete params.offset;
+    }
 
-    const { count, rows } = await Order.findAndCountAll({ where, limit, offset, order });
-    sendStandardResponse(res, rows, count, page, limit);
+    const rows = await Order.findAll({
+      where: params.where,
+      order: params.order
+    });
+
+    const mapped = rows.map(o => {
+      let parsedItems = [];
+      try {
+        parsedItems = typeof o.items === 'string' ? JSON.parse(o.items) : o.items;
+      } catch (e) {
+        parsedItems = o.items || [];
+      }
+      const items = (Array.isArray(parsedItems) ? parsedItems : []).map(item => ({
+        productName: item.name || item.productName || 'Product',
+        quantity: Number(item.qty || item.quantity || 0),
+        price: Number(item.unitPrice || item.price || 0)
+      }));
+
+      return {
+        customerName: o.customerName || '',
+        phone: o.phoneNumber || '',
+        city: o.area || 'N/A',
+        totalValue: Number(o.totalAmount || 0),
+        status: o.status || 'Confirmed',
+        items
+      };
+    });
+
+    res.json(mapped);
   } catch (err) {
     next(err);
   }
