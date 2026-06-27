@@ -1029,29 +1029,7 @@ export default function SettingsPage() {
                         return 'Default AO ERP Logo';
                       })()}
                     </div>
-                    {((logoMethod === 'file' && (logo || form.logo)) || (logoMethod === 'url' && (form.logoUrl || form.logo))) && (
-                      <button
-                        type="button"
-                        onClick={removeLogo}
-                        style={{
-                          marginTop: '0.5rem',
-                          backgroundColor: '#fef2f2',
-                          color: '#ef4444',
-                          border: '1px solid #fecaca',
-                          borderRadius: '6px',
-                          padding: '0.35rem 0.75rem',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        🗑️ Remove Logo
-                      </button>
-                    )}
+
                   </div>
                 </div>
               </div>

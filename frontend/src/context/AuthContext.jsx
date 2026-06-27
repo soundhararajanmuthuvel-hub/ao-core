@@ -363,16 +363,60 @@ export function AuthProvider({ children }) {
           alignItems: 'center',
           boxSizing: 'border-box'
         }}>
-          <div className="ao-spinner" style={{
-            width: '60px',
-            height: '60px',
-            border: '4px solid rgba(255, 152, 0, 0.1)',
-            borderTop: '4px solid #ff9800',
-            borderRadius: '50%',
-            animation: 'ao-spin 1s linear infinite',
+          <div style={{
+            position: 'relative',
+            width: '90px',
+            height: '90px',
             marginBottom: '1.5rem',
-            filter: 'drop-shadow(0 0 10px rgba(255, 152, 0, 0.3))'
-          }} />
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            {/* Spinning Outer Ring */}
+            <div style={{
+              position: 'absolute',
+              width: '82px',
+              height: '82px',
+              border: '3px solid transparent',
+              borderTop: '3px solid #ff9800',
+              borderBottom: '3px solid #ff9800',
+              borderRadius: '50%',
+              animation: 'ao-spin 2s linear infinite',
+            }} />
+            
+            {/* Pulsing Glow Ring */}
+            <div style={{
+              position: 'absolute',
+              width: '74px',
+              height: '74px',
+              border: '1px solid rgba(255, 152, 0, 0.2)',
+              borderRadius: '50%',
+              boxShadow: '0 0 15px rgba(255, 152, 0, 0.3)',
+              animation: 'ao-pulse 1.5s ease-in-out infinite alternate',
+            }} />
+
+            {/* Brand Logo in Center */}
+            <img
+              src="/default-logo.png"
+              alt="Logo"
+              style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                backgroundColor: '#ffffff',
+                border: '2px solid rgba(255, 152, 0, 0.1)',
+                objectFit: 'contain',
+                padding: '6px',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                zIndex: 2,
+                animation: 'ao-pulse 1.5s ease-in-out infinite alternate',
+              }}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/default-logo.png';
+              }}
+            />
+          </div>
           
           <h2 style={{
             margin: '0 0 0.5rem 0',
@@ -445,6 +489,10 @@ export function AuthProvider({ children }) {
           @keyframes ao-spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+          }
+          @keyframes ao-pulse {
+            0% { transform: scale(0.95); opacity: 0.9; }
+            100% { transform: scale(1.05); opacity: 1; }
           }
         `}</style>
       </div>
