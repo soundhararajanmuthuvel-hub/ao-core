@@ -123,6 +123,9 @@ exports.createProduct = async (req, res, next) => {
     if (data.parentProductId === '' || data.parentProductId === 'null' || data.parentProductId === null) {
       data.parentProductId = null;
     }
+    if (data.woocommerce_last_modified === '' || data.woocommerce_last_modified === 'null' || data.woocommerce_last_modified === 'Invalid date' || data.woocommerce_last_modified === 'Invalid Date' || data.woocommerce_last_modified === null) {
+      data.woocommerce_last_modified = null;
+    }
     
     let packSizesData = [];
     if (data.packSizes) {
@@ -162,6 +165,9 @@ exports.updateProduct = async (req, res, next) => {
     }
     if (data.parentProductId === '' || data.parentProductId === 'null' || data.parentProductId === null) {
       data.parentProductId = null;
+    }
+    if (data.woocommerce_last_modified === '' || data.woocommerce_last_modified === 'null' || data.woocommerce_last_modified === 'Invalid date' || data.woocommerce_last_modified === 'Invalid Date' || data.woocommerce_last_modified === null) {
+      data.woocommerce_last_modified = null;
     }
     
     let packSizesData = [];

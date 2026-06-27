@@ -225,7 +225,10 @@ export default function Products() {
     const fd = new FormData();
     Object.entries(form).forEach(([k, v]) => { 
       if (k !== '_id' && k !== 'image' && k !== '__v' && k !== 'packSizes') {
-        const val = (v === null || v === undefined) ? '' : v;
+        let val = (v === null || v === undefined) ? '' : v;
+        if (val === 'Invalid date' || val === 'Invalid Date') {
+          val = '';
+        }
         fd.append(k, val); 
       }
     });
