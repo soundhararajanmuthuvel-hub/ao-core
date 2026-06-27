@@ -160,12 +160,28 @@ const startServer = async () => {
   try {
     await connectDB();
     
-    // Auto-seed ABC Malt data
+    // Clean up seeded ABC Malt data from database (one-time clean up on deployment)
     try {
-      const seedAbcMalt = require('./utils/seedAbcMalt');
-      await seedAbcMalt();
-    } catch (seedErr) {
-      console.error('ABC Malt seeding failed:', seedErr);
+      const Product = require('./models/Product');
+      const RawMaterial = require('./models/RawMaterial');
+      const ManufacturingRecipe = require('./models/ManufacturingRecipe');
+      const { Op } = require('sequelize');
+
+      const deletedRecipes = await ManufacturingRecipe.destroy({
+        where: { name: { [Op.like]: 'ABC Malt%' } }
+      });
+      const deletedProducts = await Product.destroy({
+        where: { sku: { [Op.like]: 'ABC-MALT-%' } }
+      });
+      const deletedRawMaterials = await RawMaterial.destroy({
+        where: { materialCode: { [Op.like]: 'RM-%' } }
+      });
+
+      if (deletedProducts > 0 || deletedRawMaterials > 0 || deletedRecipes > 0) {
+        console.log(`✓ Cleaned up seeded ABC Malt records from database: ${deletedProducts} products, ${deletedRawMaterials} raw materials, ${deletedRecipes} recipes.`);
+      }
+    } catch (cleanErr) {
+      console.error('Failed to clean up seeded ABC Malt data:', cleanErr);
     }
     
     // Initialize background WooCommerce auto-sync scheduler
