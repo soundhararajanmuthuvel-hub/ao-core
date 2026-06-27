@@ -119,6 +119,13 @@ const menuStructure = [
     icon: UsersIcon,
     label: 'Users',
     roles: ['Super Admin', 'admin']
+  },
+  {
+    type: 'link',
+    to: '/suppliers',
+    icon: UsersIcon,
+    label: 'Suppliers',
+    roles: ['Super Admin', 'admin', 'Manufacturing Manager', 'Store Keeper']
   }
 ];
 
