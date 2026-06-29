@@ -4,6 +4,14 @@ import { productsApi, customersApi, salesApi } from '../api';
 import { useSettings } from '../context/SettingsContext';
 import { useToast } from '../context/ToastContext';
 
+const getLocalDateString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function SaleCreate() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -18,6 +26,7 @@ export default function SaleCreate() {
   const [amountPaid, setAmountPaid] = useState(0);
   const [expectedDispatchDate, setExpectedDispatchDate] = useState('');
   const [commitment, setCommitment] = useState('');
+  const [invoiceDate, setInvoiceDate] = useState(getLocalDateString());
 
   const [customerOutstanding, setCustomerOutstanding] = useState([]);
   const [loadingOutstanding, setLoadingOutstanding] = useState(false);
@@ -324,6 +333,7 @@ export default function SaleCreate() {
     try {
       const { data } = await salesApi.create({
         customer: customerId,
+        date: invoiceDate,
         items: cart.map(({ product, qty, unitPrice, discountPercent, gstPercent, schemeApplied, freeQty }) => ({
           product,
           qty,
@@ -389,32 +399,44 @@ export default function SaleCreate() {
         <div className="card" style={{ padding: '1.5rem', borderRadius: '12px', backgroundColor: '#fff' }}>
           <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>Customer & Charges Info</h3>
           
-          <div className="form-group">
-            <label>Select Customer</label>
-            <select className="form-control" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-              <option value="">Choose customer...</option>
-              {customers.map((c) => <option key={c.id || c._id} value={c.id || c._id}>{c.name} ({c.customerType})</option>)}
-            </select>
-            {cust && (
-              <div style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #fed7aa', backgroundColor: '#fff7ed', borderRadius: '8px' }}>
-                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', fontWeight: 700, color: '#c2410c', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                  🛡️ Financial Profiling: {cust.paymentCycle || 'Bill to Bill'}
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.85rem', color: '#7c2d12' }}>
-                  <div>Outstanding Amount: <strong>₹{Number(cust.balance || customerOutstanding.reduce((sum, inv) => sum + Number(inv.balance || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                  <div>Outstanding Invoices: <strong>{customerOutstanding.length}</strong></div>
-                  {customerOutstanding.length > 0 && (
-                    <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                      <span className="badge" style={{ color: '#fff', backgroundColor: '#f97316', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>⚠️ Previous Bill Unpaid</span>
-                      {customerOutstanding.some(inv => inv.daysOverdue > 15) && <span className="badge" style={{ color: '#fff', backgroundColor: '#ef4444', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>⚠️ Overdue &gt; 15 Days</span>}
-                      {customerOutstanding.some(inv => inv.daysOverdue > 30) && <span className="badge" style={{ color: '#fff', backgroundColor: '#dc2626', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>🚨 Overdue &gt; 30 Days</span>}
-                      {customerOutstanding.some(inv => inv.daysOverdue > 45) && <span className="badge" style={{ color: '#fff', backgroundColor: '#991b1b', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>⛔ Overdue &gt; 45 Days</span>}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Select Customer</label>
+              <select className="form-control" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+                <option value="">Choose customer...</option>
+                {customers.map((c) => <option key={c.id || c._id} value={c.id || c._id}>{c.name} ({c.customerType})</option>)}
+              </select>
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Invoice Date</label>
+              <input
+                type="date"
+                className="form-control"
+                value={invoiceDate}
+                onChange={(e) => setInvoiceDate(e.target.value)}
+              />
+            </div>
           </div>
+
+          {cust && (
+            <div style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid #fed7aa', backgroundColor: '#fff7ed', borderRadius: '8px' }}>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', fontWeight: 700, color: '#c2410c', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                🛡️ Financial Profiling: {cust.paymentCycle || 'Bill to Bill'}
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.85rem', color: '#7c2d12' }}>
+                <div>Outstanding Amount: <strong>₹{Number(cust.balance || customerOutstanding.reduce((sum, inv) => sum + Number(inv.balance || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
+                <div>Outstanding Invoices: <strong>{customerOutstanding.length}</strong></div>
+                {customerOutstanding.length > 0 && (
+                  <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                    <span className="badge" style={{ color: '#fff', backgroundColor: '#f97316', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>⚠️ Previous Bill Unpaid</span>
+                    {customerOutstanding.some(inv => inv.daysOverdue > 15) && <span className="badge" style={{ color: '#fff', backgroundColor: '#ef4444', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>⚠️ Overdue &gt; 15 Days</span>}
+                    {customerOutstanding.some(inv => inv.daysOverdue > 30) && <span className="badge" style={{ color: '#fff', backgroundColor: '#dc2626', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>🚨 Overdue &gt; 30 Days</span>}
+                    {customerOutstanding.some(inv => inv.daysOverdue > 45) && <span className="badge" style={{ color: '#fff', backgroundColor: '#991b1b', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>⛔ Overdue &gt; 45 Days</span>}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
