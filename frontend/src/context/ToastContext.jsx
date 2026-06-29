@@ -5,6 +5,18 @@ import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
 
 const ToastContext = createContext(null);
 
+const isCrmError = (message) => {
+  if (!message) return false;
+  const msg = String(message).toLowerCase();
+  return (
+    msg.includes('crm') || 
+    msg.includes('api key missing') || 
+    msg.includes('whatsapp') ||
+    msg.includes('phone missing') ||
+    msg.includes('rejected request')
+  );
+};
+
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const { settings } = useSettings();
@@ -401,6 +413,28 @@ export function ToastProvider({ children }) {
                   >
                     {t.message || 'An unexpected error occurred. Please try again.'}
                   </div>
+
+                  {isCrmError(t.message) && (
+                    <div style={{
+                      width: '100%',
+                      marginTop: '0.75rem',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '12px',
+                      backgroundColor: 'rgba(249, 115, 22, 0.12)',
+                      border: '1px solid rgba(249, 115, 22, 0.25)',
+                      color: '#fdba74',
+                      fontSize: '0.85rem',
+                      textAlign: 'left',
+                      lineHeight: 1.5
+                    }}>
+                      <div style={{ fontWeight: 700, marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        🔌 Cusman CRM Integration Help
+                      </div>
+                      <div>
+                        This error was returned from the CRM gateway. Please check that your API endpoints and credentials for <strong>Cusman CRM Integration</strong> are configured correctly under Settings &gt; CRM WhatsApp.
+                      </div>
+                    </div>
+                  )}
 
                   {/* Close / Dismiss Buttons */}
                   <div style={{ display: 'flex', gap: '0.75rem', width: '100%', marginTop: '0.5rem' }}>
