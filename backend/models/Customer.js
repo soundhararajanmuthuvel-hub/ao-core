@@ -192,7 +192,8 @@ makeMongooseCompatible(Customer, {
 // Territory & Customer ID Assignment Hook
 const territoryService = require('../utils/territoryService');
 
-async function assignTerritoryAndCode(customer) {
+async function assignTerritoryAndCode(customer, options = {}) {
+  const transaction = options.transaction || null;
   let resolution = null;
 
   // If address changed, but coordinates did NOT change, clear old coordinates to force re-geocoding
@@ -222,14 +223,15 @@ async function assignTerritoryAndCode(customer) {
     let salesmanId = resolution.assignedSalesmanId;
     if (salesmanId) {
       const User = require('./User');
-      const userExists = await User.count({ where: { id: salesmanId } });
+      const userExists = await User.count({ where: { id: salesmanId }, transaction });
       if (userExists === 0) {
         const fallbackSalesman = await User.findOne({
           where: {
             role: {
               [require('sequelize').Op.in]: ['Salesman', 'Sales Executive']
             }
-          }
+          },
+          transaction
         });
         salesmanId = fallbackSalesman ? fallbackSalesman.id : null;
       }
@@ -239,14 +241,14 @@ async function assignTerritoryAndCode(customer) {
     const territoryCode = resolution.routeZone;
     const currentCode = customer.customerCode;
     if (!currentCode || !currentCode.startsWith(`${territoryCode}-`)) {
-      const generatedCode = await territoryService.generateUniqueCustomerCode(Customer, territoryCode);
+      const generatedCode = await territoryService.generateUniqueCustomerCode(Customer, territoryCode, { transaction });
       customer.customerCode = generatedCode;
     }
   }
 }
 
 Customer.addHook('beforeCreate', async (customer, options) => {
-  await assignTerritoryAndCode(customer);
+  await assignTerritoryAndCode(customer, options);
 });
 
 Customer.addHook('beforeUpdate', async (customer, options) => {
@@ -256,7 +258,7 @@ Customer.addHook('beforeUpdate', async (customer, options) => {
     customer.changed('longitude') ||
     customer.changed('territory')
   ) {
-    await assignTerritoryAndCode(customer);
+    await assignTerritoryAndCode(customer, options);
   }
 });
 

@@ -101,7 +101,8 @@ function resolveByTerritoryName(name) {
   return null;
 }
 
-async function generateUniqueCustomerCode(CustomerModel, territoryCode) {
+async function generateUniqueCustomerCode(CustomerModel, territoryCode, options = {}) {
+  const transaction = options.transaction || null;
   const lastCust = await CustomerModel.findOne({
     where: {
       customerCode: {
@@ -109,7 +110,8 @@ async function generateUniqueCustomerCode(CustomerModel, territoryCode) {
       }
     },
     order: [['customerCode', 'DESC']],
-    attributes: ['customerCode']
+    attributes: ['customerCode'],
+    transaction
   });
 
   let runningNum = 1;
