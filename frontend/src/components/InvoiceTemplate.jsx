@@ -104,22 +104,38 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
   let containerPadding = '8mm';
   let containerFontSize = '13.5px';
   let logoSize = '65px';
+  let rowPadding = '1.2mm 1.5mm';
+  let spacingUnit = '3mm';
+  let cardPadding = '2.5mm 3.5mm';
+  let tableFontSize = '11.5px';
 
   if (paperSize === 'A5') {
     containerWidth = '148mm';
-    containerPadding = '6mm';
-    containerFontSize = '12px';
-    logoSize = '55px';
+    containerPadding = '4mm'; // Tighten padding
+    containerFontSize = '11px'; // Slightly smaller base font
+    logoSize = '45px';
+    rowPadding = '0.8mm 1.2mm'; // Tighten rows
+    spacingUnit = '1.5mm';      // Half the standard vertical spacing
+    cardPadding = '2mm 3mm';    // Tighten card paddings
+    tableFontSize = '10px';
   } else if (paperSize === 'Thermal 80mm') {
     containerWidth = '80mm';
     containerPadding = '3mm';
     containerFontSize = '11px';
     logoSize = '45px';
+    rowPadding = '0.8mm 1.2mm';
+    spacingUnit = '1.5mm';
+    cardPadding = '2mm 3mm';
+    tableFontSize = '10px';
   } else if (paperSize === 'Thermal 58mm') {
     containerWidth = '58mm';
     containerPadding = '2mm';
     containerFontSize = '9.5px';
     logoSize = '40px';
+    rowPadding = '0.6mm 1mm';
+    spacingUnit = '1mm';
+    cardPadding = '1.5mm 2mm';
+    tableFontSize = '9.5px';
   }
 
   const paperSizeStyle = `
@@ -162,7 +178,7 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
           flexDirection: isThermal ? 'column' : 'row',
           justifyContent: isThermal ? 'center' : 'space-between', 
           alignItems: isThermal ? 'center' : 'flex-start', 
-          marginBottom: '3mm' 
+          marginBottom: spacingUnit
         }}
       >
         {/* Company Logo */}
@@ -179,8 +195,8 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
               justifyContent: 'center', 
               alignItems: 'center', 
               overflow: 'hidden', 
-              marginTop: isThermal ? '0' : '1mm',
-              marginBottom: isThermal ? '2mm' : '0'
+              marginTop: isThermal ? '0' : '0.5mm',
+              marginBottom: isThermal ? '1.5mm' : '0'
             }}
           >
             <img 
@@ -199,31 +215,31 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
 
         {/* Company Details */}
         <div style={{ textAlign: isThermal ? 'center' : 'right', flex: 1, marginLeft: isThermal ? '0' : '4mm' }}>
-          <h1 style={{ fontSize: isThermal ? '15px' : '22px', fontWeight: 'bold', color: primaryColor, margin: '0 0 0.5mm 0', lineHeight: 1.15 }}>
+          <h1 style={{ fontSize: isThermal ? '15px' : '20px', fontWeight: 'bold', color: primaryColor, margin: '0 0 0.5mm 0', lineHeight: 1.15 }}>
             {settings?.companyName || 'Amudhasurabiy Organics'}
           </h1>
-          <p style={{ margin: '0 0 0.25mm 0', color: '#475569', fontSize: isThermal ? '9.5px' : '10.5px' }}>{settings?.address}</p>
-          <div style={{ display: 'flex', justifyContent: isThermal ? 'center' : 'flex-end', gap: '3px', flexWrap: 'wrap', color: '#475569', fontSize: isThermal ? '9.5px' : '10.5px', margin: '0 0 0.25mm 0' }}>
+          <p style={{ margin: '0 0 0.25mm 0', color: '#475569', fontSize: isThermal ? '9.5px' : '10px' }}>{settings?.address}</p>
+          <div style={{ display: 'flex', justifyContent: isThermal ? 'center' : 'flex-end', gap: '3px', flexWrap: 'wrap', color: '#475569', fontSize: isThermal ? '9.5px' : '10px', margin: '0 0 0.25mm 0' }}>
             {settings?.phone && <span><strong>Phone:</strong> {settings.phone}</span>}
             {settings?.email && <span>| <strong>Email:</strong> {settings.email}</span>}
           </div>
-          {settings?.websiteUrl && <p style={{ margin: '0 0 0.25mm 0', color: '#475569', fontSize: isThermal ? '9.5px' : '10.5px' }}><strong>Website:</strong> {settings.websiteUrl}</p>}
-          {isGstInvoice && companyGst && <p style={{ margin: '0 0 0.25mm 0', color: primaryColor, fontSize: isThermal ? '9.5px' : '10.5px', fontWeight: 'bold' }}>GSTIN: {companyGst}</p>}
+          {settings?.websiteUrl && <p style={{ margin: '0 0 0.25mm 0', color: '#475569', fontSize: isThermal ? '9.5px' : '10px' }}><strong>Website:</strong> {settings.websiteUrl}</p>}
+          {isGstInvoice && companyGst && <p style={{ margin: '0 0 0.25mm 0', color: primaryColor, fontSize: isThermal ? '9.5px' : '10px', fontWeight: 'bold' }}>GSTIN: {companyGst}</p>}
         </div>
       </header>
 
       {/* Decorative accent divider bar */}
-      <div style={{ height: '2px', backgroundColor: primaryColor, margin: '2mm 0' }}></div>
+      <div style={{ height: '2px', backgroundColor: primaryColor, margin: `${spacingUnit} 0` }}></div>
 
       {/* 2. Invoice Title */}
-      <div style={{ display: 'flex', justifyContent: isThermal ? 'center' : 'space-between', alignItems: 'center', marginBottom: '2mm' }}>
-        <h2 style={{ fontSize: isThermal ? '13px' : '18px', fontWeight: 'bold', color: primaryColor, margin: 0, textTransform: 'uppercase', letterSpacing: '-0.01em' }}>
+      <div style={{ display: 'flex', justifyContent: isThermal ? 'center' : 'space-between', alignItems: 'center', marginBottom: spacingUnit }}>
+        <h2 style={{ fontSize: isThermal ? '13px' : '16px', fontWeight: 'bold', color: primaryColor, margin: 0, textTransform: 'uppercase', letterSpacing: '-0.01em' }}>
           {isGstInvoice ? 'TAX INVOICE' : 'INVOICE'}
         </h2>
       </div>
 
       {/* 3. Invoice Information Card (Two-column layout) */}
-      <div className="invoice-info-grid" style={{ display: 'grid', gridTemplateColumns: isThermal ? '1fr' : '1fr 1fr', gap: '1.5mm', padding: '2mm 2.5mm', border: '1px solid #E2E8F0', borderRadius: '6px', marginBottom: '3.5mm', backgroundColor: '#fdfdfd' }}>
+      <div className="invoice-info-grid" style={{ display: 'grid', gridTemplateColumns: isThermal ? '1fr' : '1fr 1fr', gap: '1.5mm', padding: spacingUnit, border: '1px solid #E2E8F0', borderRadius: '6px', marginBottom: spacingUnit, backgroundColor: '#fdfdfd' }}>
         <div>
           <p style={{ margin: '0 0 0.5mm 0' }}><strong>Invoice No:</strong> {sale.invoiceNumber}</p>
           <p style={{ margin: '0 0 0.5mm 0' }}><strong>Date:</strong> {new Date(sale.date).toLocaleDateString('en-IN')}</p>
@@ -237,10 +253,10 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
       </div>
 
       {/* 4. Customer Billing & Shipping Cards */}
-      <div className="invoice-customer-cards" style={{ display: 'grid', gridTemplateColumns: isThermal ? '1fr' : '1fr 1fr', gap: '3mm', marginBottom: '4.5mm' }}>
+      <div className="invoice-customer-cards" style={{ display: 'grid', gridTemplateColumns: isThermal ? '1fr' : '1fr 1fr', gap: '3mm', marginBottom: spacingUnit }}>
         {/* BILL TO */}
-        <div style={{ padding: '2.5mm 3.5mm', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px' }}>
-          <h3 style={{ fontSize: '11px', fontWeight: 'bold', color: primaryColor, borderBottom: '1px solid #E2E8F0', paddingBottom: '0.5mm', marginBottom: '1.5mm', textTransform: 'uppercase' }}>BILL TO:</h3>
+        <div style={{ padding: cardPadding, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px' }}>
+          <h3 style={{ fontSize: '10px', fontWeight: 'bold', color: primaryColor, borderBottom: '1px solid #E2E8F0', paddingBottom: '0.5mm', marginBottom: '1.5mm', textTransform: 'uppercase' }}>BILL TO:</h3>
           <p style={{ margin: '0 0 0.5mm 0', fontWeight: 'bold' }}>{billName}</p>
           {billPhone && <p style={{ margin: '0 0 0.5mm 0', color: '#475569' }}>Phone: {billPhone}</p>}
           <p style={{ margin: '0 0 0.5mm 0', color: '#475569', lineHeight: 1.25 }}>{billAddress}</p>
@@ -249,8 +265,8 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
 
         {/* SHIP TO (Hide on Thermal if duplicate to save roll space) */}
         {(!isThermal || shipAddress !== billAddress || shipName !== billName) && (
-          <div style={{ padding: '2.5mm 3.5mm', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px' }}>
-            <h3 style={{ fontSize: '11px', fontWeight: 'bold', color: primaryColor, borderBottom: '1px solid #E2E8F0', paddingBottom: '0.5mm', marginBottom: '1.5mm', textTransform: 'uppercase' }}>SHIP TO:</h3>
+          <div style={{ padding: cardPadding, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px' }}>
+            <h3 style={{ fontSize: '10px', fontWeight: 'bold', color: primaryColor, borderBottom: '1px solid #E2E8F0', paddingBottom: '0.5mm', marginBottom: '1.5mm', textTransform: 'uppercase' }}>SHIP TO:</h3>
             <p style={{ margin: '0 0 0.5mm 0', fontWeight: 'bold' }}>{shipName}</p>
             {shipPhone && <p style={{ margin: '0 0 0.5mm 0', color: '#475569' }}>Phone: {shipPhone}</p>}
             <p style={{ margin: '0 0 0.5mm 0', color: '#475569', lineHeight: 1.25 }}>{shipAddress}</p>
@@ -260,19 +276,19 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
       </div>
 
       {/* 5. Product Table */}
-      <table className="invoice-redesign-table" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4mm', fontSize: isThermal ? '10px' : '11.5px' }}>
+      <table className="invoice-redesign-table" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: spacingUnit, fontSize: tableFontSize }}>
         <thead>
           <tr style={{ backgroundColor: primaryColor, color: '#ffffff', textAlign: 'left' }}>
-            <th style={{ padding: '1.2mm 1.5mm', width: '20px', fontWeight: 'bold' }}>#</th>
-            <th style={{ padding: '1.2mm 1.5mm', fontWeight: 'bold' }}>Product Name</th>
-            {!isThermal && isGstInvoice && <th style={{ padding: '1.2mm 1.5mm', width: '45px', fontWeight: 'bold' }}>HSN</th>}
-            <th style={{ padding: '1.2mm 1.5mm', textAlign: 'center', width: '30px', fontWeight: 'bold' }}>Qty</th>
-            {!isThermal && <th style={{ padding: '1.2mm 1.5mm', textAlign: 'center', width: '35px', fontWeight: 'bold' }}>Unit</th>}
-            <th style={{ padding: '1.2mm 1.5mm', textAlign: 'right', width: '55px', fontWeight: 'bold' }}>Rate</th>
-            {!isThermal && <th style={{ padding: '1.2mm 1.5mm', textAlign: 'right', width: '50px', fontWeight: 'bold' }}>Discount</th>}
-            {!isThermal && isGstInvoice && <th style={{ padding: '1.2mm 1.5mm', textAlign: 'center', width: '40px', fontWeight: 'bold' }}>GST %</th>}
-            {!isThermal && isGstInvoice && <th style={{ padding: '1.2mm 1.5mm', textAlign: 'right', width: '55px', fontWeight: 'bold' }}>Tax Amt</th>}
-            <th style={{ padding: '1.2mm 1.5mm', textAlign: 'right', width: '65px', fontWeight: 'bold' }}>Amount</th>
+            <th style={{ padding: rowPadding, width: '20px', fontWeight: 'bold' }}>#</th>
+            <th style={{ padding: rowPadding, fontWeight: 'bold' }}>Product Name</th>
+            {!isThermal && isGstInvoice && <th style={{ padding: rowPadding, width: '45px', fontWeight: 'bold' }}>HSN</th>}
+            <th style={{ padding: rowPadding, textAlign: 'center', width: '30px', fontWeight: 'bold' }}>Qty</th>
+            {!isThermal && <th style={{ padding: rowPadding, textAlign: 'center', width: '35px', fontWeight: 'bold' }}>Unit</th>}
+            <th style={{ padding: rowPadding, textAlign: 'right', width: '55px', fontWeight: 'bold' }}>Rate</th>
+            {!isThermal && <th style={{ padding: rowPadding, textAlign: 'right', width: '50px', fontWeight: 'bold' }}>Discount</th>}
+            {!isThermal && isGstInvoice && <th style={{ padding: rowPadding, textAlign: 'center', width: '40px', fontWeight: 'bold' }}>GST %</th>}
+            {!isThermal && isGstInvoice && <th style={{ padding: rowPadding, textAlign: 'right', width: '55px', fontWeight: 'bold' }}>Tax Amt</th>}
+            <th style={{ padding: rowPadding, textAlign: 'right', width: '65px', fontWeight: 'bold' }}>Amount</th>
           </tr>
         </thead>
         <tbody>
@@ -304,8 +320,8 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
                   borderBottom: '1px solid #E2E8F0' 
                 }}
               >
-                <td style={{ padding: '1.2mm 1.5mm', verticalAlign: 'top' }}>{idx + 1}</td>
-                <td style={{ padding: '1.2mm 1.5mm', verticalAlign: 'top', wordBreak: 'break-word' }}>
+                <td style={{ padding: rowPadding, verticalAlign: 'top' }}>{idx + 1}</td>
+                <td style={{ padding: rowPadding, verticalAlign: 'top', wordBreak: 'break-word' }}>
                   <strong>{item.name}</strong>
                   {item.schemeApplied && item.schemeApplied.trim().toLowerCase() !== 'none' && (
                     <div style={{ fontSize: '8.5px', color: accentColor, fontWeight: 600, marginTop: '0.25mm' }}>
@@ -313,8 +329,8 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
                     </div>
                   )}
                 </td>
-                {!isThermal && isGstInvoice && <td style={{ padding: '1.2mm 1.5mm', verticalAlign: 'top' }}>{item.product?.gstClass || '0000'}</td>}
-                <td style={{ padding: '1.2mm 1.5mm', verticalAlign: 'top', textAlign: 'center' }}>
+                {!isThermal && isGstInvoice && <td style={{ padding: rowPadding, verticalAlign: 'top' }}>{item.product?.gstClass || '0000'}</td>}
+                <td style={{ padding: rowPadding, verticalAlign: 'top', textAlign: 'center' }}>
                   {Number(item.qty).toFixed(0)}
                   {Number(item.freeQty) > 0 && (
                     <div style={{ fontSize: '8.5px', color: accentColor, fontWeight: 'bold' }}>
@@ -322,12 +338,12 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
                     </div>
                   )}
                 </td>
-                {!isThermal && <td style={{ padding: '1.2mm 1.5mm', verticalAlign: 'top', textAlign: 'center', textTransform: 'uppercase', color: '#64748b', fontSize: '10px' }}>{unit}</td>}
-                <td style={{ padding: '1.2mm 1.5mm', verticalAlign: 'top', textAlign: 'right' }}>₹{Number(item.unitPrice).toFixed(2)}</td>
-                {!isThermal && <td style={{ padding: '1.2mm 1.5mm', verticalAlign: 'top', textAlign: 'right', color: discVal > 0 ? '#EF4444' : '#64748b' }}>{discStr}</td>}
-                {!isThermal && isGstInvoice && <td style={{ padding: '1.2mm 1.5mm', verticalAlign: 'top', textAlign: 'center' }}>{item.gstPercent || 0}%</td>}
-                {!isThermal && isGstInvoice && <td style={{ padding: '1.2mm 1.5mm', verticalAlign: 'top', textAlign: 'right' }}>₹{taxAmt.toFixed(2)}</td>}
-                <td style={{ padding: '1.2mm 1.5mm', verticalAlign: 'top', textAlign: 'right', fontWeight: 'bold' }}>₹{Number(item.lineTotal).toFixed(2)}</td>
+                {!isThermal && <td style={{ padding: rowPadding, verticalAlign: 'top', textAlign: 'center', textTransform: 'uppercase', color: '#64748b', fontSize: '10px' }}>{unit}</td>}
+                <td style={{ padding: rowPadding, verticalAlign: 'top', textAlign: 'right' }}>₹{Number(item.unitPrice).toFixed(2)}</td>
+                {!isThermal && <td style={{ padding: rowPadding, verticalAlign: 'top', textAlign: 'right', color: discVal > 0 ? '#EF4444' : '#64748b' }}>{discStr}</td>}
+                {!isThermal && isGstInvoice && <td style={{ padding: rowPadding, verticalAlign: 'top', textAlign: 'center' }}>{item.gstPercent || 0}%</td>}
+                {!isThermal && isGstInvoice && <td style={{ padding: rowPadding, verticalAlign: 'top', textAlign: 'right' }}>₹{taxAmt.toFixed(2)}</td>}
+                <td style={{ padding: rowPadding, verticalAlign: 'top', textAlign: 'right', fontWeight: 'bold' }}>₹{Number(item.lineTotal).toFixed(2)}</td>
               </tr>
             );
           })}
@@ -340,31 +356,31 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
         style={{ 
           display: 'grid', 
           gridTemplateColumns: isThermal ? '1fr' : '1.2fr 1fr', 
-          gap: '3mm', 
+          gap: spacingUnit, 
           alignItems: 'start', 
-          marginBottom: '3mm' 
+          marginBottom: spacingUnit
         }}
       >
         {/* Left Side: Payment Details, Amount in Words & Notes */}
         <div>
           {/* Amount in Words */}
-          <div style={{ padding: '1.5mm 2.5mm', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px', marginBottom: '2.5mm' }}>
+          <div style={{ padding: cardPadding, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px', marginBottom: spacingUnit }}>
             <p style={{ margin: '0 0 0.5mm 0', fontSize: '8.5px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Amount In Words</p>
-            <p style={{ margin: 0, fontSize: '11px', fontWeight: 'bold', color: primaryColor }}>
+            <p style={{ margin: 0, fontSize: '10.5px', fontWeight: 'bold', color: primaryColor }}>
               {convertNumberToWords(sale.grandTotal)}
             </p>
           </div>
 
           {/* Payment Details Container */}
           {(settings?.bankDetails || upiId) && (
-            <div style={{ padding: '2.5mm', border: '1px solid #E2E8F0', borderRadius: '6px', backgroundColor: '#ffffff', display: 'flex', gap: '3.5mm', alignItems: 'center' }}>
+            <div style={{ padding: cardPadding, border: '1px solid #E2E8F0', borderRadius: '6px', backgroundColor: '#ffffff', display: 'flex', gap: '3.5mm', alignItems: 'center' }}>
               {/* UPI QR Code */}
               {qrCodeUrl && (
                 <div style={{ textAlign: 'center' }}>
                   <img 
                     src={qrCodeUrl} 
                     alt="UPI QR" 
-                    style={{ width: '55px', height: '55px', display: 'block', border: '1px solid #E2E8F0', padding: '0.5mm', borderRadius: '4px' }} 
+                    style={{ width: '50px', height: '50px', display: 'block', border: '1px solid #E2E8F0', padding: '0.5mm', borderRadius: '4px' }} 
                   />
                   <span style={{ fontSize: '7px', color: '#64748b', marginTop: '0.5mm', display: 'block', fontWeight: 'bold' }}>Scan to Pay</span>
                 </div>
@@ -385,8 +401,8 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
         </div>
 
         {/* Right Side: Floating Totals Card */}
-        <div style={{ padding: '2.5mm', border: '1px solid #E2E8F0', borderRadius: '6px', backgroundColor: '#F8FAFC' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2mm', fontSize: '11px' }}>
+        <div style={{ padding: cardPadding, border: '1px solid #E2E8F0', borderRadius: '6px', backgroundColor: '#F8FAFC' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2mm', fontSize: '10.5px' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>Subtotal:</span>
@@ -438,7 +454,7 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
             )}
 
             {Number(sale.roundOff || 0) !== 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontStyle: 'italic', fontSize: '10.5px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontStyle: 'italic', fontSize: '10px' }}>
                 <span>Round Off:</span>
                 <span>{Number(sale.roundOff) > 0 ? `+₹${sale.roundOff}` : `-₹${Math.abs(sale.roundOff)}`}</span>
               </div>
@@ -449,11 +465,11 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
               style={{ 
                 display: 'flex', 
                 justifyContent: 'space-between', 
-                fontSize: '13.5px', 
+                fontSize: '12.5px', 
                 fontWeight: 'bold', 
                 backgroundColor: primaryColor, 
                 color: '#ffffff', 
-                padding: '1.8mm 2.5mm', 
+                padding: '1.5mm 2.2mm', 
                 borderRadius: '6px', 
                 marginTop: '1mm' 
               }}
@@ -468,17 +484,17 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
 
       {/* 6. Terms and Notes */}
       {settings?.termsAndConditions && (
-        <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '2mm', marginBottom: '3.5mm', fontSize: '9.5px' }}>
+        <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '1.5mm', marginBottom: spacingUnit, fontSize: '9px' }}>
           <p style={{ margin: '0 0 0.5mm 0', fontWeight: 'bold', color: primaryColor, textTransform: 'uppercase' }}>Terms & Conditions:</p>
-          <p style={{ margin: 0, color: '#64748b', lineHeight: 1.3 }}>{settings.termsAndConditions}</p>
+          <p style={{ margin: 0, color: '#64748b', lineHeight: 1.35 }}>{settings.termsAndConditions}</p>
         </div>
       )}
 
       {/* Decorative divider before footer */}
-      <div style={{ borderTop: '1px dashed #CBD5E1', margin: '2mm 0' }}></div>
+      <div style={{ borderTop: '1px dashed #CBD5E1', margin: '1.5mm 0' }}></div>
 
       {/* 7. Footer */}
-      <footer style={{ textAlign: 'center', fontSize: '10px', color: '#64748b', lineHeight: 1.35 }}>
+      <footer style={{ textAlign: 'center', fontSize: '9.5px', color: '#64748b', lineHeight: 1.35 }}>
         <p style={{ margin: '0 0 0.25mm 0', fontWeight: 'bold' }}>Thank you for your purchase.</p>
         <p style={{ margin: 0 }}>
           This invoice was generated by <strong>{settings?.companyName || 'Amudhasurabiy Organics'}</strong>.

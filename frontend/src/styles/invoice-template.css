@@ -175,3 +175,39 @@
     border-top: 1px solid #e2e8f0;
   }
 }
+
+/* App Shell Reset for Clean Print Output */
+@media print {
+  body, html {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+  .app-shell,
+  .main-area,
+  main,
+  .page,
+  #root {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    position: static !important;
+    transform: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+  }
+  .app-header,
+  .sidebar,
+  .sidebar-overlay,
+  .print-actions,
+  header:not(.invoice-header-redesign),
+  nav,
+  aside,
+  .no-print {
+    display: none !important;
+  }
+}
