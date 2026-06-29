@@ -495,6 +495,23 @@ exports.executeMigration = async (req, res) => {
     const importedCustomers = extractedData.customers || [];
     const customerIdMap = {}; // Maps Zoho display name / business name to active DB Customer ID
 
+    const resolveCustomerId = async (customerName) => {
+      if (!customerName) return null;
+      const key = customerName.toLowerCase();
+      if (customerIdMap[key]) {
+        return customerIdMap[key];
+      }
+      const dbCustomer = await Customer.findOne({
+        where: { name: customerName },
+        transaction: t
+      });
+      if (dbCustomer) {
+        customerIdMap[key] = dbCustomer.id;
+        return dbCustomer.id;
+      }
+      return null;
+    };
+
     for (const cust of importedCustomers) {
       const name = cust['Customer Name'] || cust['Contact Name'] || cust['Display Name'];
       if (!name) continue;
@@ -609,6 +626,28 @@ exports.executeMigration = async (req, res) => {
     const importedProducts = extractedData.products || [];
     const productSKUMap = {}; // Maps Zoho SKU or Product Name to active DB Product
 
+    const resolveProduct = async (prodName) => {
+      if (!prodName) return null;
+      const key = prodName.toLowerCase();
+      if (productSKUMap[key]) {
+        return productSKUMap[key];
+      }
+      const dbProduct = await Product.findOne({
+        where: {
+          [sequelize.Sequelize.Op.or]: [
+            { sku: prodName },
+            { name: prodName }
+          ]
+        },
+        transaction: t
+      });
+      if (dbProduct) {
+        productSKUMap[key] = dbProduct;
+        return dbProduct;
+      }
+      return null;
+    };
+
     for (const prod of importedProducts) {
       const name = prod['Item Name'] || prod['Product Name'] || prod['Name'];
       if (!name) continue;
@@ -683,7 +722,7 @@ exports.executeMigration = async (req, res) => {
       const fields = extractDocumentFields(header);
       const customerName = fields.customerName;
       
-      const customerId = customerIdMap[customerName.toLowerCase()] || null;
+      const customerId = await resolveCustomerId(customerName);
       if (!customerId) {
         await addLog('WARNING', `Invoice ${invNum} skipped. Customer "${customerName}" not found.`);
         continue;
@@ -761,7 +800,7 @@ exports.executeMigration = async (req, res) => {
         const rate = parseZohoNumber(item['Rate'] || item['Unit Price'] || item['Price'] || item['Item Price'] || '0');
         const gst = parseZohoNumber(item['Tax %'] || item['GST %'] || item['Tax Percentage'] || '0');
 
-        const mappedProduct = productSKUMap[prodName.toLowerCase()];
+        const mappedProduct = await resolveProduct(prodName);
         const productId = mappedProduct ? mappedProduct.id : null;
 
         const lineTotalCol = parseZohoNumber(item['Item Total'] || item['Line Total'] || '0');
@@ -812,7 +851,7 @@ exports.executeMigration = async (req, res) => {
       const header = items[0];
       const fields = extractDocumentFields(header);
       const customerName = fields.customerName;
-      const customerId = customerIdMap[customerName.toLowerCase()] || null;
+      const customerId = await resolveCustomerId(customerName);
       if (!customerId) {
         await addLog('WARNING', `Quote ${qNum} skipped. Customer "${customerName}" not found.`);
         continue;
@@ -869,7 +908,7 @@ exports.executeMigration = async (req, res) => {
         const rate = parseZohoNumber(item['Rate'] || item['Unit Price'] || item['Price'] || item['Item Price'] || '0');
         const gst = parseZohoNumber(item['Tax %'] || item['GST %'] || item['Tax Percentage'] || '0');
 
-        const mappedProduct = productSKUMap[prodName.toLowerCase()];
+        const mappedProduct = await resolveProduct(prodName);
         const productId = mappedProduct ? mappedProduct.id : null;
 
         const lineTotalCol = parseZohoNumber(item['Item Total'] || item['Line Total'] || '0');
@@ -919,7 +958,7 @@ exports.executeMigration = async (req, res) => {
       const header = items[0];
       const fields = extractDocumentFields(header);
       const customerName = fields.customerName;
-      const customerId = customerIdMap[customerName.toLowerCase()] || null;
+      const customerId = await resolveCustomerId(customerName);
       if (!customerId) {
         await addLog('WARNING', `Sales Receipt ${rNum} skipped. Customer "${customerName}" not found.`);
         continue;
@@ -975,7 +1014,7 @@ exports.executeMigration = async (req, res) => {
         const rate = parseZohoNumber(item['Rate'] || item['Unit Price'] || item['Price'] || item['Item Price'] || '0');
         const gst = parseZohoNumber(item['Tax %'] || item['GST %'] || item['Tax Percentage'] || '0');
 
-        const mappedProduct = productSKUMap[prodName.toLowerCase()];
+        const mappedProduct = await resolveProduct(prodName);
         const productId = mappedProduct ? mappedProduct.id : null;
 
         const lineTotalCol = parseZohoNumber(item['Item Total'] || item['Line Total'] || '0');
@@ -1025,7 +1064,7 @@ exports.executeMigration = async (req, res) => {
       const header = items[0];
       const fields = extractDocumentFields(header);
       const customerName = fields.customerName;
-      const customerId = customerIdMap[customerName.toLowerCase()] || null;
+      const customerId = await resolveCustomerId(customerName);
       if (!customerId) {
         await addLog('WARNING', `Recurring Invoice ${riNum} skipped. Customer "${customerName}" not found.`);
         continue;
@@ -1081,7 +1120,7 @@ exports.executeMigration = async (req, res) => {
         const rate = parseZohoNumber(item['Rate'] || item['Unit Price'] || item['Price'] || item['Item Price'] || '0');
         const gst = parseZohoNumber(item['Tax %'] || item['GST %'] || item['Tax Percentage'] || '0');
 
-        const mappedProduct = productSKUMap[prodName.toLowerCase()];
+        const mappedProduct = await resolveProduct(prodName);
         const productId = mappedProduct ? mappedProduct.id : null;
 
         const lineTotalCol = parseZohoNumber(item['Item Total'] || item['Line Total'] || '0');
@@ -1173,7 +1212,7 @@ exports.executeMigration = async (req, res) => {
       const date = parseZohoDate(dateStr);
       const amount = parseZohoNumber(ref['Amount'] || ref['Refund Amount'] || '0');
       const customerName = ref['Customer Name'] || ref['Customer'] || '';
-      const customerId = customerIdMap[customerName.toLowerCase()] || null;
+      const customerId = await resolveCustomerId(customerName);
       if (!customerId) {
         await addLog('WARNING', `Refund ${refNum} skipped. Customer "${customerName}" not found.`);
         continue;
@@ -1230,7 +1269,7 @@ exports.executeMigration = async (req, res) => {
       const amount = parseZohoNumber(pay['Amount'] || pay['Amount Received'] || pay['Payment Amount'] || '0');
 
       const customerName = pay['Customer Name'] || pay['Customer'] || '';
-      const customerId = customerIdMap[customerName.toLowerCase()] || null;
+      const customerId = await resolveCustomerId(customerName);
 
       if (!customerId) {
         await addLog('WARNING', `Payment ${payNum} skipped. Customer "${customerName}" not found.`);
@@ -1299,7 +1338,7 @@ exports.executeMigration = async (req, res) => {
       const header = items[0];
       const fields = extractDocumentFields(header);
       const customerName = fields.customerName;
-      const customerId = customerIdMap[customerName.toLowerCase()] || null;
+      const customerId = await resolveCustomerId(customerName);
       if (!customerId) {
         await addLog('WARNING', `Credit Note ${cnNum} skipped. Customer "${customerName}" not found.`);
         continue;
@@ -1358,7 +1397,7 @@ exports.executeMigration = async (req, res) => {
         const rate = parseZohoNumber(item['Rate'] || item['Unit Price'] || item['Price'] || item['Item Price'] || '0');
         const gst = parseZohoNumber(item['Tax %'] || item['GST %'] || item['Tax Percentage'] || '0');
 
-        const mappedProduct = productSKUMap[prodName.toLowerCase()];
+        const mappedProduct = await resolveProduct(prodName);
         const productId = mappedProduct ? mappedProduct.id : null;
 
         const lineTotalCol = parseZohoNumber(item['Item Total'] || item['Line Total'] || '0');

@@ -220,17 +220,18 @@ makeMongooseCompatible(Invoice, {
   createdBy: 'createdById',
 });
 
-async function updateCustomerLastOrder(invoice) {
+async function updateCustomerLastOrder(invoice, options = {}) {
+  const transaction = options.transaction || null;
   if (invoice.customerId && invoice.status !== 'Draft' && invoice.status !== 'Cancelled') {
     const Customer = require('./Customer');
     const CrmFollowUp = require('./CrmFollowUp');
     try {
-      const customer = await Customer.findByPk(invoice.customerId);
+      const customer = await Customer.findByPk(invoice.customerId, { transaction });
       if (customer) {
         const invoiceDate = invoice.date ? new Date(invoice.date) : new Date(invoice.createdAt);
         if (!customer.lastOrderDate || invoiceDate > new Date(customer.lastOrderDate)) {
           customer.lastOrderDate = invoiceDate;
-          await customer.save();
+          await customer.save({ transaction });
         }
         
         // Auto-complete pending re-engagement follow-ups
@@ -243,7 +244,8 @@ async function updateCustomerLastOrder(invoice) {
             where: {
               customerId: customer.id,
               status: 'Pending'
-            }
+            },
+            transaction
           }
         );
       }
@@ -254,11 +256,11 @@ async function updateCustomerLastOrder(invoice) {
 }
 
 Invoice.addHook('afterCreate', async (invoice, options) => {
-  await updateCustomerLastOrder(invoice);
+  await updateCustomerLastOrder(invoice, options);
 });
 
 Invoice.addHook('afterUpdate', async (invoice, options) => {
-  await updateCustomerLastOrder(invoice);
+  await updateCustomerLastOrder(invoice, options);
 });
 
 module.exports = Invoice;
