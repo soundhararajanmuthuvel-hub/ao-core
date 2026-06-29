@@ -320,9 +320,14 @@ export async function buildInvoicePdfDoc(sale, settings) {
     const discVal = Number(item.discount || 0);
     const discStr = discVal > 0 ? `${discVal.toFixed(2)}` : '0.00';
 
+    let displayName = item.name;
+    if (item.schemeApplied && item.schemeApplied.trim().toLowerCase() !== 'none') {
+      displayName += `\nApplied: ${item.schemeApplied}`;
+    }
+
     let row = [
       idx + 1,
-      item.name,
+      displayName,
       ...(isGstInvoice ? [item.product?.gstClass || '0000'] : []),
       Number(item.qty).toFixed(0),
       unit.toUpperCase(),

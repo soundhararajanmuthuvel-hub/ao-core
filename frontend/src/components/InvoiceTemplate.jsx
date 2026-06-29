@@ -233,7 +233,7 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
                 <td style={{ padding: '1.2mm 1.5mm', verticalAlign: 'top' }}>{idx + 1}</td>
                 <td style={{ padding: '1.2mm 1.5mm', verticalAlign: 'top', wordBreak: 'break-word' }}>
                   <strong>{item.name}</strong>
-                  {item.schemeApplied && (
+                  {item.schemeApplied && item.schemeApplied.trim().toLowerCase() !== 'none' && (
                     <div style={{ fontSize: '9px', color: accentColor, fontWeight: 600, marginTop: '0.25mm' }}>
                       Applied: {item.schemeApplied}
                     </div>
