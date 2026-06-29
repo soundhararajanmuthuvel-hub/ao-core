@@ -17,7 +17,7 @@ const InvoiceItem = sequelize.define('InvoiceItem', {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
     validate: {
-      min: 1,
+      min: 0,
     },
   },
   unitPrice: {
