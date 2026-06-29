@@ -451,12 +451,9 @@ exports.executeMigration = async (req, res) => {
 
   const extractedData = JSON.parse(fs.readFileSync(tempPath, 'utf8'));
 
-  // Database transaction boundary
-  const t = await sequelize.transaction();
+  // Create migration session history log OUTSIDE transaction so it persists on failure!
   let migrationHistoryRecord = null;
-
   try {
-    // Create migration session history log
     migrationHistoryRecord = await MigrationHistory.create({
       importDate: new Date(),
       user: username,
@@ -464,7 +461,16 @@ exports.executeMigration = async (req, res) => {
       recordCount: {},
       status: 'In Progress',
       snapshotData: { customers: [], products: [], invoices: [], payments: [] }
-    }, { transaction: t });
+    });
+  } catch (err) {
+    console.error('Failed to initiate migration history log:', err);
+    return res.status(500).json({ success: false, message: 'Failed to initiate migration log' });
+  }
+
+  // Database transaction boundary
+  const t = await sequelize.transaction();
+
+  try {
 
     const logMessages = [];
     const addLog = async (level, message) => {
@@ -1653,7 +1659,11 @@ exports.executeMigration = async (req, res) => {
 
   } catch (err) {
     // Rollback transaction on failure!
-    await t.rollback();
+    try {
+      await t.rollback();
+    } catch (rollbackErr) {
+      console.error('Transaction rollback failed:', rollbackErr);
+    }
     console.error('Migration execution failed:', err);
 
     if (migrationHistoryRecord) {
@@ -1664,7 +1674,9 @@ exports.executeMigration = async (req, res) => {
           level: 'ERROR',
           message: `Fatal migration error: ${err.message}`
         });
-      } catch {}
+      } catch (logErr) {
+        console.error('Failed to write failure log to database:', logErr);
+      }
     }
 
     res.status(500).json({ success: false, message: 'Migration execution crashed', error: err.message });
