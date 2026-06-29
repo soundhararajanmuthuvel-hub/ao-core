@@ -224,6 +224,10 @@ const Settings = sequelize.define('Settings', {
     type: DataTypes.ENUM('Standard', 'Compact', 'Thermal'),
     defaultValue: 'Standard',
   },
+  paperSize: {
+    type: DataTypes.ENUM('A4', 'A5', 'Thermal 80mm', 'Thermal 58mm'),
+    defaultValue: 'A4',
+  },
   ignoredSuggestions: {
     type: DataTypes.TEXT,
     defaultValue: '[]',

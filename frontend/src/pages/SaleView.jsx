@@ -544,6 +544,82 @@ export default function SaleView() {
     }
   };
 
+  const handleDownloadPng = async () => {
+    setBusy('png');
+    try {
+      const el = getEl();
+      if (!el) {
+        toast('Invoice element not found', 'error');
+        return;
+      }
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(el, {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${sale.invoiceNumber}.png`;
+          a.click();
+          URL.revokeObjectURL(url);
+          toast('Invoice PNG downloaded', 'success');
+        } else {
+          toast('Failed to create PNG blob', 'error');
+        }
+      }, 'image/png', 1.0);
+    } catch (err) {
+      toast('Failed to create PNG: ' + err.message, 'error');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const handleSharePdf = async () => {
+    setBusy('share-pdf');
+    try {
+      const pdfBlob = await getInvoicePdfBlob(sale, settings);
+      const file = new File([pdfBlob], `${sale.invoiceNumber}.pdf`, { type: 'application/pdf' });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `Invoice ${sale.invoiceNumber}`,
+          text: `Please find attached invoice ${sale.invoiceNumber} from ${settings?.companyName || 'Amudhasurabiy Organics'}.`,
+        });
+        toast('PDF shared successfully', 'success');
+      } else {
+        await downloadInvoicePdf(sale, settings);
+        toast('Device does not support direct sharing. PDF downloaded.', 'info');
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        toast('Failed to share PDF: ' + err.message, 'error');
+      }
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const handleEmailPdf = async () => {
+    setBusy('email-pdf');
+    try {
+      await downloadInvoicePdf(sale, settings);
+      const customerEmail = sale.customer?.email || '';
+      const subject = encodeURIComponent(`Invoice ${sale.invoiceNumber} from ${settings?.companyName || 'Amudhasurabiy Organics'}`);
+      const body = encodeURIComponent(`Dear ${sale.customer?.name || 'Customer'},\n\nPlease find attached your invoice ${sale.invoiceNumber} for amount Rs. ${Number(sale.grandTotal).toFixed(2)}.\n\nThank you for your business!\n\nBest Regards,\n${settings?.companyName || 'Amudhasurabiy Organics'}`);
+      window.open(`mailto:${customerEmail}?subject=${subject}&body=${body}`, '_self');
+      toast('Opened email client. Please attach the downloaded PDF file.', 'success');
+    } catch (err) {
+      toast('Failed to trigger email: ' + err.message, 'error');
+    } finally {
+      setBusy('');
+    }
+  };
+
   const handleWhatsApp = async () => {
     if (!sale.customer?.phone) {
       toast('Customer has no phone number — add phone in Customers', 'warning');
@@ -673,13 +749,19 @@ export default function SaleView() {
               📦 Create Shipment
             </button>
           )}
-          <Link to={`/sales/${id}/print`} className="btn btn-secondary">Print</Link>
-          <button type="button" className="btn btn-secondary" onClick={() => downloadInvoicePdf(sale, settings)}>PDF</button>
-          <button type="button" className="btn btn-secondary" onClick={handleJpg} disabled={!!busy}>
-            {busy === 'jpg' ? '…' : 'Download JPG'}
+          <Link to={`/sales/${id}/print`} className="btn btn-secondary">🖨️ Print</Link>
+          <button type="button" className="btn btn-secondary" onClick={() => downloadInvoicePdf(sale, settings)} disabled={!!busy}>📥 Download PDF</button>
+          <button type="button" className="btn btn-secondary" onClick={handleDownloadPng} disabled={!!busy}>
+            {busy === 'png' ? '…' : '🖼️ Download PNG'}
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={handleSharePdf} disabled={!!busy}>
+            {busy === 'share-pdf' ? '…' : '📤 Share PDF'}
           </button>
           <button type="button" className="btn btn-whatsapp" onClick={openWaModal} disabled={!!busy}>
-            💬 Send WhatsApp
+            💬 WhatsApp PDF
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={handleEmailPdf} disabled={!!busy}>
+            {busy === 'email-pdf' ? '…' : '✉️ Email PDF'}
           </button>
         </div>
       </div>

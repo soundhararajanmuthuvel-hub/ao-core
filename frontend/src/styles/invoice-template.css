@@ -78,12 +78,7 @@
   }
 }
 
-/* Print Specific Rules: A5 print optimization */
 @media print {
-  @page {
-    size: A5 portrait;
-    margin: 6mm 6mm 6mm 6mm;
-  }
 
   body {
     background: #ffffff !important;

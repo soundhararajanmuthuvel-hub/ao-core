@@ -944,6 +944,16 @@ export default function SettingsPage() {
             </div>
 
             <div className="form-group">
+              <label>Invoice Paper Size</label>
+              <select className="form-control" value={form.paperSize || 'A4'} onChange={(e) => setForm({ ...form, paperSize: e.target.value })}>
+                <option value="A4">A4 Portrait</option>
+                <option value="A5">A5 Portrait (Billing Printer)</option>
+                <option value="Thermal 80mm">Thermal 80mm</option>
+                <option value="Thermal 58mm">Thermal 58mm</option>
+              </select>
+            </div>
+
+            <div className="form-group">
               <label>Invoice Counter Prefix</label>
               <input className="form-control" value={form.invoicePrefix || ''} onChange={(e) => setForm({ ...form, invoicePrefix: e.target.value })} />
             </div>

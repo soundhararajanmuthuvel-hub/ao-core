@@ -339,6 +339,7 @@ const connectDB = async () => {
   await addColumnIfNotExist('Settings', 'pan', "VARCHAR(255) DEFAULT ''");
   await addColumnIfNotExist('Settings', 'stateCode', "VARCHAR(255) DEFAULT ''");
   await addColumnIfNotExist('Settings', 'bankDetails', "TEXT NULL");
+  await addColumnIfNotExist('Settings', 'paperSize', "VARCHAR(255) DEFAULT 'A4'");
 
   await addColumnIfNotExist('Products', 'parentProductId', "INTEGER NULL");
   await addColumnIfNotExist('Products', 'packSize', "VARCHAR(255) NULL");
