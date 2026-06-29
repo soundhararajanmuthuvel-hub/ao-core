@@ -161,7 +161,7 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
         id={captureId} 
         className={`invoice-template format-${paperSize.toLowerCase().replace(' ', '-')}`}
         style={{
-          width: format === 'Thermal' || isThermal ? containerWidth : '100%',
+          width: containerWidth,
         maxWidth: containerWidth,
         padding: containerPadding,
         fontSize: containerFontSize,

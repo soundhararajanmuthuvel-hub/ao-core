@@ -54,6 +54,16 @@ export default function AppRoutes() {
       <Route path="/track" element={<PublicTracking />} />
       <Route path="/reviews/portal/:token" element={<ReviewPortal />} />
       <Route
+        path="/sales/:id/print"
+        element={
+          <ProtectedRoute>
+            <RoleRoute roles={['Super Admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive']}>
+              <SalePrint />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/"
         element={
           <ProtectedRoute>
@@ -316,14 +326,6 @@ export default function AppRoutes() {
           element={
             <RoleRoute roles={['Super Admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive']}>
               <SaleView />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="sales/:id/print"
-          element={
-            <RoleRoute roles={['Super Admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive']}>
-              <SalePrint />
             </RoleRoute>
           }
         />
