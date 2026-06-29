@@ -19,6 +19,12 @@ export default function SaleView() {
   const [busy, setBusy] = useState('');
   const { user } = useAuth();
 
+  // Redesign States
+  const [zoom, setZoom] = useState(90);
+  const [fitMode, setFitMode] = useState('page');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activeTab, setActiveTab] = useState('activity');
+
   // Payment recording state
   const [payments, setPayments] = useState([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -681,130 +687,503 @@ export default function SaleView() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          Invoice {sale.invoiceNumber}
-          {sale.is_historical_data && (
-            <span style={{
-              fontSize: '0.75rem',
-              backgroundColor: '#fffbeb',
-              color: '#d97706',
-              border: '1px solid #fef3c7',
-              padding: '0.25rem 0.6rem',
-              borderRadius: '9999px',
-              fontWeight: 700,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.25rem'
-            }}>
-              📊 Historical Data
-            </span>
-          )}
-          <span style={getStatusBadgeStyle(sale.paymentStatus)}>{String(sale.paymentStatus).toLowerCase() === 'partial' ? 'PARTIALLY PAID' : String(sale.paymentStatus).toUpperCase()}</span>
-        </h1>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {(user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'admin') && (
-            <>
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 650 }}
-                onClick={startEdit}
-              >
-                ✏️ Edit Invoice
-              </button>
-              {sale.paymentStatus !== 'paid' && (
+      {/* 1. Top Header Dashboard */}
+      <div className="card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.5rem', borderLeft: '4px solid #5A2D0C' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>Invoice {sale.invoiceNumber}</span>
+              <span style={getStatusBadgeStyle(sale.paymentStatus)}>{String(sale.paymentStatus).toLowerCase() === 'partial' ? 'PARTIALLY PAID' : String(sale.paymentStatus).toUpperCase()}</span>
+              {sale.is_historical_data && (
+                <span style={{
+                  fontSize: '0.7rem',
+                  backgroundColor: '#fffbeb',
+                  color: '#d97706',
+                  border: '1px solid #fef3c7',
+                  padding: '0.2rem 0.5rem',
+                  borderRadius: '9999px',
+                  fontWeight: 700
+                }}>
+                  📊 Historical Data
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.85rem', color: '#475569' }}>
+              <span><strong>Customer:</strong> {sale.customer?.name || 'Walk-in Customer'}</span>
+              <span><strong>Date:</strong> {new Date(sale.date).toLocaleDateString('en-IN')}</span>
+              <span><strong>Total:</strong> ₹{Number(sale.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              <span>
+                <strong>Outstanding:</strong>{' '}
+                <span style={{ color: Number(sale.grandTotal || 0) - Number(sale.amountPaid || 0) > 0 ? '#dc2626' : '#16a34a', fontWeight: 'bold' }}>
+                  ₹{Math.max(0, Number(sale.grandTotal || 0) - Number(sale.amountPaid || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </span>
+            </div>
+          </div>
+
+          {/* Grouped Action Toolbar (Sticky on Mobile) */}
+          <div className="mobile-sticky-action-bar" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div className="btn-group" style={{ display: 'flex', gap: '0.25rem', border: '1px solid #cbd5e1', padding: '2px', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
+              {(user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'admin') && (
+                <>
+                  <button type="button" className="btn btn-sm btn-secondary" onClick={startEdit} style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#475569' }}>
+                    ✏️ Edit
+                  </button>
+                  {sale.paymentStatus !== 'paid' && (
+                    <button type="button" className="btn btn-sm btn-success" onClick={() => setShowPaymentModal(true)} style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#10b981' }}>
+                      💳 Record Payment
+                    </button>
+                  )}
+                </>
+              )}
+              {activeShipment ? (
                 <button
                   type="button"
-                  className="btn btn-success"
-                  style={{ backgroundColor: '#10b981', borderColor: '#10b981', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 650 }}
-                  onClick={() => setShowPaymentModal(true)}
+                  className="btn btn-sm btn-secondary"
+                  style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#ff9800' }}
+                  onClick={() => {
+                    localStorage.setItem('select_shipment_id', activeShipment.id);
+                    navigate('/shipping');
+                  }}
                 >
+                  📦 Track
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#ff9800' }}
+                  onClick={() => navigate(`/shipping?createForInvoice=${id || sale.id}`)}
+                >
+                  📦 Create Shipment
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'nowrap' }}>
+              <Link to={`/sales/${id}/print`} className="btn btn-secondary btn-sm">🖨️ Print</Link>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => downloadInvoicePdf(sale, settings)} disabled={!!busy}>📥 PDF</button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handleDownloadPng} disabled={!!busy}>🖼️ PNG</button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handleSharePdf} disabled={!!busy}>📤 Share</button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handleEmailPdf} disabled={!!busy}>✉️ Email</button>
+              <button type="button" className="btn btn-whatsapp btn-sm" onClick={openWaModal} disabled={!!busy}>💬 WhatsApp</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Main 2-Column ERP Content Layout */}
+      <div className="invoice-view-layout">
+        
+        {/* LEFT COLUMN: Zoomable Preview Frame (70%) */}
+        <div className="invoice-view-left">
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 4px 10px rgba(0, 0, 0, 0.04)',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            
+            {/* Zoom Widget Controls Bar */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              backgroundColor: '#f8fafc',
+              padding: '0.6rem 1rem',
+              borderBottom: '1px solid #e2e8f0',
+              borderTopLeftRadius: '12px',
+              borderTopRightRadius: '12px',
+              flexWrap: 'wrap',
+              gap: '0.5rem'
+            }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>📄 Invoice Document Preview</span>
+              
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button type="button" className="btn btn-sm btn-secondary" onClick={() => setZoom(z => Math.max(50, z - 10))} style={{ padding: '0.2rem 0.5rem', height: '24px', display: 'flex', alignItems: 'center' }}>−</button>
+                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', minWidth: '40px', textAlign: 'center' }}>{zoom}%</span>
+                <button type="button" className="btn btn-sm btn-secondary" onClick={() => setZoom(z => Math.min(150, z + 10))} style={{ padding: '0.2rem 0.5rem', height: '24px', display: 'flex', alignItems: 'center' }}>+</button>
+                
+                <div style={{ width: '1px', height: '16px', backgroundColor: '#cbd5e1', margin: '0 0.25rem' }}></div>
+                
+                <button type="button" className={`btn btn-sm ${fitMode === 'width' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFitMode('width'); setZoom(100); }} style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', height: '24px', display: 'flex', alignItems: 'center' }}>Fit Width</button>
+                <button type="button" className={`btn btn-sm ${fitMode === 'page' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFitMode('page'); setZoom(90); }} style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', height: '24px', display: 'flex', alignItems: 'center' }}>Fit Page</button>
+                <button type="button" className="btn btn-sm btn-secondary" onClick={() => setIsFullscreen(!isFullscreen)} style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', height: '24px', display: 'flex', alignItems: 'center' }}>
+                  {isFullscreen ? 'Exit Full' : 'Fullscreen 🖥️'}
+                </button>
+              </div>
+            </div>
+
+            {/* Preview Sheet Area */}
+            <div 
+              style={{
+                backgroundColor: '#cbd5e1',
+                padding: '2.5rem 1.5rem',
+                overflow: 'auto',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'flex-start',
+                maxHeight: isFullscreen ? 'calc(100vh - 50px)' : '680px',
+                position: isFullscreen ? 'fixed' : 'relative',
+                top: isFullscreen ? 0 : 'auto',
+                left: isFullscreen ? 0 : 'auto',
+                width: isFullscreen ? '100vw' : '100%',
+                height: isFullscreen ? '100vh' : 'auto',
+                zIndex: isFullscreen ? 99999 : 'auto',
+                borderBottomLeftRadius: '12px',
+                borderBottomRightRadius: '12px',
+              }}
+            >
+              {isFullscreen && (
+                <button 
+                  type="button" 
+                  className="btn btn-secondary btn-sm" 
+                  onClick={() => setIsFullscreen(false)}
+                  style={{ position: 'absolute', top: '1rem', right: '1.5rem', zIndex: 100000 }}
+                >
+                  ✕ Close Fullscreen
+                </button>
+              )}
+
+              <div 
+                ref={captureRef}
+                className="invoice-paper-mockup"
+                style={{
+                  backgroundColor: '#ffffff',
+                  boxShadow: '0 15px 35px rgba(15, 23, 42, 0.15), 0 5px 15px rgba(0, 0, 0, 0.08)',
+                  borderRadius: '6px',
+                  border: '1px solid #94a3b8',
+                  width: 'fit-content',
+                  zoom: zoom / 100,
+                  transform: `scale(${zoom / 100})`, // Safari fallback
+                  transformOrigin: 'top center',
+                  maxWidth: '100%'
+                }}
+              >
+                <InvoiceTemplate sale={sale} settings={settings} captureId="invoice-preview" />
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Billing Summary Dashboard (30%) */}
+        <div className="invoice-view-right" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          
+          {/* Metadata Card */}
+          <div className="card" style={{ margin: 0, padding: '1.25rem' }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#334155', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
+              📊 Billing Summary
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.85rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f1f5f9', paddingBottom: '0.35rem' }}>
+                <span style={{ color: '#64748b' }}>Customer:</span>
+                <span style={{ fontWeight: 'bold', color: '#1e293b' }}>{sale.customer?.name || 'Walk-in Customer'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f1f5f9', paddingBottom: '0.35rem' }}>
+                <span style={{ color: '#64748b' }}>Invoice Date:</span>
+                <span style={{ fontWeight: 600 }}>{new Date(sale.date).toLocaleDateString('en-IN')}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f1f5f9', paddingBottom: '0.35rem' }}>
+                <span style={{ color: '#64748b' }}>Payment Status:</span>
+                <span style={{ fontWeight: 'bold', textTransform: 'uppercase', color: sale.paymentStatus === 'paid' ? '#16a34a' : '#dc2626' }}>
+                  {sale.paymentStatus}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f1f5f9', paddingBottom: '0.35rem' }}>
+                <span style={{ color: '#64748b' }}>Paid Amount:</span>
+                <span style={{ fontWeight: 'bold', color: '#16a34a' }}>₹{Number(sale.amountPaid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f1f5f9', paddingBottom: '0.35rem' }}>
+                <span style={{ color: '#64748b' }}>Outstanding:</span>
+                <span style={{ fontWeight: 'bold', color: '#dc2626' }}>
+                  ₹{Math.max(0, Number(sale.grandTotal || 0) - Number(sale.amountPaid || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f1f5f9', paddingBottom: '0.35rem' }}>
+                <span style={{ color: '#64748b' }}>GST Amount:</span>
+                <span style={{ fontWeight: 'bold' }}>₹{Number(sale.gstTotal || sale.totalGST || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f1f5f9', paddingBottom: '0.35rem' }}>
+                <span style={{ color: '#64748b' }}>Salesperson:</span>
+                <span>{sale.salesman?.name || sale.salesperson || 'N/A'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f1f5f9', paddingBottom: '0.35rem' }}>
+                <span style={{ color: '#64748b' }}>Shipment Status:</span>
+                <span>
+                  {activeShipment ? (
+                    <span className={`status-badge status-${(activeShipment.courierStatus || 'Pending').toLowerCase().replace(/ /g, '')}`} style={{ fontSize: '0.7rem', padding: '0.1rem 0.5rem' }}>
+                      {activeShipment.courierStatus || 'Pending'}
+                    </span>
+                  ) : (
+                    'Not Shipped'
+                  )}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#64748b' }}>Last Updated:</span>
+                <span style={{ fontSize: '0.75rem' }}>{new Date(sale.updatedAt || sale.date).toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Actions Panel */}
+          <div className="card" style={{ margin: 0, padding: '1.25rem' }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#334155', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
+              ⚡ Quick Actions
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {(user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'admin') && sale.paymentStatus !== 'paid' && (
+                <button type="button" className="btn btn-success btn-sm w-100" onClick={() => setShowPaymentModal(true)} style={{ fontWeight: 650 }}>
                   💳 Record Payment
                 </button>
               )}
-            </>
-          )}
-          {activeShipment ? (
-            <>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ color: '#ff9800', borderColor: '#ff9800' }}
-                onClick={() => {
-                  localStorage.setItem('select_shipment_id', activeShipment.id);
-                  navigate('/shipping');
-                }}
-              >
-                Track Shipment
+              {!activeShipment && (
+                <button type="button" className="btn btn-secondary btn-sm w-100" onClick={() => navigate(`/shipping?createForInvoice=${id || sale.id}`)}>
+                  📦 Create Shipment
+                </button>
+              )}
+              <button type="button" className="btn btn-secondary btn-sm w-100" onClick={openWaModal}>
+                💬 Send WhatsApp Notification
               </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ color: '#ff9800', borderColor: '#ff9800' }}
-              onClick={() => navigate(`/shipping?createForInvoice=${id || sale.id}`)}
-            >
-              📦 Create Shipment
-            </button>
-          )}
-          <Link to={`/sales/${id}/print`} className="btn btn-secondary">🖨️ Print</Link>
-          <button type="button" className="btn btn-secondary" onClick={() => downloadInvoicePdf(sale, settings)} disabled={!!busy}>📥 Download PDF</button>
-          <button type="button" className="btn btn-secondary" onClick={handleDownloadPng} disabled={!!busy}>
-            {busy === 'png' ? '…' : '🖼️ Download PNG'}
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={handleSharePdf} disabled={!!busy}>
-            {busy === 'share-pdf' ? '…' : '📤 Share PDF'}
-          </button>
-          <button type="button" className="btn btn-whatsapp" onClick={openWaModal} disabled={!!busy}>
-            💬 WhatsApp PDF
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={handleEmailPdf} disabled={!!busy}>
-            {busy === 'email-pdf' ? '…' : '✉️ Email PDF'}
-          </button>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-        <div className="card" style={{ margin: 0 }}>
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.5rem', color: '#4b5563' }}>Billing Summary</h3>
-          <p style={{ margin: '0 0 0.25rem 0' }}><strong>Customer:</strong> {sale.customer?.name} {sale.customer?.phone && `(${sale.customer.phone})`}</p>
-          <p style={{ margin: '0 0 0.25rem 0' }}><strong>Date:</strong> {new Date(sale.date).toLocaleDateString()}</p>
-          <p style={{ margin: '0 0 0.25rem 0' }}><strong>Total Amount:</strong> ₹{Number(sale.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-          <p style={{ margin: '0 0 0.25rem 0' }}><strong>Already Paid:</strong> ₹{Number(sale.amountPaid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-          <p style={{ margin: '0 0 0.25rem 0' }}>
-            <strong>Outstanding:</strong>{' '}
-            <span style={{ color: Number(sale.grandTotal || 0) - Number(sale.amountPaid || 0) > 0 ? '#dc2626' : '#16a34a', fontWeight: 'bold' }}>
-              ₹{Math.max(0, Number(sale.grandTotal || 0) - Number(sale.amountPaid || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </span>
-          </p>
-          <p style={{ margin: 0 }}><strong>Payment:</strong> <span style={{ textTransform: 'uppercase' }}>{sale.paymentMethod}</span> — <span style={{ textTransform: 'uppercase', fontWeight: 700 }}>{String(sale.paymentStatus).toLowerCase() === 'partial' ? 'PARTIALLY PAID' : String(sale.paymentStatus).toUpperCase()}</span></p>
-        </div>
-
-        {activeShipment && (
-          <div className="card" style={{ margin: 0, borderLeft: '4px solid #ff9800' }}>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.5rem', color: '#ff9800' }}>Shipping & Delivery Details</h3>
-            <p style={{ margin: '0 0 0.25rem 0' }}><strong>Shipment Number:</strong> {activeShipment.shipmentNumber}</p>
-            <p style={{ margin: '0 0 0.25rem 0' }}><strong>Courier:</strong> {activeShipment.courier} | AWB: <code>{activeShipment.trackingNumber}</code></p>
-            <p style={{ margin: 0 }}>
-              <strong>Status:</strong>{' '}
-              <span className={`status-badge status-${(activeShipment.courierStatus || 'Pending').toLowerCase().replace(/ /g, '')}`} style={{ fontSize: '0.7rem', padding: '0.1rem 0.5rem' }}>
-                {activeShipment.courierStatus || 'Pending'}
-              </span>
-            </p>
+            </div>
           </div>
-        )}
-      </div>
 
-      <div className="invoice-capture-hidden" aria-hidden="true">
-        <div ref={captureRef}>
-          <InvoiceTemplate sale={sale} settings={settings} captureId="invoice-capture-view" />
         </div>
       </div>
 
-      <div className="card">
-        <InvoiceTemplate sale={sale} settings={settings} captureId="invoice-preview" />
+      {/* 3. Bottom Tab Panel */}
+      <div className="card" style={{ padding: '1.25rem 1.5rem', marginTop: '1.5rem' }}>
+        <div style={{ display: 'flex', borderBottom: '2px solid #e2e8f0', gap: '1.5rem', marginBottom: '1.25rem', overflowX: 'auto' }}>
+          {[
+            { id: 'activity', label: 'Activity Timeline' },
+            { id: 'payments', label: `Payments (${invoicePayments.length})` },
+            { id: 'shipment', label: 'Shipment Details' },
+            { id: 'whatsapp', label: 'WhatsApp History' },
+            { id: 'audit', label: 'Audit Logs' },
+            { id: 'notes', label: 'Internal Notes' },
+            { id: 'attachments', label: 'Attachments' }
+          ].map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setActiveTab(t.id)}
+              style={{
+                padding: '0.65rem 0.25rem',
+                border: 'none',
+                background: 'transparent',
+                borderBottom: activeTab === t.id ? '3px solid #5A2D0C' : '3px solid transparent',
+                color: activeTab === t.id ? '#5A2D0C' : '#64748b',
+                fontWeight: activeTab === t.id ? 800 : 500,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease-in-out',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ minHeight: '150px' }}>
+          {activeTab === 'activity' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '0.5rem 0' }}>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10b981', marginTop: '4px' }}></div>
+                  <div style={{ width: '2px', flex: 1, backgroundColor: '#cbd5e1', margin: '4px 0' }}></div>
+                </div>
+                <div>
+                  <div style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>Invoice Generated</div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{new Date(sale.createdAt || sale.date).toLocaleString('en-IN')}</div>
+                  <p style={{ fontSize: '0.8rem', color: '#475569', margin: '0.2rem 0 0 0' }}>Initial invoice generation for {sale.invoiceNumber} recorded under salesperson.</p>
+                </div>
+              </div>
+
+              {sale.updatedAt && sale.updatedAt !== sale.createdAt && (
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#2563eb', marginTop: '4px' }}></div>
+                    {invoicePayments.length > 0 && <div style={{ width: '2px', flex: 1, backgroundColor: '#cbd5e1', margin: '4px 0' }}></div>}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>Invoice Recalculated / Updated</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{new Date(sale.updatedAt).toLocaleString('en-IN')}</div>
+                    <p style={{ fontSize: '0.8rem', color: '#475569', margin: '0.2rem 0 0 0' }}>Billing details, cart products, or logistics settings were updated.</p>
+                  </div>
+                </div>
+              )}
+
+              {invoicePayments.map((p, idx) => (
+                <div style={{ display: 'flex', gap: '1rem' }} key={idx}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10b981', marginTop: '4px' }}></div>
+                    {idx < invoicePayments.length - 1 && <div style={{ width: '2px', flex: 1, backgroundColor: '#cbd5e1', margin: '4px 0' }}></div>}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>Payment Allocated (Ref: {p.paymentNumber})</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{new Date(p.date).toLocaleString('en-IN')}</div>
+                    <p style={{ fontSize: '0.8rem', color: '#16a34a', margin: '0.2rem 0 0 0', fontWeight: 'bold' }}>
+                      Amount Received: ₹{getInvoiceAllocatedAmount(p).toLocaleString('en-IN', { minimumFractionDigits: 2 })} via {p.paymentMethod.toUpperCase()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTab === 'payments' && (
+            <div>
+              {invoicePayments.length > 0 ? (
+                <div className="table-wrap">
+                  <table className="data-table" style={{ fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Payment No</th>
+                        <th>Method</th>
+                        <th>Reference No</th>
+                        <th style={{ textAlign: 'right' }}>Amount Paid</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invoicePayments.map((p, idx) => (
+                        <tr key={idx}>
+                          <td>{new Date(p.date).toLocaleDateString('en-IN')}</td>
+                          <td><code>{p.paymentNumber}</code></td>
+                          <td><span style={{ textTransform: 'uppercase', fontWeight: 650 }}>{p.paymentMethod}</span></td>
+                          <td>{p.referenceNumber || 'N/A'}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#16a34a' }}>
+                            ₹{getInvoiceAllocatedAmount(p).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                  No payment allocations found for this invoice.
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'shipment' && (
+            <div>
+              {activeShipment ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
+                  <div>
+                    <p><strong>Shipment ID:</strong> {activeShipment.shipmentNumber}</p>
+                    <p><strong>Courier:</strong> {activeShipment.courier}</p>
+                    <p><strong>Tracking / AWB Number:</strong> <code>{activeShipment.trackingNumber}</code></p>
+                  </div>
+                  <div>
+                    <p><strong>Status:</strong>{' '}
+                      <span className={`status-badge status-${(activeShipment.courierStatus || 'Pending').toLowerCase().replace(/ /g, '')}`}>
+                        {activeShipment.courierStatus || 'Pending'}
+                      </span>
+                    </p>
+                    <p><strong>Shipping Notes:</strong> {activeShipment.notes || 'None'}</p>
+                    {activeShipment.trackingNumber && (
+                      <a href={`${window.location.origin}/track/${activeShipment.trackingNumber}`} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ display: 'inline-block', marginTop: '0.25rem' }}>
+                        🔗 Launch Public Tracker
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                  <p style={{ margin: '0 0 0.5rem 0' }}>No shipments have been dispatched for this invoice.</p>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(`/shipping?createForInvoice=${id || sale.id}`)}>
+                    📦 Create Shipment Now
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'whatsapp' && (
+            <div style={{ fontSize: '0.85rem' }}>
+              <p style={{ color: '#64748b', marginBottom: '0.75rem' }}>History of notifications sent via CRM WhatsApp API for this sale:</p>
+              <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '1rem', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.25rem' }}>
+                  <strong>Type</strong>
+                  <strong>Recipient</strong>
+                  <strong>Status</strong>
+                </div>
+                {sale.whatsappLogs && sale.whatsappLogs.length > 0 ? (
+                  sale.whatsappLogs.map((log, idx) => (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }} key={idx}>
+                      <span>{log.messageType || 'Invoice'}</span>
+                      <span>+{log.phone}</span>
+                      <span style={{ color: '#16a34a', fontWeight: 'bold' }}>Dispatched</span>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ color: '#64748b', fontStyle: 'italic', textAlign: 'center', padding: '0.5rem' }}>
+                    No dispatch history recorded. Use the "Send WhatsApp" action above.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'audit' && (
+            <div className="table-wrap">
+              <table className="data-table" style={{ fontSize: '0.85rem' }}>
+                <thead>
+                  <tr>
+                    <th>Action</th>
+                    <th>User</th>
+                    <th>Date</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>CREATION</strong></td>
+                    <td>{user?.name || 'Staff'}</td>
+                    <td>{new Date(sale.createdAt || sale.date).toLocaleString('en-IN')}</td>
+                    <td>Invoice {sale.invoiceNumber} initialized with total amount ₹{Number(sale.grandTotal || 0).toFixed(2)}.</td>
+                  </tr>
+                  {sale.updatedAt && sale.updatedAt !== sale.createdAt && (
+                    <tr>
+                      <td><strong>UPDATE</strong></td>
+                      <td>{user?.name || 'Staff'}</td>
+                      <td>{new Date(sale.updatedAt).toLocaleString('en-IN')}</td>
+                      <td>Invoice quantities, charges or totals recalculated.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {activeTab === 'notes' && (
+            <div style={{ fontSize: '0.85rem' }}>
+              <p><strong>Staff Internal Notes:</strong></p>
+              <div style={{ border: '1px solid #cbd5e1', padding: '1rem', borderRadius: '8px', backgroundColor: '#fffdf9', whiteSpace: 'pre-wrap', minHeight: '80px', color: '#475569' }}>
+                {sale.notes || 'No internal notes captured for this invoice. Use Edit Invoice to write notes.'}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'attachments' && (
+            <div style={{ fontSize: '0.85rem' }}>
+              <p style={{ color: '#64748b' }}>Upload files, receipts, or delivery slips related to this invoice:</p>
+              <div style={{ border: '2px dashed #cbd5e1', borderRadius: '8px', padding: '2rem', textAlign: 'center', backgroundColor: '#f8fafc', cursor: 'pointer' }}>
+                <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '0.5rem' }}>📁</span>
+                <span>Drag & drop files or click to upload</span>
+                <input type="file" style={{ display: 'none' }} />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {isEditing && (
@@ -1236,40 +1615,7 @@ export default function SaleView() {
         </div>
       )}
 
-      {/* Payment History Section */}
-      {invoicePayments.length > 0 && (
-        <div className="card" style={{ marginTop: '1.5rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#334155', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            📜 Payment History
-          </h3>
-          <div className="table-wrap">
-            <table className="data-table" style={{ fontSize: '0.85rem' }}>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Payment No</th>
-                  <th>Method</th>
-                  <th>Reference No</th>
-                  <th style={{ textAlign: 'right' }}>Amount Paid</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoicePayments.map((p, idx) => (
-                  <tr key={idx}>
-                    <td>{new Date(p.date).toLocaleDateString()}</td>
-                    <td><code>{p.paymentNumber}</code></td>
-                    <td><span style={{ textTransform: 'uppercase', fontWeight: 650 }}>{p.paymentMethod}</span></td>
-                    <td>{p.referenceNumber || 'N/A'}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#16a34a' }}>
-                      ₹{getInvoiceAllocatedAmount(p).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+
 
       {/* Record Payment Modal */}
       {showPaymentModal && (
