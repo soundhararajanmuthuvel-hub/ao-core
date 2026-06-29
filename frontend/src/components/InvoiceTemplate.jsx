@@ -1,20 +1,71 @@
 import '../styles/invoice-template.css';
-import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
+import { getActiveLogoUrl } from '../utils/url';
+
+// Indian Rupees Number-to-Words conversion helper
+function convertNumberToWords(amount) {
+  const num = Math.floor(amount);
+  if (num === 0) return 'Rupees Zero Only';
+
+  const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function g(n) {
+    if (n < 20) return a[n];
+    const digit = n % 10;
+    return b[Math.floor(n / 10)] + (digit ? '-' + a[digit].trim() : '') + ' ';
+  }
+
+  let words = '';
+  // Crores
+  const crores = Math.floor(num / 10000000);
+  if (crores > 0) {
+    words += g(crores) + 'Crore ';
+  }
+  // Lakhs
+  const lakhs = Math.floor((num % 10000000) / 100000);
+  if (lakhs > 0) {
+    words += g(lakhs) + 'Lakh ';
+  }
+  // Thousands
+  const thousands = Math.floor((num % 100000) / 1000);
+  if (thousands > 0) {
+    words += g(thousands) + 'Thousand ';
+  }
+  // Hundreds
+  const hundreds = Math.floor((num % 1000) / 100);
+  if (hundreds > 0) {
+    words += g(hundreds) + 'Hundred ';
+  }
+  // Tens and Ones
+  const tens = num % 100;
+  if (tens > 0) {
+    if (words !== '') words += 'and ';
+    words += g(tens);
+  }
+
+  // Handle Paise
+  const paise = Math.round((amount - num) * 100);
+  let paiseWords = '';
+  if (paise > 0) {
+    paiseWords = `and ${g(paise)}Paise`;
+  }
+
+  return `Rupees ${words.trim()} ${paiseWords ? paiseWords : ''} Only`.replace(/\s+/g, ' ');
+}
 
 export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-capture' }) {
   if (!sale) return null;
 
-  // Determine GST Split: Intra-state (CGST + SGST) vs Inter-state (IGST)
+  // Determine GST SPLIT
   const customerGst = sale.customer?.gstNumber || sale.customerGSTIN || '';
   const companyGst = settings?.gstNumber || settings?.gstDetails || '';
-  
   const isGstInvoice = sale.invoiceType ? (sale.invoiceType === 'GST') : !!customerGst;
   const isIntrastate = customerGst && companyGst && customerGst.substring(0, 2) === companyGst.substring(0, 2);
 
   const totalGst = Number(sale.gstTotal || sale.totalGST || 0);
   let cgst = 0, sgst = 0, igst = 0;
   if (totalGst > 0) {
-    if (isIntrastate || !customerGst) { // default to local if no GSTIN provided
+    if (isIntrastate || !customerGst) {
       cgst = totalGst / 2;
       sgst = totalGst / 2;
     } else {
@@ -22,257 +73,339 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
     }
   }
 
-  // Formatting configurations
+  // Format and theme overrides
   const format = settings?.invoiceFormat || 'Standard';
-  const theme = settings?.invoiceTheme || 'default';
-  const primaryColor = settings?.brandColor || '#2563eb';
+  const primaryColor = '#5A2D0C'; // Premium Dark Brown
+  const accentColor = '#F59E0B'; // Golden Orange
+
+  // Billing and Shipping addresses
+  const billName = sale.customer?.name || 'Walk-in Customer';
+  const billPhone = sale.customer?.phone || '';
+  const billAddress = sale.customer?.address || 'N/A';
+  const billGst = customerGst;
+
+  const shipName = sale.shippingName || billName;
+  const shipPhone = sale.shippingPhone || billPhone;
+  const shipAddress = sale.shippingAddress || billAddress;
+  const shipGst = customerGst;
+
+  // UPI QR Code generation
+  const upiId = settings?.upiId;
+  const payeeName = settings?.payeeName || settings?.companyName || 'AO Core';
+  const grandTotalStr = Number(sale.grandTotal).toFixed(2);
+  const upiLink = upiId ? `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${grandTotalStr}&cu=INR` : null;
+  const qrCodeUrl = upiLink ? `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(upiLink)}` : null;
 
   return (
     <div 
       id={captureId} 
-      className={`invoice-template format-${format.toLowerCase()} theme-${theme}`}
+      className={`invoice-template format-${format.toLowerCase()}`}
       style={{
-        width: format === 'Thermal' ? '80mm' : '100%',
-        padding: format === 'Thermal' ? '0.5rem' : '1.5rem',
-        fontSize: format === 'Thermal' ? '11px' : '14px',
-        lineHeight: 1.4,
+        width: format === 'Thermal' ? '80mm' : '148mm', // Standard A5 width on screen
+        padding: format === 'Thermal' ? '0.5rem' : '8mm',
+        fontSize: format === 'Thermal' ? '11px' : '13px',
       }}
     >
-      <header className="invoice-template-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-        {(settings?.logo || settings?.logoUrl) && format !== 'Thermal' && (
-          <img 
-            src={getActiveLogoUrl(settings)} 
-            alt="" 
-            className="invoice-logo" 
-            onError={(e) => {
-              e.target.onerror = null;
-              e.target.src = '/default-logo.png';
-            }}
-            style={{ maxHeight: '60px', objectFit: 'contain' }} 
-            crossOrigin="anonymous" 
-          />
+      {/* 1. Header Section */}
+      <header className="invoice-header-redesign" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6mm' }}>
+        {/* Company Logo (Left) */}
+        {format !== 'Thermal' && (
+          <div className="invoice-logo-container" style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#ffffff', border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+            <img 
+              src={getActiveLogoUrl(settings) || '/default-logo.png'} 
+              alt="Logo" 
+              className="invoice-logo-img" 
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/default-logo.png';
+              }}
+              style={{ maxWidth: '85%', maxHeight: '85%', objectFit: 'contain' }}
+              crossOrigin="anonymous" 
+            />
+          </div>
         )}
-        <div style={{ textAlign: format === 'Thermal' ? 'center' : 'right', width: format === 'Thermal' ? '100%' : 'auto' }}>
-          <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: primaryColor, margin: '0 0 0.25rem 0' }}>
-            {settings?.companyName || 'AO Core'}
+
+        {/* Company Details (Right) */}
+        <div style={{ textAlign: 'right', flex: 1, marginLeft: '6mm' }}>
+          <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: primaryColor, margin: '0 0 1mm 0', lineHeight: 1.1 }}>
+            {settings?.companyName || 'Amudhasurabiy Organics'}
           </h1>
-          <p style={{ margin: '0 0 0.15rem 0', color: '#64748b' }}>{settings?.address}</p>
-          {isGstInvoice && companyGst && <p style={{ margin: '0 0 0.15rem 0', color: '#64748b' }}>GSTIN: {companyGst}</p>}
-          {settings?.phone && <p style={{ margin: 0, color: '#64748b' }}>Phone: {settings.phone}</p>}
+          <p style={{ margin: '0 0 0.5mm 0', color: '#475569', fontSize: '11px' }}>{settings?.address}</p>
+          {settings?.phone && <p style={{ margin: '0 0 0.5mm 0', color: '#475569', fontSize: '11px' }}><strong>Phone:</strong> {settings.phone}</p>}
+          {settings?.email && <p style={{ margin: '0 0 0.5mm 0', color: '#475569', fontSize: '11px' }}><strong>Email:</strong> {settings.email}</p>}
+          {settings?.websiteUrl && <p style={{ margin: '0 0 0.5mm 0', color: '#475569', fontSize: '11px' }}><strong>Website:</strong> {settings.websiteUrl}</p>}
+          {isGstInvoice && companyGst && <p style={{ margin: '0 0 0.5mm 0', color: primaryColor, fontSize: '11px', fontWeight: 'bold' }}>GSTIN: {companyGst}</p>}
         </div>
       </header>
-      
-      <hr style={{ border: 'none', borderTop: `1px solid ${primaryColor}22`, margin: '0.75rem 0' }} />
 
-      <div className="invoice-template-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-        <div><strong>Invoice No:</strong> {sale.invoiceNumber}</div>
-        <div><strong>Date:</strong> {new Date(sale.date).toLocaleDateString('en-IN')}</div>
+      {/* Decorative accent divider bar */}
+      <div style={{ height: '3px', backgroundColor: primaryColor, margin: '3mm 0' }}></div>
+
+      {/* 2. Invoice Title */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4mm' }}>
+        <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: primaryColor, margin: 0, textTransform: 'uppercase' }}>
+          {isGstInvoice ? 'TAX INVOICE' : 'INVOICE'}
+        </h2>
       </div>
 
-      <div className="invoice-template-customer" style={{ marginBottom: '1rem', backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px' }}>
-        <p style={{ margin: '0 0 0.25rem 0' }}><strong>Bill To:</strong> {sale.customer?.name}</p>
-        <p style={{ margin: '0 0 0.25rem 0', color: '#475569' }}>Phone: {sale.customer?.phone} {sale.customer?.email && `| Email: ${sale.customer.email}`}</p>
-        <p style={{ margin: '0 0 0.25rem 0', color: '#475569' }}>{sale.customer?.address}</p>
-        {isGstInvoice && customerGst && <p style={{ margin: '0 0 0.25rem 0', color: '#475569' }}>GSTIN: {customerGst}</p>}
-        {isGstInvoice && sale.placeOfSupply && <p style={{ margin: 0, color: '#475569' }}>Place of Supply: {sale.placeOfSupply}</p>}
+      {/* 3. Invoice Information Card (Two-column layout) */}
+      <div className="invoice-info-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3mm', padding: '3mm', border: '1px solid #E2E8F0', borderRadius: '6px', marginBottom: '5mm', backgroundColor: '#fdfdfd' }}>
+        <div>
+          <p style={{ margin: '0 0 1mm 0' }}><strong>Invoice Number:</strong> {sale.invoiceNumber}</p>
+          <p style={{ margin: '0 0 1mm 0' }}><strong>Invoice Date:</strong> {new Date(sale.date).toLocaleDateString('en-IN')}</p>
+          <p style={{ margin: 0 }}><strong>Due Date:</strong> {sale.dueDate ? new Date(sale.dueDate).toLocaleDateString('en-IN') : 'N/A'}</p>
+        </div>
+        <div>
+          <p style={{ margin: '0 0 1mm 0' }}><strong>Reference:</strong> {sale.reference || 'N/A'}</p>
+          {isGstInvoice && sale.placeOfSupply && <p style={{ margin: '0 0 1mm 0' }}><strong>Place of Supply:</strong> {sale.placeOfSupply}</p>}
+          <p style={{ margin: 0 }}><strong>Payment Terms:</strong> {sale.paymentTerms || 'Due on Receipt'}</p>
+        </div>
       </div>
 
-      <table className="invoice-template-table" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
+      {/* 4. Customer Billing & Shipping Cards */}
+      <div className="invoice-customer-cards" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4mm', marginBottom: '6mm' }}>
+        {/* BILL TO */}
+        <div style={{ padding: '3mm 4mm', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px' }}>
+          <h3 style={{ fontSize: '13px', fontWeight: 'bold', color: primaryColor, borderBottom: '1px solid #E2E8F0', paddingBottom: '1mm', marginBottom: '2mm', textTransform: 'uppercase' }}>BILL TO:</h3>
+          <p style={{ margin: '0 0 1mm 0', fontWeight: 'bold' }}>{billName}</p>
+          {billPhone && <p style={{ margin: '0 0 1mm 0', color: '#475569' }}>Phone: {billPhone}</p>}
+          <p style={{ margin: '0 0 1.5mm 0', color: '#475569', lineHeight: 1.3 }}>{billAddress}</p>
+          {isGstInvoice && billGst && <p style={{ margin: 0, fontWeight: 'bold', color: '#475569' }}>GSTIN: {billGst}</p>}
+        </div>
+
+        {/* SHIP TO */}
+        <div style={{ padding: '3mm 4mm', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px' }}>
+          <h3 style={{ fontSize: '13px', fontWeight: 'bold', color: primaryColor, borderBottom: '1px solid #E2E8F0', paddingBottom: '1mm', marginBottom: '2mm', textTransform: 'uppercase' }}>SHIP TO:</h3>
+          <p style={{ margin: '0 0 1mm 0', fontWeight: 'bold' }}>{shipName}</p>
+          {shipPhone && <p style={{ margin: '0 0 1mm 0', color: '#475569' }}>Phone: {shipPhone}</p>}
+          <p style={{ margin: '0 0 1.5mm 0', color: '#475569', lineHeight: 1.3 }}>{shipAddress}</p>
+          {isGstInvoice && shipGst && <p style={{ margin: 0, fontWeight: 'bold', color: '#475569' }}>GSTIN: {shipGst}</p>}
+        </div>
+      </div>
+
+      {/* 5. Product Table */}
+      <table className="invoice-redesign-table" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6mm', fontSize: '12px' }}>
         <thead>
-          <tr style={{ borderBottom: `2px solid ${primaryColor}`, textAlign: 'left' }}>
-            <th style={{ padding: '0.4rem 0.25rem' }}>#</th>
-            <th style={{ padding: '0.4rem 0.25rem' }}>Item</th>
-            {isGstInvoice && <th style={{ padding: '0.4rem 0.25rem' }}>HSN</th>}
-            <th style={{ padding: '0.4rem 0.25rem', textAlign: 'center' }}>Qty</th>
-            <th style={{ padding: '0.4rem 0.25rem', textAlign: 'right' }}>Rate</th>
-            {isGstInvoice && <th style={{ padding: '0.4rem 0.25rem', textAlign: 'center' }}>GST</th>}
-            <th style={{ padding: '0.4rem 0.25rem', textAlign: 'right' }}>Amount</th>
+          <tr style={{ backgroundColor: primaryColor, color: '#ffffff', textAlign: 'left' }}>
+            <th style={{ padding: '2mm 1.5mm', width: '30px', fontWeight: 'bold' }}>#</th>
+            <th style={{ padding: '2mm 1.5mm', fontWeight: 'bold' }}>Product Name</th>
+            {isGstInvoice && <th style={{ padding: '2mm 1.5mm', width: '60px', fontWeight: 'bold' }}>HSN</th>}
+            <th style={{ padding: '2mm 1.5mm', textAlign: 'center', width: '40px', fontWeight: 'bold' }}>Qty</th>
+            <th style={{ padding: '2mm 1.5mm', textAlign: 'center', width: '40px', fontWeight: 'bold' }}>Unit</th>
+            <th style={{ padding: '2mm 1.5mm', textAlign: 'right', width: '70px', fontWeight: 'bold' }}>Rate</th>
+            <th style={{ padding: '2mm 1.5mm', textAlign: 'right', width: '60px', fontWeight: 'bold' }}>Discount</th>
+            {isGstInvoice && <th style={{ padding: '2mm 1.5mm', textAlign: 'center', width: '50px', fontWeight: 'bold' }}>GST %</th>}
+            {isGstInvoice && <th style={{ padding: '2mm 1.5mm', textAlign: 'right', width: '70px', fontWeight: 'bold' }}>Tax Amt</th>}
+            <th style={{ padding: '2mm 1.5mm', textAlign: 'right', width: '80px', fontWeight: 'bold' }}>Amount</th>
           </tr>
         </thead>
         <tbody>
-          {sale.items.map((item, idx) => (
-            <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-              <td style={{ padding: '0.4rem 0.25rem' }}>{idx + 1}</td>
-              <td style={{ padding: '0.4rem 0.25rem' }}>
-                <div><strong>{item.name}</strong></div>
-                {item.schemeApplied && (
-                  <div style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 600 }}>
-                    Applied: {item.schemeApplied}
-                  </div>
-                )}
-              </td>
-              {isGstInvoice && <td style={{ padding: '0.4rem 0.25rem' }}>{item.product?.gstClass || '0000'}</td>}
-              <td style={{ padding: '0.4rem 0.25rem', textAlign: 'center' }}>
-                {Number(item.qty).toFixed(0)}
-                {Number(item.freeQty) > 0 && (
-                  <span style={{ fontSize: '0.75rem', color: '#f59e0b', marginLeft: '0.25rem' }}>
-                    (+{Number(item.freeQty).toFixed(0)} Free)
-                  </span>
-                )}
-              </td>
-              <td style={{ padding: '0.4rem 0.25rem', textAlign: 'right' }}>₹{Number(item.unitPrice).toFixed(2)}</td>
-              {isGstInvoice && <td style={{ padding: '0.4rem 0.25rem', textAlign: 'center' }}>{item.gstPercent || 0}%</td>}
-              <td style={{ padding: '0.4rem 0.25rem', textAlign: 'right' }}>₹{Number(item.lineTotal).toFixed(2)}</td>
-            </tr>
-          ))}
+          {sale.items.map((item, idx) => {
+            const discVal = Number(item.discount || 0);
+            const discStr = discVal > 0 ? `₹${discVal.toFixed(2)}` : '0.00';
+            
+            // Derive unit
+            const unit = item.product?.unit || item.unit || 'pcs';
+
+            // Calculate tax amount per item
+            let taxAmt = 0;
+            if (isGstInvoice) {
+              const itemTotal = Number(item.lineTotal || 0);
+              const gstPct = Number(item.gstPercent || 0);
+              // if price is inclusive, calculate tax backwards, else forwards. Default is exclusive
+              if (settings?.defaultGstMode === 'inclusive') {
+                taxAmt = itemTotal - (itemTotal / (1 + gstPct / 100));
+              } else {
+                taxAmt = itemTotal * (gstPct / 100);
+              }
+            }
+
+            return (
+              <tr 
+                key={idx} 
+                className="invoice-redesign-tr"
+                style={{ 
+                  backgroundColor: idx % 2 === 0 ? '#ffffff' : '#F9F6F2', // Alternate soft beige row background
+                  borderBottom: '1px solid #E2E8F0' 
+                }}
+              >
+                <td style={{ padding: '2mm 1.5mm', verticalAlign: 'top' }}>{idx + 1}</td>
+                <td style={{ padding: '2mm 1.5mm', verticalAlign: 'top', wordBreak: 'break-word' }}>
+                  <strong>{item.name}</strong>
+                  {item.schemeApplied && (
+                    <div style={{ fontSize: '10px', color: accentColor, fontWeight: 600, marginTop: '0.5mm' }}>
+                      Applied: {item.schemeApplied}
+                    </div>
+                  )}
+                </td>
+                {isGstInvoice && <td style={{ padding: '2mm 1.5mm', verticalAlign: 'top' }}>{item.product?.gstClass || '0000'}</td>}
+                <td style={{ padding: '2mm 1.5mm', verticalAlign: 'top', textAlign: 'center' }}>
+                  {Number(item.qty).toFixed(0)}
+                  {Number(item.freeQty) > 0 && (
+                    <div style={{ fontSize: '9px', color: accentColor, fontWeight: 'bold' }}>
+                      +{Number(item.freeQty).toFixed(0)} Free
+                    </div>
+                  )}
+                </td>
+                <td style={{ padding: '2mm 1.5mm', verticalAlign: 'top', textAlign: 'center', textTransform: 'uppercase', color: '#64748b' }}>{unit}</td>
+                <td style={{ padding: '2mm 1.5mm', verticalAlign: 'top', textAlign: 'right' }}>₹{Number(item.unitPrice).toFixed(2)}</td>
+                <td style={{ padding: '2mm 1.5mm', verticalAlign: 'top', textAlign: 'right', color: discVal > 0 ? '#EF4444' : '#64748b' }}>{discStr}</td>
+                {isGstInvoice && <td style={{ padding: '2mm 1.5mm', verticalAlign: 'top', textAlign: 'center' }}>{item.gstPercent || 0}%</td>}
+                {isGstInvoice && <td style={{ padding: '2mm 1.5mm', verticalAlign: 'top', textAlign: 'right' }}>₹{taxAmt.toFixed(2)}</td>}
+                <td style={{ padding: '2mm 1.5mm', verticalAlign: 'top', textAlign: 'right', fontWeight: 'bold' }}>₹{Number(item.lineTotal).toFixed(2)}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 
-      <div className="invoice-template-totals" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginTop: '1rem' }}>
-        <div style={{ width: format === 'Thermal' ? '100%' : '250px', display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.9rem' }}>
-          
-          {isGstInvoice ? (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Taxable Value:</span>
-              <span>₹{Number(sale.taxableAmount || sale.subtotal).toFixed(2)}</span>
+      {/* Bottom Layout Container (split between payment details & totals summary card) */}
+      <div className="invoice-bottom-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '5mm', alignItems: 'start', marginBottom: '5mm' }}>
+        
+        {/* Left Side: Payment Details, Amount in Words & Notes */}
+        <div>
+          {/* Amount in Words */}
+          <div style={{ padding: '2.5mm 3.5mm', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px', marginBottom: '4mm' }}>
+            <p style={{ margin: '0 0 0.5mm 0', fontSize: '10px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Amount In Words</p>
+            <p style={{ margin: 0, fontSize: '12px', fontWeight: 'bold', color: primaryColor }}>
+              {convertNumberToWords(sale.grandTotal)}
+            </p>
+          </div>
+
+          {/* Payment Details Container */}
+          {(settings?.bankDetails || upiId) && (
+            <div style={{ padding: '3mm', border: '1px solid #E2E8F0', borderRadius: '6px', backgroundColor: '#ffffff', display: 'flex', gap: '3.5mm', alignItems: 'center' }}>
+              {/* UPI QR Code */}
+              {qrCodeUrl && (
+                <div style={{ textAlign: 'center' }}>
+                  <img 
+                    src={qrCodeUrl} 
+                    alt="UPI QR Code" 
+                    style={{ width: '70px', height: '70px', display: 'block', border: '1px solid #E2E8F0', padding: '1mm', borderRadius: '4px' }} 
+                  />
+                  <span style={{ fontSize: '8px', color: '#64748b', marginTop: '0.5mm', display: 'block', fontWeight: 'bold' }}>Scan to Pay</span>
+                </div>
+              )}
+              
+              {/* Bank Account Info */}
+              <div style={{ flex: 1, fontSize: '11px', lineHeight: 1.35 }}>
+                <p style={{ margin: '0 0 1mm 0', fontSize: '9px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Payment Details</p>
+                {upiId && <p style={{ margin: '0 0 0.5mm 0' }}><strong>UPI ID:</strong> {upiId}</p>}
+                {settings?.bankDetails && (
+                  <p style={{ margin: 0, whiteSpace: 'pre-line', color: '#475569' }}>
+                    {settings.bankDetails}
+                  </p>
+                )}
+              </div>
             </div>
-          ) : (
+          )}
+        </div>
+
+        {/* Right Side: Floating Totals Card */}
+        <div style={{ padding: '4mm', border: '1px solid #E2E8F0', borderRadius: '6px', backgroundColor: '#F8FAFC' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2mm', fontSize: '12px' }}>
+            
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>Subtotal:</span>
               <span>₹{Number(sale.subtotal).toFixed(2)}</span>
             </div>
-          )}
-          
-          {isGstInvoice && (
-            <>
-              {cgst > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>CGST:</span>
-                  <span>₹{cgst.toFixed(2)}</span>
-                </div>
-              )}
-              {sgst > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>SGST:</span>
-                  <span>₹{sgst.toFixed(2)}</span>
-                </div>
-              )}
-              {igst > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>IGST:</span>
-                  <span>₹{igst.toFixed(2)}</span>
-                </div>
-              )}
-            </>
-          )}
 
-          {Number(sale.shippingCharge) > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Shipping Charge:</span>
-              <span>₹{Number(sale.shippingCharge).toFixed(2)}</span>
-            </div>
-          )}
-          {Number(sale.packingCharge) > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Packing Charge:</span>
-              <span>₹{Number(sale.packingCharge).toFixed(2)}</span>
-            </div>
-          )}
-          {Number(sale.handlingCharge) > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Handling Charge:</span>
-              <span>₹{Number(sale.handlingCharge).toFixed(2)}</span>
-            </div>
-          )}
-          {Number(sale.courierCharge) > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Courier Charge:</span>
-              <span>₹{Number(sale.courierCharge).toFixed(2)}</span>
-            </div>
-          )}
-          {Number(sale.otherCharge) > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Other Charge:</span>
-              <span>₹{Number(sale.otherCharge).toFixed(2)}</span>
-            </div>
-          )}
-
-          {Number(sale.discount) > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444' }}>
-              <span>Discount:</span>
-              <span>-₹{Number(sale.discount).toFixed(2)}</span>
-            </div>
-          )}
-
-          {Number(sale.roundOff) !== 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontStyle: 'italic', fontSize: '0.8rem' }}>
-              <span>Round Off:</span>
-              <span>{Number(sale.roundOff) > 0 ? `+₹${sale.roundOff}` : `-₹${Math.abs(sale.roundOff)}`}</span>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, borderTop: `1px solid ${primaryColor}`, paddingTop: '0.4rem', marginTop: '0.2rem', color: primaryColor }}>
-            <span>Grand Total:</span>
-            <span>₹{Number(sale.grandTotal).toFixed(2)}</span>
-          </div>
-        </div>
-      </div>
-
-      {isGstInvoice && sale.hsnSummary && (
-        <div style={{ marginTop: '1.5rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.75rem' }}>
-          <p style={{ margin: '0 0 0.35rem 0', fontSize: '0.85rem', fontWeight: 'bold' }}>HSN Tax Summary</p>
-          <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid #cbd5e1', textAlign: 'left', color: '#64748b' }}>
-                <th style={{ padding: '0.25rem' }}>HSN</th>
-                <th style={{ padding: '0.25rem' }}>Taxable Value</th>
-                <th style={{ padding: '0.25rem' }}>Rate</th>
-                {cgst > 0 && <th style={{ padding: '0.25rem' }}>CGST</th>}
-                {sgst > 0 && <th style={{ padding: '0.25rem' }}>SGST</th>}
-                {igst > 0 && <th style={{ padding: '0.25rem' }}>IGST</th>}
-                <th style={{ padding: '0.25rem', textAlign: 'right' }}>Total Tax</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(() => {
-                try {
-                  const hsnList = JSON.parse(sale.hsnSummary);
-                  if (Array.isArray(hsnList)) {
-                    return hsnList.map((h, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.25rem' }}>{h.hsn}</td>
-                        <td style={{ padding: '0.25rem' }}>₹{Number(h.taxable).toFixed(2)}</td>
-                        <td style={{ padding: '0.25rem' }}>{h.gstRate}%</td>
-                        {cgst > 0 && <td style={{ padding: '0.25rem' }}>₹{Number(h.cgst).toFixed(2)}</td>}
-                        {sgst > 0 && <td style={{ padding: '0.25rem' }}>₹{Number(h.sgst).toFixed(2)}</td>}
-                        {igst > 0 && <td style={{ padding: '0.25rem' }}>₹{Number(h.igst).toFixed(2)}</td>}
-                        <td style={{ padding: '0.25rem', textAlign: 'right' }}>₹{Number(h.totalGst).toFixed(2)}</td>
-                      </tr>
-                    ));
-                  }
-                } catch (e) {
-                  console.error(e);
-                }
-                return null;
-              })()}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {isGstInvoice && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem', fontSize: '0.75rem' }}>
-          <div style={{ flex: 1, paddingRight: '1rem' }}>
-            <p style={{ margin: '0 0 0.25rem 0', fontWeight: 'bold' }}>GST Declaration:</p>
-            <p style={{ margin: 0, color: '#64748b' }}>We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.</p>
-            {settings?.bankDetails && (
-              <div style={{ marginTop: '0.5rem' }}>
-                <strong>Bank Details:</strong> {settings.bankDetails}
+            {Number(sale.discount) > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#EF4444' }}>
+                <span>Discount:</span>
+                <span>-₹{Number(sale.discount).toFixed(2)}</span>
               </div>
             )}
+
+            {isGstInvoice && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Taxable Amount:</span>
+                <span>₹{Number(sale.taxableAmount || (Number(sale.subtotal) - Number(sale.discount))).toFixed(2)}</span>
+              </div>
+            )}
+
+            {isGstInvoice && (
+              <>
+                {cgst > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                    <span>CGST:</span>
+                    <span>₹{cgst.toFixed(2)}</span>
+                  </div>
+                )}
+                {sgst > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                    <span>SGST:</span>
+                    <span>₹{sgst.toFixed(2)}</span>
+                  </div>
+                )}
+                {igst > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                    <span>IGST:</span>
+                    <span>₹{igst.toFixed(2)}</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {Number(sale.shippingCharge || 0) > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                <span>Shipping Charge:</span>
+                <span>₹{Number(sale.shippingCharge).toFixed(2)}</span>
+              </div>
+            )}
+
+            {Number(sale.roundOff || 0) !== 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontStyle: 'italic', fontSize: '11px' }}>
+                <span>Round Off:</span>
+                <span>{Number(sale.roundOff) > 0 ? `+₹${sale.roundOff}` : `-₹${Math.abs(sale.roundOff)}`}</span>
+              </div>
+            )}
+
+            {/* Grand Total Highlight */}
+            <div 
+              style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                fontSize: '15px', 
+                fontWeight: 'bold', 
+                backgroundColor: primaryColor, 
+                color: '#ffffff', 
+                padding: '2.5mm 3.5mm', 
+                borderRadius: '6px', 
+                marginTop: '1.5mm' 
+              }}
+            >
+              <span>Grand Total:</span>
+              <span>₹{Number(sale.grandTotal).toFixed(2)}</span>
+            </div>
           </div>
-          <div style={{ width: '180px', textAlign: 'center' }}>
-            <p style={{ margin: '0 0 2.5rem 0', color: '#64748b' }}>For {settings?.companyName || 'AO Core'}</p>
-            <div style={{ borderTop: '1px solid #94a3b8', paddingTop: '0.25rem', fontWeight: 'bold' }}>Authorized Signatory</div>
-          </div>
+        </div>
+
+      </div>
+
+      {/* 6. Terms and Notes (only if set) */}
+      {settings?.termsAndConditions && (
+        <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '3mm', marginBottom: '5mm', fontSize: '10.5px' }}>
+          <p style={{ margin: '0 0 1mm 0', fontWeight: 'bold', color: primaryColor, textTransform: 'uppercase' }}>Terms & Conditions:</p>
+          <p style={{ margin: 0, color: '#64748b', lineHeight: 1.35 }}>{settings.termsAndConditions}</p>
         </div>
       )}
 
-      <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.8rem', color: '#64748b' }}>
-        <p style={{ margin: '0 0 0.25rem 0' }}>Payment Mode: <strong style={{ textTransform: 'uppercase' }}>{sale.paymentMethod}</strong> — Status: <strong style={{ textTransform: 'uppercase' }}>{String(sale.paymentStatus).toLowerCase() === 'partial' ? 'PARTIALLY PAID' : String(sale.paymentStatus).toUpperCase()}</strong></p>
-        {isGstInvoice && sale.gstBillingMode && <p style={{ margin: '0 0 0.5rem 0' }}>Tax Invoicing: GST {sale.gstBillingMode.toUpperCase()}</p>}
-        <p className="invoice-footer" style={{ margin: 0, fontWeight: 600 }}>Thank you for your business!</p>
-      </div>
+      {/* Decorative divider before footer */}
+      <div style={{ borderTop: '1px dashed #CBD5E1', margin: '3mm 0' }}></div>
+
+      {/* 7. Redesigned Premium Footer */}
+      <footer style={{ textAlign: 'center', fontSize: '11px', color: '#64748b', lineHeight: 1.4 }}>
+        <p style={{ margin: '0 0 0.5mm 0', fontWeight: 'bold' }}>Thank you for your purchase.</p>
+        <p style={{ margin: 0 }}>
+          This invoice was generated by <strong>{settings?.companyName || 'Amudhasurabiy Organics'}</strong>.
+        </p>
+        {settings?.websiteUrl && (
+          <p style={{ margin: '0.5mm 0 0 0' }}>
+            Visit: <a href={`http://${settings.websiteUrl}`} target="_blank" rel="noopener noreferrer" style={{ color: primaryColor, textDecoration: 'none', fontWeight: 'bold' }}>{settings.websiteUrl}</a>
+          </p>
+        )}
+      </footer>
     </div>
   );
 }

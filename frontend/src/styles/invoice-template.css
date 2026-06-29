@@ -1,96 +1,131 @@
+/* Redesigned Premium Enterprise Invoice Layout Stylesheet */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 .invoice-template {
   background: #ffffff;
-  color: #0f172a;
-  padding: 24px;
-  max-width: 800px;
-  font-family: Inter, system-ui, sans-serif;
-  font-size: 14px;
+  color: #1e293b;
+  margin: 0 auto;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  box-sizing: border-box;
+  position: relative;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
 }
 
-.invoice-template-header {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
+/* Typography elements */
+.invoice-template h1 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 800;
 }
 
-.invoice-logo {
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
-}
-
-.invoice-template-header h1 {
-  font-size: 1.35rem;
-  margin-bottom: 4px;
-}
-
-.invoice-template-header p {
-  font-size: 0.8rem;
-  color: #475569;
-  margin: 2px 0;
-}
-
-.invoice-template-meta {
-  display: flex;
-  justify-content: space-between;
-  margin: 16px 0;
-  font-size: 0.9rem;
-}
-
-.invoice-template-customer {
-  margin-bottom: 16px;
-  font-size: 0.9rem;
-}
-
-.invoice-template-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 12px 0;
-}
-
-.invoice-template-table th,
-.invoice-template-table td {
-  border: 1px solid #cbd5e1;
-  padding: 8px 10px;
-  text-align: left;
-}
-
-.invoice-template-table th {
-  background: #f1f5f9;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-}
-
-.invoice-template-totals {
-  text-align: right;
-  margin-top: 16px;
-}
-
-.invoice-grand-total {
-  font-size: 1.25rem;
+.invoice-template h2 {
+  font-family: 'Inter', sans-serif;
   font-weight: 700;
-  color: var(--brand-primary, #2563eb);
-  margin-top: 8px;
+  letter-spacing: -0.025em;
 }
 
-.invoice-payment {
-  font-size: 0.85rem;
-  color: #64748b;
-  margin-top: 4px;
+.invoice-template h3 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.05em;
 }
 
-.invoice-footer {
-  text-align: center;
-  margin-top: 24px;
-  color: #64748b;
-  font-size: 0.85rem;
+/* Customer address card spacing */
+.invoice-customer-cards p,
+.invoice-info-grid p {
+  line-height: 1.4;
+  font-size: 11.5px;
 }
 
-.invoice-capture-hidden {
-  position: fixed;
-  left: -9999px;
-  top: 0;
-  width: 800px;
-  z-index: -1;
-  pointer-events: none;
+/* Product table custom styling */
+.invoice-redesign-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.invoice-redesign-table td {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: #334155;
+}
+
+.invoice-redesign-tr:hover {
+  background-color: #fcfbf9 !important; /* Subtle highlight on hover */
+}
+
+/* Responsive constraints */
+@media (max-width: 600px) {
+  .invoice-template {
+    width: 100% !important;
+    padding: 4mm !important;
+  }
+  
+  .invoice-customer-cards {
+    grid-template-columns: 1fr !important;
+    gap: 3mm !important;
+  }
+  
+  .invoice-bottom-grid {
+    grid-template-columns: 1fr !important;
+    gap: 4mm !important;
+  }
+  
+  .invoice-info-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Print Specific Rules: A5 print optimization */
+@media print {
+  @page {
+    size: A5 portrait;
+    margin: 6mm 6mm 6mm 6mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .invoice-template {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Make sure table header stays brown on print */
+  .invoice-redesign-table th {
+    background-color: #5A2D0C !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Ensure alternating rows maintain their gray/beige color on print */
+  .invoice-redesign-tr {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Ensure grand total remains brown on print */
+  .invoice-bottom-grid div[style*="background-color"] {
+    background-color: #5A2D0C !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Remove non-printable actions */
+  .no-print {
+    display: none !important;
+  }
 }
