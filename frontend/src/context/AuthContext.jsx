@@ -409,7 +409,6 @@ export function AuthProvider({ children }) {
                 padding: '6px',
                 boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
                 zIndex: 2,
-                animation: 'ao-pulse 1.5s ease-in-out infinite alternate',
               }}
               onError={(e) => {
                 e.target.onerror = null;
@@ -419,71 +418,55 @@ export function AuthProvider({ children }) {
           </div>
           
           <h2 style={{
-            margin: '0 0 0.5rem 0',
+            margin: '0 0 0.25rem 0',
             fontSize: '1.4rem',
-            fontWeight: 800,
+            fontWeight: 900,
             color: '#ffffff',
-            letterSpacing: '-0.01em',
+            letterSpacing: '1px',
+            textTransform: 'uppercase'
           }}>
-            AO Core ERP
+            Amudhasurabiy Organics
           </h2>
           
           <p style={{
             margin: '0 0 1.5rem 0',
-            fontSize: '0.95rem',
-            color: '#ff9800',
-            fontWeight: 600,
-            minHeight: '24px'
+            fontSize: '0.75rem',
+            color: '#f59e0b',
+            fontWeight: 700,
+            letterSpacing: '3px',
+            textTransform: 'uppercase',
+            opacity: 0.85
           }}>
-            {message}
+            Enterprise ERP Platform
           </p>
 
+          {/* Clean Thin Progress Bar */}
           <div style={{
-            width: '100%',
-            height: '6px',
-            background: 'rgba(255, 255, 255, 0.1)',
+            width: '240px',
+            height: '4px',
+            background: 'rgba(255, 255, 255, 0.08)',
             borderRadius: '10px',
             overflow: 'hidden',
-            marginBottom: '1.5rem'
+            marginBottom: '1rem'
           }}>
             <div style={{
               width: `${progress}%`,
               height: '100%',
-              background: 'linear-gradient(90deg, #ff9800, #ff5722)',
+              background: 'linear-gradient(90deg, #f59e0b, #d97706)',
               borderRadius: '10px',
               transition: 'width 0.4s ease-out'
             }} />
           </div>
 
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'flex-start',
-            width: '100%',
-            gap: '0.65rem',
+          <p style={{
+            margin: 0,
             fontSize: '0.85rem',
-            color: '#cbd5e1',
-            padding: '1rem',
-            borderRadius: '12px',
-            background: 'rgba(0, 0, 0, 0.2)'
+            color: '#94a3b8',
+            fontWeight: 500,
+            letterSpacing: '0.5px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: progress >= 25 ? 1 : 0.5 }}>
-              <span>{progress > 25 ? '✅' : progress === 25 ? '🔄' : '⚫'}</span>
-              <span style={{ textDecoration: progress > 25 ? 'line-through' : 'none' }}>Checking Internet Connection</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: progress >= 50 ? 1 : 0.5 }}>
-              <span>{progress > 50 ? '✅' : progress === 50 || (healthStatus?.startsWith('retrying')) ? '🔄' : '⚫'}</span>
-              <span style={{ textDecoration: progress > 50 ? 'line-through' : 'none' }}>Connecting Backend API</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: progress >= 75 ? 1 : 0.5 }}>
-              <span>{progress > 75 ? '✅' : progress === 75 ? '🔄' : '⚫'}</span>
-              <span style={{ textDecoration: progress > 75 ? 'line-through' : 'none' }}>Connecting Database Instance</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: progress >= 95 ? 1 : 0.5 }}>
-              <span>{progress >= 95 ? '🔄' : '⚫'}</span>
-              <span>Bootstrapping ERP Interface</span>
-            </div>
-          </div>
+            {message}
+          </p>
         </div>
         <style>{`
           @keyframes ao-spin {
@@ -491,7 +474,7 @@ export function AuthProvider({ children }) {
             100% { transform: rotate(360deg); }
           }
           @keyframes ao-pulse {
-            0% { transform: scale(0.95); opacity: 0.9; }
+            0% { transform: scale(0.95); opacity: 0.85; }
             100% { transform: scale(1.05); opacity: 1; }
           }
         `}</style>
