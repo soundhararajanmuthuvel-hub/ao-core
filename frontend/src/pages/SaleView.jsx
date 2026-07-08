@@ -15,6 +15,7 @@ export default function SaleView() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const captureRef = useRef(null);
+  const exportRef = useRef(null);
   const [sale, setSale] = useState(null);
   const [settings, setSettings] = useState(null);
   const [busy, setBusy] = useState('');
@@ -561,7 +562,7 @@ export default function SaleView() {
     }
   };
 
-  const getEl = () => captureRef.current;
+  const getEl = () => exportRef.current || captureRef.current;
 
   const handleJpg = async () => {
     setBusy('jpg');
@@ -762,6 +763,22 @@ export default function SaleView() {
 
   return (
     <div className="page">
+      {/* Hidden container for PDF/PNG/WhatsApp captures (always at 100% zoom to prevent html2canvas layout bugs on mobile) */}
+      {sale && settings && (
+        <div 
+          style={{ 
+            position: 'absolute', 
+            left: '-9999px', 
+            top: '-9999px',
+            overflow: 'hidden',
+            width: settings.paperSize === 'A5' ? '559px' : '794px' // force standard dimensions
+          }}
+        >
+          <div ref={exportRef} style={{ backgroundColor: '#ffffff', zoom: 1 }}>
+            <InvoiceTemplate sale={sale} settings={settings} captureId="invoice-export" />
+          </div>
+        </div>
+      )}
       {/* 1. Top Header Dashboard */}
       <div className="card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.5rem', borderLeft: '4px solid #5A2D0C' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
