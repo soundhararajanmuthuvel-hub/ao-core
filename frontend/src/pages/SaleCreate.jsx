@@ -371,7 +371,7 @@ export default function SaleCreate() {
         </h1>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '1.5rem' }}>
         {/* Left Column: Product Selection */}
         <div className="card" style={{ padding: '1.5rem', borderRadius: '12px', backgroundColor: '#fff' }}>
           <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>Select Finished Goods</h3>
@@ -399,7 +399,7 @@ export default function SaleCreate() {
         <div className="card" style={{ padding: '1.5rem', borderRadius: '12px', backgroundColor: '#fff' }}>
           <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>Customer & Charges Info</h3>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Select Customer</label>
               <select className="form-control" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
@@ -438,7 +438,7 @@ export default function SaleCreate() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
             <div className="form-group">
               <label>Payment Method</label>
               <select className="form-control" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
@@ -453,7 +453,7 @@ export default function SaleCreate() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
             <div className="form-group">
               <label>GST Billing Mode</label>
               <select className="form-control" value={gstBillingMode} onChange={(e) => setGstBillingMode(e.target.value)}>
@@ -476,7 +476,7 @@ export default function SaleCreate() {
 
           <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1rem', marginTop: '1rem' }}>
             <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.75rem', color: '#475569' }}>Additional Logistics Charges</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
               <div className="form-group">
                 <label>Shipping Charge (₹)</label>
                 <input
@@ -547,7 +547,8 @@ export default function SaleCreate() {
       {/* Cart Grid list */}
       <div className="card" style={{ marginTop: '1.5rem', padding: '1.5rem', borderRadius: '12px', backgroundColor: '#fff' }}>
         <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>Order Lines / Cart</h3>
-        <table className="data-table cart-table">
+        <div className="table-wrap">
+          <table className="data-table cart-table">
           <thead>
             <tr>
               <th>Item</th>
@@ -630,7 +631,8 @@ export default function SaleCreate() {
               </tr>
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
 
         {cart.length > 0 && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
