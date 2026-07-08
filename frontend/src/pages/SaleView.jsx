@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { salesApi, productsApi, customersApi, whatsappApi } from '../api';
 import { downloadInvoicePdf, getInvoicePdfBlob } from '../utils/invoicePdf';
@@ -24,6 +25,15 @@ export default function SaleView() {
   const [fitMode, setFitMode] = useState('page');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeTab, setActiveTab] = useState('activity');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Auto-scale zoom for mobile devices to prevent layout shift
   useEffect(() => {
@@ -700,6 +710,56 @@ export default function SaleView() {
     };
   };
 
+  const actionBarContent = (
+    <div className="mobile-sticky-action-bar" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center' }}>
+      <div className="btn-group" style={{ display: 'flex', gap: '0.25rem', border: '1px solid #cbd5e1', padding: '2px', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
+        {user && ['Super Admin', 'Admin', 'admin', 'Billing Executive', 'Sales Executive'].includes(user.role) && (
+          <>
+            <button type="button" className="btn btn-sm btn-secondary" onClick={startEdit} style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#475569' }}>
+              ✏️ Edit
+            </button>
+            {sale && sale.paymentStatus !== 'paid' && (
+              <button type="button" className="btn btn-sm btn-success" onClick={() => setShowPaymentModal(true)} style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#10b981' }}>
+                💳 Record Payment
+              </button>
+            )}
+          </>
+        )}
+        {activeShipment ? (
+          <button
+            type="button"
+            className="btn btn-sm btn-secondary"
+            style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#ff9800' }}
+            onClick={() => {
+              localStorage.setItem('select_shipment_id', activeShipment.id);
+              navigate('/shipping');
+            }}
+          >
+            📦 Track
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-sm btn-secondary"
+            style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#ff9800' }}
+            onClick={() => navigate(`/shipping?createForInvoice=${id || sale.id}`)}
+          >
+            📦 Create Shipment
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'nowrap' }}>
+        <Link to={`/sales/${id}/print`} className="btn btn-secondary btn-sm">🖨️ Print</Link>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => downloadInvoicePdf(sale, settings)} disabled={!!busy}>📥 PDF</button>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={handleDownloadPng} disabled={!!busy}>🖼️ PNG</button>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={handleSharePdf} disabled={!!busy}>📤 Share</button>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={handleEmailPdf} disabled={!!busy}>✉️ Email</button>
+        <button type="button" className="btn btn-whatsapp btn-sm" onClick={openWaModal} disabled={!!busy}>💬 WhatsApp</button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="page">
       {/* 1. Top Header Dashboard */}
@@ -736,54 +796,8 @@ export default function SaleView() {
             </div>
           </div>
 
-          {/* Grouped Action Toolbar (Sticky on Mobile) */}
-          <div className="mobile-sticky-action-bar" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <div className="btn-group" style={{ display: 'flex', gap: '0.25rem', border: '1px solid #cbd5e1', padding: '2px', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
-              {(user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'admin') && (
-                <>
-                  <button type="button" className="btn btn-sm btn-secondary" onClick={startEdit} style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#475569' }}>
-                    ✏️ Edit
-                  </button>
-                  {sale.paymentStatus !== 'paid' && (
-                    <button type="button" className="btn btn-sm btn-success" onClick={() => setShowPaymentModal(true)} style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#10b981' }}>
-                      💳 Record Payment
-                    </button>
-                  )}
-                </>
-              )}
-              {activeShipment ? (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-secondary"
-                  style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#ff9800' }}
-                  onClick={() => {
-                    localStorage.setItem('select_shipment_id', activeShipment.id);
-                    navigate('/shipping');
-                  }}
-                >
-                  📦 Track
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-secondary"
-                  style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#ff9800' }}
-                  onClick={() => navigate(`/shipping?createForInvoice=${id || sale.id}`)}
-                >
-                  📦 Create Shipment
-                </button>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'nowrap' }}>
-              <Link to={`/sales/${id}/print`} className="btn btn-secondary btn-sm">🖨️ Print</Link>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => downloadInvoicePdf(sale, settings)} disabled={!!busy}>📥 PDF</button>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={handleDownloadPng} disabled={!!busy}>🖼️ PNG</button>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={handleSharePdf} disabled={!!busy}>📤 Share</button>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={handleEmailPdf} disabled={!!busy}>✉️ Email</button>
-              <button type="button" className="btn btn-whatsapp btn-sm" onClick={openWaModal} disabled={!!busy}>💬 WhatsApp</button>
-            </div>
-          </div>
+          {/* Grouped Action Toolbar (Sticky on Mobile via Portal to bypass container transformations) */}
+          {isMobile ? createPortal(actionBarContent, document.body) : actionBarContent}
         </div>
       </div>
 
@@ -949,7 +963,7 @@ export default function SaleView() {
               ⚡ Quick Actions
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {(user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'admin') && sale.paymentStatus !== 'paid' && (
+              {user && ['Super Admin', 'Admin', 'admin', 'Billing Executive', 'Sales Executive'].includes(user.role) && sale.paymentStatus !== 'paid' && (
                 <button type="button" className="btn btn-success btn-sm w-100" onClick={() => setShowPaymentModal(true)} style={{ fontWeight: 650 }}>
                   💳 Record Payment
                 </button>

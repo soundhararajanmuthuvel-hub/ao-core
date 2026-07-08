@@ -161,7 +161,7 @@
 @media (max-width: 768px) {
   .mobile-sticky-action-bar {
     position: fixed !important;
-    bottom: 0;
+    bottom: 60px !important; /* Position above the mobile bottom navigation bar (60px) */
     left: 0;
     right: 0;
     background: #ffffff !important;
@@ -181,7 +181,7 @@
     display: none !important;  /* Hide scrollbar Safari/Chrome */
   }
   .page {
-    padding-bottom: 90px !important; /* Make sure bottom page content isn't covered by sticky actions footer */
+    padding-bottom: 150px !important; /* Make sure bottom page content isn't covered by sticky actions footer or bottom nav */
   }
 }
 
@@ -192,6 +192,8 @@
 @media (max-width: 768px) {
   .invoice-preview-area {
     padding: 1rem 0.5rem !important;
+    max-height: none !important; /* Allow natural height on mobile */
+    overflow: visible !important;  /* Disable nested scrollbar on mobile */
   }
 }
 
