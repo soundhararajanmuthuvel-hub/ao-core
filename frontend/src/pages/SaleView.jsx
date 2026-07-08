@@ -25,6 +25,21 @@ export default function SaleView() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeTab, setActiveTab] = useState('activity');
 
+  // Auto-scale zoom for mobile devices to prevent layout shift
+  useEffect(() => {
+    if (settings) {
+      const screenWidth = window.innerWidth;
+      if (screenWidth < 768) {
+        const pad = 24; // responsive preview wrapper padding
+        const availableWidth = screenWidth - pad;
+        const paperSize = settings.paperSize || 'A4';
+        const sheetWidth = paperSize === 'A5' ? 559 : 794; // A5 (148mm) vs A4 (210mm) pixel-based width
+        const calculatedZoom = Math.floor((availableWidth / sheetWidth) * 100);
+        setZoom(Math.max(25, Math.min(90, calculatedZoom)));
+      }
+    }
+  }, [settings]);
+
   // Payment recording state
   const [payments, setPayments] = useState([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -802,7 +817,7 @@ export default function SaleView() {
               <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>📄 Invoice Document Preview</span>
               
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <button type="button" className="btn btn-sm btn-secondary" onClick={() => setZoom(z => Math.max(50, z - 10))} style={{ padding: '0.2rem 0.5rem', height: '24px', display: 'flex', alignItems: 'center' }}>−</button>
+                <button type="button" className="btn btn-sm btn-secondary" onClick={() => setZoom(z => Math.max(20, z - 10))} style={{ padding: '0.2rem 0.5rem', height: '24px', display: 'flex', alignItems: 'center' }}>−</button>
                 <span style={{ fontSize: '0.8rem', fontWeight: 'bold', minWidth: '40px', textAlign: 'center' }}>{zoom}%</span>
                 <button type="button" className="btn btn-sm btn-secondary" onClick={() => setZoom(z => Math.min(150, z + 10))} style={{ padding: '0.2rem 0.5rem', height: '24px', display: 'flex', alignItems: 'center' }}>+</button>
                 
@@ -818,9 +833,9 @@ export default function SaleView() {
 
             {/* Preview Sheet Area */}
             <div 
+              className="invoice-preview-area"
               style={{
                 backgroundColor: '#cbd5e1',
-                padding: '2.5rem 1.5rem',
                 overflow: 'auto',
                 display: 'flex',
                 justifyContent: 'center',
@@ -857,8 +872,6 @@ export default function SaleView() {
                   border: '1px solid #94a3b8',
                   width: 'fit-content',
                   zoom: zoom / 100,
-                  transform: `scale(${zoom / 100})`, // Safari fallback
-                  transformOrigin: 'top center',
                   maxWidth: '100%'
                 }}
               >
