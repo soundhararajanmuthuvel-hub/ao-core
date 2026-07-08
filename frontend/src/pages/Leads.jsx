@@ -412,59 +412,124 @@ export default function Leads() {
           <p>Create a new lead manually or use the Lead Finder to search local stores.</p>
         </div>
       ) : (
-        <div className="card table-wrap" style={{ padding: 0 }}>
-          <table className="data-table customers-table">
-            <thead>
-              <tr>
-                <th>Shop Name</th>
-                <th>Category</th>
-                <th>Mobile</th>
-                <th>City</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leads.map((lead) => {
-                let badgeColor = 'badge-warning';
-                if (lead.status === 'New') badgeColor = 'badge-warning';
-                if (lead.status === 'Contacted') badgeColor = 'badge-info';
-                if (lead.status === 'Visited') badgeColor = 'badge-info';
-                if (lead.status === 'Interested') badgeColor = 'badge-success';
-                if (lead.status === 'Customer') badgeColor = 'badge-success';
-                if (lead.status === 'Rejected') badgeColor = 'badge-danger';
+        <>
+          {/* Desktop Table View */}
+          <div className="desktop-table-container card table-wrap" style={{ padding: 0 }}>
+            <table className="data-table customers-table">
+              <thead>
+                <tr>
+                  <th>Shop Name</th>
+                  <th>Category</th>
+                  <th>Mobile</th>
+                  <th>City</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leads.map((lead) => {
+                  let badgeColor = 'badge-warning';
+                  if (lead.status === 'New') badgeColor = 'badge-warning';
+                  if (lead.status === 'Contacted') badgeColor = 'badge-info';
+                  if (lead.status === 'Visited') badgeColor = 'badge-info';
+                  if (lead.status === 'Interested') badgeColor = 'badge-success';
+                  if (lead.status === 'Customer') badgeColor = 'badge-success';
+                  if (lead.status === 'Rejected') badgeColor = 'badge-danger';
 
-                return (
-                  <tr key={lead.id} style={{ cursor: 'pointer' }} onClick={() => selectLeadForDetails(lead)}>
-                    <td style={{ fontWeight: 700, color: 'var(--brand-primary)' }}>{lead.shopName}</td>
-                    <td>{lead.category}</td>
-                    <td>{lead.mobileNumber || '—'}</td>
-                    <td>{lead.city || '—'}</td>
-                    <td>
-                      <span className={`badge ${badgeColor}`}>{lead.status}</span>
-                    </td>
-                    <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                      <button className="btn btn-outline-primary btn-sm" onClick={() => selectLeadForDetails(lead)} title="View Details" style={{ marginRight: '0.25rem' }}>
-                        <FileText size={14} /> View
-                      </button>
-                      <button className="btn btn-icon btn-sm" onClick={() => openEditModal(lead)} title="Edit Lead" style={{ marginRight: '0.25rem' }}>
-                        <Edit size={14} /> Edit
-                      </button>
-                      {lead.status !== 'Customer' && (
-                        <button className="btn btn-success btn-sm" onClick={() => handleConvertLead(lead.id)} title="Convert to Customer" style={{ marginRight: '0.25rem' }}>
-                          <UserPlus size={14} /> Convert
+                  return (
+                    <tr key={lead.id} style={{ cursor: 'pointer' }} onClick={() => selectLeadForDetails(lead)}>
+                      <td style={{ fontWeight: 700, color: 'var(--brand-primary)' }}>{lead.shopName}</td>
+                      <td>{lead.category}</td>
+                      <td>{lead.mobileNumber || '—'}</td>
+                      <td>{lead.city || '—'}</td>
+                      <td>
+                        <span className={`badge ${badgeColor}`}>{lead.status}</span>
+                      </td>
+                      <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                        <button className="btn btn-outline-primary btn-sm" onClick={() => selectLeadForDetails(lead)} title="View Details" style={{ marginRight: '0.25rem' }}>
+                          <FileText size={14} /> View
                         </button>
-                      )}
-                      <button className="btn btn-outline-danger btn-sm" onClick={() => handleDeleteLead(lead.id)} title="Delete Lead">
-                        <Trash size={14} /> Delete
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                        <button className="btn btn-icon btn-sm" onClick={() => openEditModal(lead)} title="Edit Lead" style={{ marginRight: '0.25rem' }}>
+                          <Edit size={14} /> Edit
+                        </button>
+                        {lead.status !== 'Customer' && (
+                          <button className="btn btn-success btn-sm" onClick={() => handleConvertLead(lead.id)} title="Convert to Customer" style={{ marginRight: '0.25rem' }}>
+                            <UserPlus size={14} /> Convert
+                          </button>
+                        )}
+                        <button className="btn btn-outline-danger btn-sm" onClick={() => handleDeleteLead(lead.id)} title="Delete Lead">
+                          <Trash size={14} /> Delete
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card List View */}
+          <div className="mobile-card-list" style={{ display: 'none', flexDirection: 'column', gap: '0.75rem' }}>
+            {leads.map((lead) => {
+              let badgeColor = 'badge-warning';
+              if (lead.status === 'New') badgeColor = 'badge-warning';
+              if (lead.status === 'Contacted') badgeColor = 'badge-info';
+              if (lead.status === 'Visited') badgeColor = 'badge-info';
+              if (lead.status === 'Interested') badgeColor = 'badge-success';
+              if (lead.status === 'Customer') badgeColor = 'badge-success';
+              if (lead.status === 'Rejected') badgeColor = 'badge-danger';
+
+              // Clean phone for calls / WhatsApp
+              const cleanPhone = lead.mobileNumber ? lead.mobileNumber.replace(/\D/g, '') : '';
+              const waPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+
+              return (
+                <div key={lead.id} className="mobile-card" onClick={() => selectLeadForDetails(lead)}>
+                  <div className="mobile-card-header">
+                    <div>
+                      <strong className="mobile-card-title">{lead.shopName}</strong>
+                      <div className="mobile-card-subtitle">{lead.category}</div>
+                    </div>
+                    <span className={`badge ${badgeColor}`}>{lead.status}</span>
+                  </div>
+
+                  <div className="mobile-card-grid">
+                    <div className="mobile-card-item">
+                      <span className="mobile-card-label">Mobile</span>
+                      <span className="mobile-card-value">{lead.mobileNumber || '—'}</span>
+                    </div>
+                    <div className="mobile-card-item">
+                      <span className="mobile-card-label">City</span>
+                      <span className="mobile-card-value">{lead.city || '—'}</span>
+                    </div>
+                    <div className="mobile-card-item">
+                      <span className="mobile-card-label">Source</span>
+                      <span className="mobile-card-value">{lead.source || '—'}</span>
+                    </div>
+                    <div className="mobile-card-item">
+                      <span className="mobile-card-label">Salesman</span>
+                      <span className="mobile-card-value">{lead.assignedSalesman?.name || 'Unassigned'}</span>
+                    </div>
+                  </div>
+
+                  <div className="mobile-card-actions" onClick={(e) => e.stopPropagation()}>
+                    {cleanPhone && (
+                      <>
+                        <a href={`tel:${cleanPhone}`} className="mobile-action-btn phone">📞 Call</a>
+                        <a href={`https://wa.me/${waPhone}?text=Hello%20${encodeURIComponent(lead.shopName)}`} target="_blank" rel="noreferrer" className="mobile-action-btn whatsapp">💬 WA</a>
+                      </>
+                    )}
+                    {lead.status !== 'Customer' && (
+                      <button type="button" className="mobile-action-btn primary" onClick={() => handleConvertLead(lead.id)}>👤 Convert</button>
+                    )}
+                    <button type="button" className="mobile-action-btn secondary" onClick={() => openEditModal(lead)}>✏️ Edit</button>
+                    <button type="button" className="mobile-action-btn" style={{ borderColor: '#f87171', color: '#ef4444' }} onClick={() => handleDeleteLead(lead.id)}>🗑️ Del</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {/* DETAIL DRAWER / SLIDE-OUT PANEL */}

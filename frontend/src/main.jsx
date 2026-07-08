@@ -15,6 +15,7 @@ import './styles/components.css';
 import './styles/dark.css';
 import './styles/invoice-template.css';
 import './styles/tour.css';
+import './styles/mobile-list.css';
 import { startOfflineSync } from './utils/OfflineSync';
 
 // Initialize background SFA offline data synchronizer

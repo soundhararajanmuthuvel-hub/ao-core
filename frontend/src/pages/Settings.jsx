@@ -1005,6 +1005,21 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label>Default Customer Map Engine</label>
+                  <select
+                    className="form-control"
+                    value={form.mapProvider || 'osm'}
+                    onChange={(e) => setForm({ ...form, mapProvider: e.target.value })}
+                  >
+                    <option value="osm">OpenStreetMap (OSM) / Leaflet (Default Free)</option>
+                    <option value="google">Google Maps Web Integration</option>
+                    <option value="mapbox">Mapbox Professional Maps</option>
+                    <option value="here">HERE Enterprise Location Suite</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
             <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem', marginTop: '1.25rem' }}>

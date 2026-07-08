@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
+import { useNavigate } from 'react-router-dom';
 import { customersApi, sfaApi } from '../api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { 
@@ -15,12 +17,44 @@ import {
   Check, 
   TrendingUp, 
   Phone,
-  DollarSign
+  DollarSign,
+  Compass
 } from 'lucide-react';
 import '../styles/customermap.css';
 
+// Haversine formula to compute distance between coordinates in Kilometers
+function getDistance(lat1, lon1, lat2, lon2) {
+  if (lat1 === null || lon1 === null || lat2 === null || lon2 === null) return Infinity;
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; // Distance in km
+}
+
+// Map customer types to specific V3 colors and indicators
+function getCustomerTypeColors(type) {
+  const t = String(type || '').toLowerCase();
+  if (t.includes('retail')) {
+    return { bg: '#dcfce7', text: '#15803d', icon: '🟢', color: '#10b981' };
+  } else if (t.includes('d2c') || t.includes('direct')) {
+    return { bg: '#dbeafe', text: '#1d4ed8', icon: '🔵', color: '#3b82f6' };
+  } else if (t.includes('white label') || t.includes('whitelabel')) {
+    return { bg: '#f3e8ff', text: '#7e22ce', icon: '🟣', color: '#a855f7' };
+  } else if (t.includes('organic')) {
+    return { bg: '#ffedd5', text: '#c2410c', icon: '🟠', color: '#f97316' };
+  }
+  return { bg: '#f1f5f9', text: '#475569', icon: '⚪', color: '#64748b' };
+}
+
 export default function CustomerMap() {
   const { user } = useAuth();
+  const { settings } = useSettings();
+  const navigate = useNavigate();
   
   // Data State
   const [customers, setCustomers] = useState([]);
@@ -33,6 +67,16 @@ export default function CustomerMap() {
   const [selectedTiers, setSelectedTiers] = useState({ GREEN: true, YELLOW: true, RED: true });
   const [selectedTerritory, setSelectedTerritory] = useState('ALL');
   const [activeTab, setActiveTab] = useState('customers'); // 'customers' | 'route'
+  const [radiusFilter, setRadiusFilter] = useState('ALL'); // ALL, 0.5, 1, 3, 5, 10
+  const [userLocation, setUserLocation] = useState(null); // { lat, lng }
+
+  // Smart Details overlay state
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+
+  // Quick Onboarding State
+  const [onboardModalOpen, setOnboardModalOpen] = useState(false);
+  const [onboardForm, setOnboardForm] = useState({ name: '', phone: '', customerType: 'Retail Shop' });
+  const [onboarding, setOnboarding] = useState(false);
 
   // Visit Dialog State
   const [visitDialogCustomer, setVisitDialogCustomer] = useState(null);
@@ -46,12 +90,28 @@ export default function CustomerMap() {
   const mapRef = useRef(null);
   const markersGroupRef = useRef(null);
 
+  // Get current user location for radius checks
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (err) => console.log('Could not retrieve salesman location for beat matching:', err),
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+  }, []);
+
   // Load Customers and Today's Beat Route
   const loadData = async () => {
     try {
       setLoading(true);
       const [customersRes, routesRes] = await Promise.all([
-        customersApi.list({ limit: 500 }),
+        customersApi.list({ limit: 1000 }),
         sfaApi.getRoutes({ date: new Date().toISOString().split('T')[0] })
       ]);
 
@@ -97,15 +157,40 @@ export default function CustomerMap() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Filter Logic
-  const filteredCustomers = customers.filter(c => {
-    const matchesSearch = 
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      (c.businessName && c.businessName.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesTier = selectedTiers[c.tier || 'RED'];
-    const matchesTerritory = selectedTerritory === 'ALL' || c.territory === selectedTerritory;
-    return matchesSearch && matchesTier && matchesTerritory;
-  });
+  // Filter Logic utilizing Haversine formulas and Search Matchers
+  const filteredCustomers = useMemo(() => {
+    let result = customers.map(c => {
+      const dist = userLocation && c.latitude !== null && c.longitude !== null
+        ? getDistance(userLocation.lat, userLocation.lng, Number(c.latitude), Number(c.longitude))
+        : null;
+      return { ...c, distance: dist };
+    });
+
+    result = result.filter(c => {
+      const matchesSearch = 
+        c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (c.businessName && c.businessName.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesTier = selectedTiers[c.tier || 'RED'];
+      const matchesTerritory = selectedTerritory === 'ALL' || c.territory === selectedTerritory;
+      
+      const matchesRadius = radiusFilter === 'ALL'
+        ? true
+        : c.distance !== null && c.distance <= parseFloat(radiusFilter);
+
+      return matchesSearch && matchesTier && matchesTerritory && matchesRadius;
+    });
+
+    // Sort by distance (nearest first) if location is available
+    if (userLocation) {
+      result.sort((a, b) => {
+        if (a.distance === null) return 1;
+        if (b.distance === null) return -1;
+        return a.distance - b.distance;
+      });
+    }
+    
+    return result;
+  }, [customers, searchQuery, selectedTiers, selectedTerritory, radiusFilter, userLocation]);
 
   // Calculate Average Coordinates for Map Center
   const getMapCenter = () => {
@@ -129,27 +214,26 @@ export default function CustomerMap() {
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+    // Dynamic Multi-Provider Tile Configuration
+    const mapProvider = settings?.mapProvider || 'osm';
+    let tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    let tileAttribution = '© OpenStreetMap contributors';
+    
+    if (mapProvider === 'google') {
+      tileUrl = 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+      tileAttribution = '© Google Maps';
+    } else if (mapProvider === 'mapbox') {
+      // Mapbox high-density OSM layer styling
+      tileUrl = 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png';
+      tileAttribution = '© Mapbox / OSM Hot Tiles';
+    } else if (mapProvider === 'here') {
+      // Clean CartoDB Voyager styling
+      tileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+      tileAttribution = '© HERE / CartoDB Voyager';
+    }
 
+    L.tileLayer(tileUrl, { attribution: tileAttribution }).addTo(map);
     markersGroupRef.current = L.layerGroup().addTo(map);
-
-    // Dynamic Leaflet popup event mapping for Custom Add Visit actions
-    map.on('popupopen', (e) => {
-      const container = e.popup._container;
-      const visitBtn = container.querySelector('.popup-visit-btn');
-      if (visitBtn) {
-        visitBtn.onclick = () => {
-          const customerId = visitBtn.getAttribute('data-customer-id');
-          const matchedCust = customers.find(c => c.id === Number(customerId));
-          if (matchedCust) {
-            setVisitDialogCustomer(matchedCust);
-            map.closePopup();
-          }
-        };
-      }
-    });
 
     return () => {
       if (mapRef.current) {
@@ -169,80 +253,41 @@ export default function CustomerMap() {
     const validCustomers = filteredCustomers.filter(c => c.latitude !== null && c.longitude !== null);
 
     validCustomers.forEach(c => {
-      const color = c.tier === 'GREEN' ? '#10b981' : c.tier === 'YELLOW' ? '#f59e0b' : '#ef4444';
+      const color = getCustomerTypeColors(c.customerType).color;
       const iconHtml = `
         <div style="
           background-color: ${color}; 
-          width: 18px; 
-          height: 18px; 
-          border: 2px solid #ffffff; 
+          width: 20px; 
+          height: 20px; 
+          border: 2.5px solid #ffffff; 
           border-radius: 50%; 
-          box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+          box-shadow: 0 3px 8px rgba(0,0,0,0.4);
           display: flex;
           align-items: center;
           justify-content: center;
         ">
-          <div style="width: 6px; height: 6px; background-color: #ffffff; border-radius: 50%;"></div>
+          <div style="width: 5px; height: 5px; background-color: #ffffff; border-radius: 50%;"></div>
         </div>
       `;
 
       const customIcon = L.divIcon({
         className: 'custom-map-pin',
         html: iconHtml,
-        iconSize: [18, 18],
-        iconAnchor: [9, 9]
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
       });
 
-      const formattedDate = c.lastOrderDate 
-        ? new Date(c.lastOrderDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-        : 'N/A';
-
-      const outstandingFormatted = new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR'
-      }).format(c.balance || 0);
-
-      const popupHtml = `
-        <div class="popup-card">
-          <div class="popup-title">${c.name}</div>
-          <div class="popup-shop">${c.businessName || 'No Shop Name'}</div>
-          
-          <table class="popup-details-table">
-            <tr>
-              <td class="label">Mobile</td>
-              <td class="val">${c.phone || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td class="label">Outstanding</td>
-              <td class="val" style="color: ${c.balance > 0 ? '#ef4444' : '#0f172a'};">${outstandingFormatted}</td>
-            </tr>
-            <tr>
-              <td class="label">Last Order</td>
-              <td class="val">${formattedDate}</td>
-            </tr>
-          </table>
-
-          <div class="popup-actions">
-            <a href="https://www.google.com/maps/dir/?api=1&destination=${c.latitude},${c.longitude}" 
-               target="_blank" 
-               rel="noopener noreferrer" 
-               class="popup-btn nav">
-              <span style="font-size: 11px;">✈</span> Navigate
-            </a>
-            <button class="popup-btn visit popup-visit-btn" data-customer-id="${c.id}">
-              Add Visit
-            </button>
-          </div>
-        </div>
-      `;
-
-      const marker = L.marker([Number(c.latitude), Number(c.longitude)], { icon: customIcon })
-        .bindPopup(popupHtml);
+      const marker = L.marker([Number(c.latitude), Number(c.longitude)], { icon: customIcon });
+      
+      // Bind React state overlay updater on click instead of raw popups
+      marker.on('click', () => {
+        setSelectedCustomer(c);
+      });
       
       markersGroupRef.current.addLayer(marker);
     });
 
-    // Auto-pan / Auto-zoom to fit markers if list is filtered and markers exist
+    // Auto-pan to bounds if markers are mapped
     if (validCustomers.length > 0) {
       const bounds = L.latLngBounds(validCustomers.map(c => [Number(c.latitude), Number(c.longitude)]));
       mapRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
@@ -253,15 +298,9 @@ export default function CustomerMap() {
   const handleSelectCustomer = (c) => {
     if (c.latitude !== null && c.longitude !== null && mapRef.current) {
       mapRef.current.setView([Number(c.latitude), Number(c.longitude)], 15);
-      
-      // Find matching marker in group to trigger popup
-      markersGroupRef.current.eachLayer(layer => {
-        if (layer.getLatLng().lat === Number(c.latitude) && layer.getLatLng().lng === Number(c.longitude)) {
-          layer.openPopup();
-        }
-      });
+      setSelectedCustomer(c);
 
-      // On mobile, scroll to map
+      // On mobile, scroll to map smoothly
       if (window.innerWidth <= 768) {
         document.querySelector('.map-canvas-container').scrollIntoView({ behavior: 'smooth' });
       }
@@ -270,12 +309,77 @@ export default function CustomerMap() {
     }
   };
 
+  // Quick Geocoded Onboarding
+  const handleQuickOnboardSubmit = async (e) => {
+    e.preventDefault();
+    if (!onboardForm.name || !onboardForm.phone) {
+      showToast('Please enter both name and contact number.', 'error');
+      return;
+    }
+
+    setOnboarding(true);
+
+    // Retrieve device GPS coordinates
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        let resolvedAddress = `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+        // Query OSM Nominatim for reverse geocoding lookup
+        try {
+          const geoUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+          const geoRes = await fetch(geoUrl, {
+            headers: { 'Accept-Language': 'en' }
+          });
+          if (geoRes.ok) {
+            const geoData = await geoRes.json();
+            if (geoData.display_name) {
+              resolvedAddress = geoData.display_name;
+            }
+          }
+        } catch (err) {
+          console.error('Address lookup failed:', err);
+        }
+
+        // POST onboarding payload to Backend
+        try {
+          const payload = {
+            name: onboardForm.name,
+            phone: onboardForm.phone,
+            customerType: onboardForm.customerType,
+            latitude: lat,
+            longitude: lng,
+            address: resolvedAddress,
+            status: 'Active',
+            salesmanId: user?.id
+          };
+          await customersApi.create(payload);
+          showToast(`⚡ Onboarded ${onboardForm.name} successfully!`);
+          setOnboardModalOpen(false);
+          setOnboardForm({ name: '', phone: '', customerType: 'Retail Shop' });
+          loadData(); // reload datasets
+        } catch (err) {
+          console.error('Onboard failed:', err);
+          showToast(err.response?.data?.message || 'Quick onboarding failed.', 'error');
+        } finally {
+          setOnboarding(false);
+        }
+      },
+      (error) => {
+        console.error('Geolocation failed:', error);
+        showToast('Could not acquire GPS position. Onboarding failed.', 'error');
+        setOnboarding(false);
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
   // Generate Google Maps multi-stop URL for Today's Planned Visits
   const getGoogleMapsRouteUrl = () => {
     const validCoords = routeCustomers.filter(c => c.latitude !== null && c.longitude !== null);
     if (validCoords.length === 0) return '#';
 
-    // Start coordinates (Coimbatore base/warehouse or first customer)
     const origin = `${validCoords[0].latitude},${validCoords[0].longitude}`;
     const destination = `${validCoords[validCoords.length - 1].latitude},${validCoords[validCoords.length - 1].longitude}`;
     
@@ -307,7 +411,6 @@ export default function CustomerMap() {
       showToast(`Manual visit recorded successfully for ${visitDialogCustomer.name}!`);
       setVisitDialogCustomer(null);
       setVisitNotes('');
-      // Reload customers list to show latest check-in
       loadData();
     } catch (err) {
       console.error('Failed to log manual visit:', err);
@@ -414,6 +517,220 @@ export default function CustomerMap() {
         </div>
       )}
 
+      {/* Quick Customer Onboarding Modal */}
+      {onboardModalOpen && (
+        <div className="visit-dialog-overlay" style={{ zIndex: 2000 }}>
+          <form onSubmit={handleQuickOnboardSubmit} className="visit-dialog" style={{ maxWidth: '400px' }}>
+            <div className="visit-dialog-header">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                ⚡ Quick Onboard Account
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setOnboardModalOpen(false)} 
+                className="close-dialog-btn"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="visit-dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div className="form-group">
+                <label>Shop / Account Name *</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Wellness Organic Foods"
+                  value={onboardForm.name} 
+                  onChange={(e) => setOnboardForm({ ...onboardForm, name: e.target.value })} 
+                  className="form-input" 
+                  required 
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Contact Phone Number *</label>
+                <input 
+                  type="tel" 
+                  placeholder="e.g. 9876543210"
+                  value={onboardForm.phone} 
+                  onChange={(e) => setOnboardForm({ ...onboardForm, phone: e.target.value })} 
+                  className="form-input" 
+                  required 
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Account Category / Type</label>
+                <select 
+                  value={onboardForm.customerType} 
+                  onChange={(e) => setOnboardForm({ ...onboardForm, customerType: e.target.value })} 
+                  className="form-input"
+                >
+                  <option value="Retail Shop">Retail Shop</option>
+                  <option value="Distributor">Distributor</option>
+                  <option value="Wholesaler">Wholesaler</option>
+                  <option value="Organic Store">Organic Store</option>
+                  <option value="Medical Shop">Medical Shop</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="visit-dialog-footer">
+              <button 
+                type="button" 
+                onClick={() => setOnboardModalOpen(false)} 
+                className="dialog-btn cancel"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={onboarding} 
+                className="dialog-btn save"
+              >
+                {onboarding ? 'Locating (GPS)...' : '⚡ Onboard Now'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Floating Action Button (FAB) for Quick Customer Onboarding */}
+      <button 
+        type="button" 
+        onClick={() => setOnboardModalOpen(true)}
+        style={{
+          position: 'fixed',
+          bottom: '140px',
+          right: '20px',
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          backgroundColor: 'var(--brand-primary, #5a2d0c)',
+          color: '#ffffff',
+          border: 'none',
+          cursor: 'pointer',
+          zIndex: 99,
+          boxShadow: '0 8px 16px rgba(90, 45, 12, 0.35)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '1.5rem'
+        }}
+        title="Quick Onboard Customer"
+      >
+        ➕
+      </button>
+
+      {/* Smart Customer Card Details Overlay */}
+      {selectedCustomer && (
+        <div style={{
+          position: 'fixed',
+          bottom: '75px', // Sit cleanly above standard bottom navigation
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '90%',
+          maxWidth: '400px',
+          backgroundColor: 'var(--bg-card, #ffffff)',
+          border: '1px solid var(--border)',
+          borderRadius: '16px',
+          padding: '1.25rem',
+          zIndex: 100,
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.75rem',
+          fontFamily: 'Inter, sans-serif'
+        }}>
+          {/* Title row */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>{selectedCustomer.name}</h4>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{selectedCustomer.businessName || 'No Shop Name'}</span>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setSelectedCustomer(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', color: 'var(--text-secondary)' }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Details layout grids */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem 1rem', fontSize: '0.8rem', borderTop: '1px solid var(--border)', paddingTop: '0.6rem' }}>
+            <div>
+              <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Contact Phone</span>
+              <strong style={{ color: 'var(--text-primary)' }}>{selectedCustomer.phone || 'N/A'}</strong>
+            </div>
+            <div>
+              <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Outstanding Dues</span>
+              <strong style={{ color: selectedCustomer.balance > 0 ? '#ef4444' : '#10b981' }}>
+                ₹{Number(selectedCustomer.balance || 0).toLocaleString('en-IN')}
+              </strong>
+            </div>
+            <div>
+              <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Last Visited</span>
+              <strong style={{ color: 'var(--text-primary)' }}>
+                {selectedCustomer.lastVisitDate ? new Date(selectedCustomer.lastVisitDate).toLocaleDateString('en-IN') : 'N/A'}
+              </strong>
+            </div>
+            <div>
+              <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tier / Territory</span>
+              <strong style={{ color: 'var(--text-primary)' }}>{selectedCustomer.tier || 'RED'} / {selectedCustomer.territory || 'N/A'}</strong>
+            </div>
+            {selectedCustomer.distance !== null && selectedCustomer.distance !== Infinity && (
+              <div style={{ gridColumn: 'span 2' }}>
+                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Distance from You</span>
+                <strong style={{ color: 'var(--brand-primary)' }}>{selectedCustomer.distance.toFixed(2)} km away</strong>
+              </div>
+            )}
+          </div>
+
+          {/* Action Row 1: Calling & Navigation */}
+          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.25rem', borderTop: '1px solid var(--border)', paddingTop: '0.65rem' }}>
+            {selectedCustomer.phone && (
+              <>
+                <a href={`tel:${selectedCustomer.phone}`} className="mobile-action-btn phone" style={{ flex: 1, minHeight: '36px', fontSize: '0.75rem', padding: '0.35rem' }}>📞 Call</a>
+                <a href={`https://wa.me/91${selectedCustomer.phone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="mobile-action-btn whatsapp" style={{ flex: 1, minHeight: '36px', fontSize: '0.75rem', padding: '0.35rem' }}>💬 WhatsApp</a>
+              </>
+            )}
+            <a 
+              href={`https://www.google.com/maps/dir/?api=1&destination=${selectedCustomer.latitude},${selectedCustomer.longitude}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mobile-action-btn navigate"
+              style={{ flex: 1, minHeight: '36px', fontSize: '0.75rem', padding: '0.35rem' }}
+            >
+              🧭 Navigate
+            </a>
+          </div>
+
+          {/* Action Row 2: Sales Triggers */}
+          <div style={{ display: 'flex', gap: '0.35rem' }}>
+            <button 
+              type="button" 
+              className="mobile-action-btn primary" 
+              style={{ flex: 1, minHeight: '36px', fontSize: '0.75rem', padding: '0.35rem' }}
+              onClick={() => navigate(`/field-ordering?customerId=${selectedCustomer.id || selectedCustomer._id}`)}
+            >
+              🧾 New Order
+            </button>
+            <button 
+              type="button" 
+              className="mobile-action-btn secondary" 
+              style={{ flex: 1, minHeight: '36px', fontSize: '0.75rem', padding: '0.35rem' }}
+              onClick={() => {
+                setVisitDialogCustomer(selectedCustomer);
+                setSelectedCustomer(null);
+              }}
+            >
+              💰 Collect Payment
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Side Control and Details Panel */}
       <div className="map-sidebar">
         
@@ -452,6 +769,25 @@ export default function CustomerMap() {
                   className="search-input"
                 />
               </div>
+
+              {/* Nearby Customers filter */}
+              {userLocation && (
+                <div className="filter-section">
+                  <div className="filter-label">🧭 Nearby Distance Filter</div>
+                  <select 
+                    value={radiusFilter} 
+                    onChange={(e) => setRadiusFilter(e.target.value)}
+                    className="select-dropdown"
+                  >
+                    <option value="ALL">Show All Mapped</option>
+                    <option value="0.5">Within 500 meters</option>
+                    <option value="1">Within 1 Kilometer</option>
+                    <option value="3">Within 3 Kilometers</option>
+                    <option value="5">Within 5 Kilometers</option>
+                    <option value="10">Within 10 Kilometers</option>
+                  </select>
+                </div>
+              )}
 
               {/* Credit Tier Filters */}
               <div className="filter-section">
@@ -512,6 +848,11 @@ export default function CustomerMap() {
                         <div className="customer-meta-badge-row">
                           <span className={`meta-badge tier-${c.tier || 'RED'}`}>{c.tier || 'RED'}</span>
                           {c.territory && <span className="meta-badge" style={{ backgroundColor: '#e2e8f0', color: '#475569' }}>{c.territory}</span>}
+                          {c.distance !== null && c.distance !== Infinity && (
+                            <span className="meta-badge" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+                              🧭 {c.distance.toFixed(1)} km
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="customer-list-right">

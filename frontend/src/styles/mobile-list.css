@@ -1,0 +1,150 @@
+/* Responsive Card-Based Listing CSS for Mobile ERP V2 */
+
+.mobile-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.mobile-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mobile-card:active {
+  transform: scale(0.99);
+  background-color: var(--bg-active);
+}
+
+.mobile-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
+  gap: 0.5rem;
+}
+
+.mobile-card-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.mobile-card-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.mobile-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem 1rem;
+  margin: 0.25rem 0;
+}
+
+.mobile-card-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.mobile-card-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mobile-card-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mobile-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+  margin-top: 0.4rem;
+  justify-content: flex-end;
+}
+
+/* Touch targets optimized for one-hand usage (min 44px/48px hit areas) */
+.mobile-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 40px;
+  padding: 0.5rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.mobile-action-btn.primary {
+  background-color: var(--brand-primary, #5a2d0c);
+  border-color: var(--brand-primary, #5a2d0c);
+  color: #ffffff;
+}
+
+.mobile-action-btn.secondary {
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+}
+
+.mobile-action-btn.whatsapp {
+  background-color: #25d366;
+  border-color: #25d366;
+  color: #ffffff;
+}
+
+.mobile-action-btn.phone {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+
+.mobile-action-btn.navigate {
+  background-color: #f59e0b;
+  border-color: #f59e0b;
+  color: #ffffff;
+}
+
+/* Responsive Table Toggles */
+@media (max-width: 768px) {
+  .desktop-table-container {
+    display: none !important;
+  }
+  .mobile-card-list {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .desktop-table-container {
+    display: block !important;
+  }
+  .mobile-card-list {
+    display: none !important;
+  }
+}

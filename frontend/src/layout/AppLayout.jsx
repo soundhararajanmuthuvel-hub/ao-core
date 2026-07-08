@@ -600,17 +600,17 @@ export default function AppLayout() {
           <span className="bottom-nav-icon">🏠</span>
           <span>Home</span>
         </NavLink>
-        <NavLink to="/inventory" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-          <span className="bottom-nav-icon">📦</span>
-          <span>Inventory</span>
+        <NavLink to="/customers" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <span className="bottom-nav-icon">👥</span>
+          <span>Customers</span>
         </NavLink>
         <NavLink to="/sales" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
           <span className="bottom-nav-icon">🧾</span>
           <span>Sales</span>
         </NavLink>
-        <NavLink to="/customers" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-          <span className="bottom-nav-icon">👥</span>
-          <span>Customers</span>
+        <NavLink to="/crm/customer-map" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <span className="bottom-nav-icon">🗺️</span>
+          <span>Map</span>
         </NavLink>
         <button
           type="button"

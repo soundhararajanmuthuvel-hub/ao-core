@@ -457,66 +457,148 @@ export default function Products() {
             </select>
           </div>
           {loading ? <LoadingSpinner /> : (
-            <div className="card table-wrap">
-              <table className="data-table products-table">
-                <thead>
-                  <tr><th>Image</th><th>Name</th><th>SKU</th><th>Category</th><th>Type</th><th>Stock</th><th>Price</th><th>Actions</th></tr>
-                </thead>
-                <tbody>
-                  {products.map((p) => (
-                    <tr key={p._id}>
-                      <td>{p.image ? <img src={resolveAssetUrl(p.image)} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} /> : '—'}</td>
-                      <td>
-                        <div>
-                          <strong>{p.name}</strong> {p.stock <= p.lowStockThreshold && <span className="badge badge-warning">Low</span>}
-                        </div>
-                        {p.productType === 'BULK_PRODUCT' && (
-                          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '6px', paddingLeft: '8px', borderLeft: '2px solid #ff9800' }}>
-                            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 'bold', display: 'block', marginBottom: '2px' }}>Variants</span>
-                            {allProducts.filter(v => String(v.parentProductId) === String(p._id || p.id)).map(v => (
-                              <div key={v._id || v.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '1px' }}>
-                                <span style={{ fontSize: '0.75rem' }}>📦 {v.packSize || v.name}</span>
-                                <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.75rem' }}>Stock: {v.stock} {v.unit || 'pcs'}</span>
-                              </div>
-                            ))}
-                            {allProducts.filter(v => String(v.parentProductId) === String(p._id || p.id)).length === 0 && (
-                              <span style={{ fontStyle: 'italic', fontSize: '0.7rem', color: '#94a3b8' }}>No variants configured</span>
-                            )}
+            <>
+              {/* Desktop Table View */}
+              <div className="desktop-table-container card table-wrap">
+                <table className="data-table products-table">
+                  <thead>
+                    <tr><th>Image</th><th>Name</th><th>SKU</th><th>Category</th><th>Type</th><th>Stock</th><th>Price</th><th>Actions</th></tr>
+                  </thead>
+                  <tbody>
+                    {products.map((p) => (
+                      <tr key={p._id}>
+                        <td>{p.image ? <img src={resolveAssetUrl(p.image)} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} /> : '—'}</td>
+                        <td>
+                          <div>
+                            <strong>{p.name}</strong> {p.stock <= p.lowStockThreshold && <span className="badge badge-warning">Low</span>}
                           </div>
-                        )}
-                      </td>
-                      <td>{p.sku}</td>
-                      <td>{p.category}</td>
-                      <td>
-                        <span style={getProductTypeStyle(p.productType)}>
-                          {PRODUCT_TYPE_LABELS[p.productType] || 'Manufactured Product'}
-                        </span>
-                      </td>
-                      <td>{p.stock} {p.unit}</td>
-                      <td>₹{p.sellingPrice}</td>
-                      <td>
-                        {activeTab === 'active' ? (
-                          <>
-                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => openModal(p)}>Edit</button>{' '}
-                            <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => triggerDelete(p)}>Del</button>
-                          </>
+                          {p.productType === 'BULK_PRODUCT' && (
+                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '6px', paddingLeft: '8px', borderLeft: '2px solid #ff9800' }}>
+                              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 'bold', display: 'block', marginBottom: '2px' }}>Variants</span>
+                              {allProducts.filter(v => String(v.parentProductId) === String(p._id || p.id)).map(v => (
+                                <div key={v._id || v.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '1px' }}>
+                                  <span style={{ fontSize: '0.75rem' }}>📦 {v.packSize || v.name}</span>
+                                  <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.75rem' }}>Stock: {v.stock} {v.unit || 'pcs'}</span>
+                                </div>
+                              ))}
+                              {allProducts.filter(v => String(v.parentProductId) === String(p._id || p.id)).length === 0 && (
+                                <span style={{ fontStyle: 'italic', fontSize: '0.7rem', color: '#94a3b8' }}>No variants configured</span>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td>{p.sku}</td>
+                        <td>{p.category}</td>
+                        <td>
+                          <span style={getProductTypeStyle(p.productType)}>
+                            {PRODUCT_TYPE_LABELS[p.productType] || 'Manufactured Product'}
+                          </span>
+                        </td>
+                        <td>{p.stock} {p.unit}</td>
+                        <td>₹{p.sellingPrice}</td>
+                        <td>
+                          {activeTab === 'active' ? (
+                            <>
+                              <button type="button" className="btn btn-secondary btn-sm" onClick={() => openModal(p)}>Edit</button>{' '}
+                              <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => triggerDelete(p)}>Del</button>
+                            </>
+                          ) : (
+                            <>
+                              <button type="button" className="btn btn-success btn-sm" onClick={() => handleRestore(p._id || p.id)} disabled={isRestoring}>
+                                {isRestoring ? 'Restoring...' : '🔄 Restore'}
+                              </button>{' '}
+                              <button type="button" className="btn btn-danger btn-sm" onClick={() => triggerDelete(p)}>
+                                🗑️ Permanent Delete
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card List View */}
+              <div className="mobile-card-list" style={{ display: 'none', flexDirection: 'column', gap: '0.75rem' }}>
+                {products.map((p) => (
+                  <div key={p._id || p.id} className="mobile-card">
+                    <div className="mobile-card-header">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        {p.image ? (
+                          <img src={resolveAssetUrl(p.image)} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 8 }} />
                         ) : (
-                          <>
-                            <button type="button" className="btn btn-success btn-sm" onClick={() => handleRestore(p._id || p.id)} disabled={isRestoring}>
-                              {isRestoring ? 'Restoring...' : '🔄 Restore'}
-                            </button>{' '}
-                            <button type="button" className="btn btn-danger btn-sm" onClick={() => triggerDelete(p)}>
-                              🗑️ Permanent Delete
-                            </button>
-                          </>
+                          <div style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: 'var(--bg-page)', fontSize: '1.25rem' }}>📦</div>
                         )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <div>
+                          <strong className="mobile-card-title">{p.name}</strong>
+                          <div className="mobile-card-subtitle">SKU: {p.sku || '—'}</div>
+                        </div>
+                      </div>
+                      <span style={getProductTypeStyle(p.productType)}>
+                        {PRODUCT_TYPE_LABELS[p.productType] || 'Product'}
+                      </span>
+                    </div>
+
+                    <div className="mobile-card-grid">
+                      <div className="mobile-card-item">
+                        <span className="mobile-card-label">Stock Status</span>
+                        <span className="mobile-card-value" style={{ color: p.stock <= p.lowStockThreshold ? '#f97316' : 'inherit' }}>
+                          {p.stock} {p.unit} {p.stock <= p.lowStockThreshold && '(LOW)'}
+                        </span>
+                      </div>
+                      <div className="mobile-card-item">
+                        <span className="mobile-card-label">Category</span>
+                        <span className="mobile-card-value">{p.category}</span>
+                      </div>
+                      <div className="mobile-card-item">
+                        <span className="mobile-card-label">Selling Price</span>
+                        <span className="mobile-card-value" style={{ color: 'var(--brand-primary)' }}>₹{p.sellingPrice}</span>
+                      </div>
+                      <div className="mobile-card-item">
+                        <span className="mobile-card-label">Low Level</span>
+                        <span className="mobile-card-value">{p.lowStockThreshold} {p.unit}</span>
+                      </div>
+                    </div>
+
+                    {p.productType === 'BULK_PRODUCT' && (
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem', padding: '0.5rem', backgroundColor: 'var(--bg-page)', borderRadius: '6px' }}>
+                        <strong style={{ display: 'block', marginBottom: '2px', fontSize: '0.7rem', color: 'var(--text-secondary)', textAlign: 'left' }}>CONFIGURED PACK VARIANTS:</strong>
+                        {allProducts.filter(v => String(v.parentProductId) === String(p._id || p.id)).map(v => (
+                          <div key={v._id || v.id} style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
+                            <span>• {v.packSize || v.name}</span>
+                            <strong>Stock: {v.stock}</strong>
+                          </div>
+                        ))}
+                        {allProducts.filter(v => String(v.parentProductId) === String(p._id || p.id)).length === 0 && (
+                          <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>No pack variants added yet.</span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="mobile-card-actions">
+                      {activeTab === 'active' ? (
+                        <>
+                          <button type="button" className="mobile-action-btn secondary" onClick={() => openModal(p)}>✏️ Edit</button>
+                          <button type="button" className="mobile-action-btn" style={{ borderColor: '#f87171', color: '#ef4444' }} onClick={() => triggerDelete(p)}>🗑️ Delete</button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" className="mobile-action-btn primary" onClick={() => handleRestore(p._id || p.id)} disabled={isRestoring}>
+                            🔄 Restore
+                          </button>
+                          <button type="button" className="mobile-action-btn" style={{ backgroundColor: '#ef4444', borderColor: '#ef4444', color: '#ffffff' }} onClick={() => triggerDelete(p)}>
+                            🗑️ Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               <Pagination page={page} pages={pages} onPageChange={setPage} />
-            </div>
+            </>
           )}
         </>
       )}

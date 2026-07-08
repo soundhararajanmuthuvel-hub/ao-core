@@ -1,6 +1,33 @@
+import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
 import RoleRoute from './RoleRoute';
+
+function DesktopOnlyRoute({ children }) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  if (isMobile) {
+    return (
+      <div className="page" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>
+        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🖥️</div>
+        <h2 style={{ fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Desktop Screen Recommended</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: '360px', margin: '0 auto 1.5rem auto', lineHeight: 1.5 }}>
+          This advanced administrative layout is optimized for desktop computers. Please access it from a larger screen.
+        </p>
+        <button type="button" className="btn btn-secondary" onClick={() => window.history.back()}>
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
+  return children;
+}
 import AppLayout from '../layout/AppLayout';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
@@ -226,9 +253,11 @@ export default function AppRoutes() {
         <Route
           path="manufacturing"
           element={
-            <RoleRoute roles={['Super Admin', 'Manufacturing Manager']}>
-              <ManufacturingPage />
-            </RoleRoute>
+            <DesktopOnlyRoute>
+              <RoleRoute roles={['Super Admin', 'Manufacturing Manager']}>
+                <ManufacturingPage />
+              </RoleRoute>
+            </DesktopOnlyRoute>
           }
         />
         <Route
@@ -266,33 +295,41 @@ export default function AppRoutes() {
         <Route
           path="reports"
           element={
-            <RoleRoute roles={['Super Admin']}>
-              <ReportsPage />
-            </RoleRoute>
+            <DesktopOnlyRoute>
+              <RoleRoute roles={['Super Admin']}>
+                <ReportsPage />
+              </RoleRoute>
+            </DesktopOnlyRoute>
           }
         />
         <Route
           path="settings"
           element={
-            <RoleRoute roles={['Super Admin']}>
-              <Settings />
-            </RoleRoute>
+            <DesktopOnlyRoute>
+              <RoleRoute roles={['Super Admin']}>
+                <Settings />
+              </RoleRoute>
+            </DesktopOnlyRoute>
           }
         />
         <Route
           path="settings/integrations-marketplace"
           element={
-            <RoleRoute roles={['Super Admin']}>
-              <IntegrationsMarketplace />
-            </RoleRoute>
+            <DesktopOnlyRoute>
+              <RoleRoute roles={['Super Admin']}>
+                <IntegrationsMarketplace />
+              </RoleRoute>
+            </DesktopOnlyRoute>
           }
         />
         <Route
           path="settings/developer-center"
           element={
-            <RoleRoute roles={['Super Admin', 'admin']}>
-              <DeveloperCenter />
-            </RoleRoute>
+            <DesktopOnlyRoute>
+              <RoleRoute roles={['Super Admin', 'admin']}>
+                <DeveloperCenter />
+              </RoleRoute>
+            </DesktopOnlyRoute>
           }
         />
         <Route

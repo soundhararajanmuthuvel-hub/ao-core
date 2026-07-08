@@ -70,6 +70,21 @@ const segmentFilters = [
   { value: 'Archived', label: 'Archived Customers' },
 ];
 
+// Map customer types to specific V3 colors and indicators
+const getCustomerTypeColors = (type) => {
+  const t = String(type || '').toLowerCase();
+  if (t.includes('retail')) {
+    return { bg: '#dcfce7', text: '#15803d', icon: '🟢', color: '#10b981' };
+  } else if (t.includes('d2c') || t.includes('direct')) {
+    return { bg: '#dbeafe', text: '#1d4ed8', icon: '🔵', color: '#3b82f6' };
+  } else if (t.includes('white label') || t.includes('whitelabel')) {
+    return { bg: '#f3e8ff', text: '#7e22ce', icon: '🟣', color: '#a855f7' };
+  } else if (t.includes('organic')) {
+    return { bg: '#ffedd5', text: '#c2410c', icon: '🟠', color: '#f97316' };
+  }
+  return { bg: '#f1f5f9', text: '#475569', icon: '⚪', color: '#64748b' };
+};
+
 export default function Customers() {
   const { toast } = useToast();
   const { settings } = useSettings();
@@ -2107,6 +2122,7 @@ export default function Customers() {
                     : 'C';
 
                   const lastOrd = c.lastOrderDate ? new Date(c.lastOrderDate).toLocaleDateString() : 'No orders';
+                  const typeColors = getCustomerTypeColors(c.customerType);
 
                   return (
                     <div 
@@ -2117,7 +2133,7 @@ export default function Customers() {
                       }}
                       className={`crm-row-item ${isSelected ? 'active' : ''}`}
                     >
-                      <div className="crm-avatar">{initials}</div>
+                      <div className="crm-avatar" style={{ backgroundColor: typeColors.bg, color: typeColors.text, borderColor: typeColors.color }}>{initials}</div>
                       <div className="crm-row-details">
                         <div className="crm-row-title-row">
                           <span className="crm-row-name" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -2199,21 +2215,26 @@ export default function Customers() {
                 {/* Profile header card */}
                 <div className="card" style={{ padding: '1rem', borderLeft: '4px solid var(--brand-primary)' }}>
                   <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <div style={{
-                      width: '46px',
-                      height: '46px',
-                      borderRadius: '50%',
-                      background: '#ffeed9',
-                      color: 'var(--brand-primary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1.25rem',
-                      fontWeight: 800,
-                      border: '2px solid rgba(255, 152, 0, 0.3)'
-                    }}>
-                      {selectedCustomer.name ? selectedCustomer.name[0].toUpperCase() : 'C'}
-                    </div>
+                    {(() => {
+                      const typeColors = getCustomerTypeColors(selectedCustomer.customerType);
+                      return (
+                        <div style={{
+                          width: '46px',
+                          height: '46px',
+                          borderRadius: '50%',
+                          background: typeColors.bg,
+                          color: typeColors.text,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1.25rem',
+                          fontWeight: 800,
+                          border: `2px solid ${typeColors.color}`
+                        }}>
+                          {selectedCustomer.name ? selectedCustomer.name[0].toUpperCase() : 'C'}
+                        </div>
+                      );
+                    })()}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem' }}>
                         {selectedCustomer.name}

@@ -426,13 +426,24 @@ export default function Header({ onMenuToggle }) {
         )}
         {/* Row 1 */}
         <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <button type="button" className="menu-toggle" onClick={onMenuToggle} style={{ display: 'block', background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-primary)', minHeight: '44px', minWidth: '44px' }}>
               ☰
             </button>
-            <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>AO Core ERP</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <img 
+                src={getActiveLogoUrl(settings)} 
+                alt="Logo" 
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = '/default-logo.png';
+                }}
+                style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain' }} 
+              />
+              <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{settings?.companyName || 'AO Core'}</span>
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
             <PWAInstallButton />
             <div className="notifications-panel" style={{ position: 'relative' }}>
               <button type="button" className="btn-icon" onClick={() => setShowNotif(!showNotif)} style={{ minHeight: '44px', minWidth: '44px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -448,7 +459,7 @@ export default function Header({ onMenuToggle }) {
                   border: '1px solid var(--border)',
                   borderRadius: '12px',
                   boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                  width: '300px',
+                  width: '280px',
                   maxHeight: '400px',
                   zIndex: 1000,
                   padding: '0.75rem',
@@ -472,6 +483,74 @@ export default function Header({ onMenuToggle }) {
             <button type="button" className="btn-icon" onClick={toggleDarkMode} style={{ minHeight: '44px', minWidth: '44px', background: 'none', border: 'none', fontSize: '1.25rem' }}>
               {darkMode ? '☀️' : '🌙'}
             </button>
+
+            {/* Profile Dropdown avatar trigger for mobile */}
+            <div className="user-menu" style={{ position: 'relative' }}>
+              <button 
+                type="button" 
+                onClick={() => setShowUser(!showUser)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--brand-primary, #5a2d0c)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  marginLeft: '0.25rem'
+                }}
+              >
+                {user?.name ? user.name.charAt(0).toUpperCase() : '👤'}
+              </button>
+              {showUser && (
+                <div className="user-dropdown" style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '100%',
+                  marginTop: '0.5rem',
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                  minWidth: '180px',
+                  overflow: 'hidden',
+                  zIndex: 1000,
+                  padding: '0.75rem'
+                }}>
+                  <div style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)', marginBottom: '0.5rem', textAlign: 'left' }}>
+                    <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.85rem' }}>{user?.name}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>{user?.email}</div>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => { logout(); navigate('/login'); }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      padding: '0.5rem',
+                      color: '#ef4444',
+                      fontWeight: 700,
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      minHeight: '36px'
+                    }}
+                  >
+                    🚪 Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
