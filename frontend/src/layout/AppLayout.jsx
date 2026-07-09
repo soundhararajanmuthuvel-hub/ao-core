@@ -639,6 +639,10 @@ export default function AppLayout() {
             <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>📍</span>
             <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Visits</span>
           </div>
+          <div className="drawer-item" onClick={() => handleDrawerNavigate('/sales-targets')}>
+            <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🎯</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Targets</span>
+          </div>
           <div className="drawer-item" onClick={() => handleDrawerNavigate('/field-ordering')}>
             <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🛒</span>
             <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Orders</span>

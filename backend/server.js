@@ -100,6 +100,7 @@ app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/customers', require('./routes/customerRoutes'));
 app.use('/api/sales', require('./routes/salesRoutes'));
+app.use('/api/sales-targets', require('./routes/salesTargetRoutes'));
 app.use('/api/purchases', require('./routes/purchaseRoutes'));
 app.use('/api/inventory', require('./routes/inventoryRoutes'));
 app.use('/api/suppliers', require('./routes/supplierRoutes'));

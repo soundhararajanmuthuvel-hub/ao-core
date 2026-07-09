@@ -48,6 +48,14 @@ export const customersApi = {
   createReminder: (id, data) => client.post(`/customers/${id}/reminders`, data),
 };
 
+export const salesTargetsApi = {
+  list: () => client.get('/sales-targets'),
+  create: (data) => client.post('/sales-targets', data),
+  update: (id, data) => client.put(`/sales-targets/${id}`, data),
+  remove: (id) => client.delete(`/sales-targets/${id}`),
+  dashboard: () => client.get('/sales-targets/dashboard'),
+};
+
 export const salesApi = {
   list: (params) => client.get('/sales', { params }),
   get: (id) => client.get(`/sales/${id}`),

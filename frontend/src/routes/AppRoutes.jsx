@@ -64,6 +64,7 @@ import CustomerReviews from '../pages/CustomerReviews';
 import CustomerMap from '../pages/CustomerMap';
 import ReEngagement from '../pages/ReEngagement';
 import WhatsAppLogs from '../pages/WhatsAppLogs';
+import SalesTargets from '../pages/SalesTargets';
 
 // SFA Pages
 import FieldSalesDashboard from '../pages/FieldSalesDashboard';
@@ -289,6 +290,14 @@ export default function AppRoutes() {
           element={
             <RoleRoute roles={['Super Admin', 'admin', 'Sales Executive', 'Billing Executive', 'Sales Manager', 'Salesman']}>
               <CustomersPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="sales-targets"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+              <SalesTargets />
             </RoleRoute>
           }
         />
