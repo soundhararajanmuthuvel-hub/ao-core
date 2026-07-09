@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
-import { customersApi, productsApi, ordersApi, sfaApi, crmApi, aiApi, whatsappApi, catalogApi } from '../api';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { customersApi, productsApi, ordersApi, sfaApi, crmApi, aiApi, whatsappApi, catalogApi, usersApi } from '../api';
 import { Brain } from 'lucide-react';
 import AIInsightsModal from '../components/AIInsightsModal';
 import { useToast } from '../context/ToastContext';
@@ -86,9 +87,45 @@ const getCustomerTypeColors = (type) => {
 };
 
 export default function Customers() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { settings } = useSettings();
   const [customers, setCustomers] = useState([]);
+  
+  // V3 Advanced Filters & Bulk Actions
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [filterTypes, setFilterTypes] = useState([]);
+  const [filterStatuses, setFilterStatuses] = useState([]);
+  const [filterOutstandings, setFilterOutstandings] = useState([]);
+  const [filterLastOrder, setFilterLastOrder] = useState('all');
+  const [filterState, setFilterState] = useState('');
+  const [filterCity, setFilterCity] = useState('');
+  const [filterArea, setFilterArea] = useState('');
+  const [filterPincode, setFilterPincode] = useState('');
+  const [filterSalesman, setFilterSalesman] = useState('all');
+  const [filterSource, setFilterSource] = useState('all');
+  const [filterRating, setFilterRating] = useState(0);
+  const [filterTags, setFilterTags] = useState([]);
+  
+  // Bulk Actions
+  const [selectedIds, setSelectedIds] = useState([]);
+  
+  // Import Wizard states
+  const [importWizardOpen, setImportWizardOpen] = useState(false);
+  const [importStep, setImportStep] = useState(1);
+  const [importFile, setImportFile] = useState(null);
+  const [importFileText, setImportFileText] = useState('');
+  const [importHeaders, setImportHeaders] = useState([]);
+  const [importFieldMapping, setImportFieldMapping] = useState({});
+  const [importDuplicateRule, setImportDuplicateRule] = useState('skip'); // 'merge' | 'skip' | 'replace' | 'new'
+  const [importPreviewData, setImportPreviewData] = useState([]);
+  const [importHistory, setImportHistory] = useState([]);
+  const [showImportHistory, setShowImportHistory] = useState(false);
+  const [allSalesmen, setAllSalesmen] = useState([]);
+
+  // Touch Swipe Gesture Refs
+  const touchStartX = useRef(null);
+  const touchId = useRef(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
@@ -449,9 +486,866 @@ export default function Customers() {
     }
   }, [page, search, activeSegment, toast, selectedCustomerId]);
 
+  // Load Salesmen list for CRM Filters
+  useEffect(() => {
+    usersApi.list({ role: 'Salesman' })
+      .then(({ data }) => setAllSalesmen(data.users || []))
+      .catch(err => console.error('Failed to load salesmen list', err));
+  }, []);
+
+  // Client-Side CSV Parser
+  const parseCSV = (text) => {
+    const lines = text.split(/\r?\n/);
+    return lines.map(line => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    }).filter(row => row.length > 0 && row.some(cell => cell !== ''));
+  };
+
+  // Zoho-like Client Side Filters
+  const filteredCustomersList = useMemo(() => {
+    return customers.filter(c => {
+      // 1. Search Text Match
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const nameMatch = String(c.name || '').toLowerCase().includes(q);
+        const phoneMatch = String(c.phone || '').toLowerCase().includes(q);
+        const gstMatch = String(c.gstNumber || '').toLowerCase().includes(q);
+        const businessMatch = String(c.businessName || '').toLowerCase().includes(q);
+        const cityMatch = String(c.city || c.address || '').toLowerCase().includes(q);
+        const codeMatch = String(c.customerCode || '').toLowerCase().includes(q);
+        const salesmanMatch = c.salesman ? String(c.salesman.name || '').toLowerCase().includes(q) : false;
+        
+        if (!nameMatch && !phoneMatch && !gstMatch && !businessMatch && !cityMatch && !codeMatch && !salesmanMatch) {
+          return false;
+        }
+      }
+
+      // 2. Customer Type
+      if (filterTypes.length > 0) {
+        if (!filterTypes.includes(c.customerType)) return false;
+      }
+
+      // 3. Status
+      if (filterStatuses.length > 0) {
+        if (!filterStatuses.includes(c.status)) return false;
+      }
+
+      // 4. Outstanding slabs
+      if (filterOutstandings.length > 0) {
+        const bal = Number(c.balance || 0);
+        let match = false;
+        if (filterOutstandings.includes('none') && bal <= 0) match = true;
+        if (filterOutstandings.includes('1-1000') && bal > 0 && bal <= 1000) match = true;
+        if (filterOutstandings.includes('1000-5000') && bal > 1000 && bal <= 5000) match = true;
+        if (filterOutstandings.includes('5000+') && bal > 5000) match = true;
+        if (!match) return false;
+      }
+
+      // 5. Last Order Date
+      if (filterLastOrder !== 'all') {
+        if (!c.lastOrderDate) {
+          if (filterLastOrder !== 'none') return false;
+        } else {
+          const lastOrderDate = new Date(c.lastOrderDate);
+          const diffMs = new Date() - lastOrderDate;
+          const diffDays = diffMs / (1000 * 60 * 60 * 24);
+          if (filterLastOrder === 'today' && diffDays > 1) return false;
+          if (filterLastOrder === 'yesterday' && (diffDays <= 1 || diffDays > 2)) return false;
+          if (filterLastOrder === '7days' && diffDays > 7) return false;
+          if (filterLastOrder === '30days' && diffDays > 30) return false;
+          if (filterLastOrder === 'none') return false;
+        }
+      }
+
+      // 6. Assigned Salesman
+      if (filterSalesman !== 'all') {
+        if (String(c.assignedSalesmanId) !== String(filterSalesman)) return false;
+      }
+
+      // 7. Geography
+      if (filterState && !String(c.state || '').toLowerCase().includes(filterState.toLowerCase())) return false;
+      if (filterCity && !String(c.city || c.address || '').toLowerCase().includes(filterCity.toLowerCase())) return false;
+      if (filterArea && !String(c.territory || c.address || '').toLowerCase().includes(filterArea.toLowerCase())) return false;
+      if (filterPincode && !String(c.pincode || '').includes(filterPincode)) return false;
+
+      // 8. Rating Filter
+      if (filterRating > 0) {
+        let rating = 3;
+        if (c.storeCategory === 'A') rating = 5;
+        else if (c.storeCategory === 'B') rating = 4;
+        else if (c.storeCategory === 'C') rating = 3;
+        else if (c.storeCategory === 'D') rating = 2;
+        if (rating !== filterRating) return false;
+      }
+
+      // 9. Source Filter
+      if (filterSource !== 'all') {
+        const source = c.wooCustomerId ? 'Website' : 'Manual';
+        if (source !== filterSource) return false;
+      }
+
+      // 10. Tags Filter
+      if (filterTags.length > 0) {
+        let match = false;
+        if (filterTags.includes('VIP') && Number(c.balance || 0) > 10000) match = true;
+        if (filterTags.includes('Premium') && c.tier === 'GREEN') match = true;
+        if (filterTags.includes('Recovery') && c.tier === 'RED') match = true;
+        if (!match) return false;
+      }
+
+      return true;
+    });
+  }, [customers, search, filterTypes, filterStatuses, filterOutstandings, filterLastOrder, filterSalesman, filterState, filterCity, filterArea, filterPincode, filterRating, filterSource, filterTags]);
+
+  // CSV Importer Trigger
+  const handleCSVUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImportFile(file);
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      setImportFileText(text);
+      const rows = parseCSV(text);
+      if (rows.length > 1) {
+        const headers = rows[0];
+        setImportHeaders(headers);
+        
+        // Auto-detect columns mapping
+        const mappings = {};
+        headers.forEach((h, idx) => {
+          const name = h.toLowerCase().trim();
+          if (name.includes('name') && !name.includes('company') && !name.includes('business')) mappings.name = idx;
+          else if (name.includes('company') || name.includes('business') || name.includes('shop')) mappings.businessName = idx;
+          else if (name.includes('phone') || name.includes('mobile') || name.includes('contact')) mappings.phone = idx;
+          else if (name.includes('email') || name.includes('mail')) mappings.email = idx;
+          else if (name.includes('gst') || name.includes('tax')) mappings.gstNumber = idx;
+          else if (name.includes('address') || name.includes('street')) mappings.address = idx;
+          else if (name.includes('state')) mappings.state = idx;
+          else if (name.includes('pin') || name.includes('zip')) mappings.pincode = idx;
+          else if (name.includes('type')) mappings.customerType = idx;
+        });
+        setImportFieldMapping(mappings);
+        setImportStep(2);
+      } else {
+        toast('Selected file is empty or invalid', 'error');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const processImportPreview = () => {
+    const rows = parseCSV(importFileText);
+    const dataRows = rows.slice(1);
+    const mappedPreview = dataRows.map(row => {
+      const record = {};
+      Object.entries(importFieldMapping).forEach(([field, colIdx]) => {
+        record[field] = row[colIdx] || '';
+      });
+      if (!record.customerType) record.customerType = 'Retail Shop';
+      return record;
+    });
+    setImportPreviewData(mappedPreview);
+    setImportStep(5); // Skip duplicate options directly to preview screen
+  };
+
+  const executeSpreadsheetImport = async () => {
+    setImportStep(6);
+    let successCount = 0;
+    let duplicateCount = 0;
+    let errorCount = 0;
+    const errors = [];
+    const duplicatesList = [];
+
+    for (let i = 0; i < importPreviewData.length; i++) {
+      const record = importPreviewData[i];
+      const isDuplicate = customers.find(c => 
+        (record.phone && c.phone === record.phone) || 
+        (record.gstNumber && c.gstNumber === record.gstNumber) ||
+        (record.email && c.email === record.email)
+      );
+
+      if (isDuplicate) {
+        duplicatesList.push(record);
+        if (importDuplicateRule === 'skip') {
+          duplicateCount++;
+          continue;
+        } else if (importDuplicateRule === 'replace') {
+          try {
+            await customersApi.update(isDuplicate.id || isDuplicate._id, record);
+            successCount++;
+          } catch (e) {
+            errorCount++;
+            errors.push(`${record.name || 'Row ' + i}: ${e.message || 'Replace failed'}`);
+          }
+          continue;
+        } else if (importDuplicateRule === 'merge') {
+          try {
+            const merged = { ...isDuplicate, ...record };
+            await customersApi.update(isDuplicate.id || isDuplicate._id, merged);
+            successCount++;
+          } catch (e) {
+            errorCount++;
+            errors.push(`${record.name || 'Row ' + i}: ${e.message || 'Merge failed'}`);
+          }
+          continue;
+        }
+      }
+
+      try {
+        await customersApi.create(record);
+        successCount++;
+      } catch (e) {
+        errorCount++;
+        errors.push(`${record.name || 'Row ' + i}: ${e.message || 'Creation failed'}`);
+      }
+    }
+
+    const auditRecord = {
+      id: Date.now(),
+      importedBy: user?.name || 'Administrator',
+      date: new Date().toLocaleString(),
+      records: importPreviewData.length,
+      success: successCount,
+      duplicates: duplicateCount,
+      errors: errorCount,
+      errorLog: errors
+    };
+
+    setImportHistory([auditRecord, ...importHistory]);
+    toast(`Import completed: ${successCount} imported, ${duplicateCount} duplicates, ${errorCount} errors`, errorCount > 0 ? 'warning' : 'success');
+    loadCustomers();
+    setImportStep(1);
+    setImportWizardOpen(false);
+  };
+
   useEffect(() => {
     loadCustomers();
   }, [loadCustomers]);
+
+  const renderFilterPanel = () => {
+    if (!filterPanelOpen) return null;
+    return (
+      <>
+        <div 
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 2000, transition: 'opacity 0.3s' }} 
+          onClick={() => setFilterPanelOpen(false)}
+        />
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          width: '380px',
+          maxWidth: '90%',
+          height: '100vh',
+          backgroundColor: 'var(--bg-card)',
+          borderLeft: '1px solid var(--border)',
+          boxShadow: '-4px 0 20px rgba(0,0,0,0.15)',
+          zIndex: 2001,
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '1.25rem',
+          overflowY: 'auto',
+          fontFamily: 'Inter, sans-serif'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+            <h3 style={{ margin: 0, fontWeight: 800, color: 'var(--text-primary)' }}>🔍 Advanced Filters</h3>
+            <button type="button" style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setFilterPanelOpen(false)}>✕</button>
+          </div>
+
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Customer Type Checkboxes */}
+            <div>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>Customer Type</h4>
+              {['Retail Shop', 'D2C Customer', 'White Label', 'Organic Store'].map(t => (
+                <label key={t} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', marginBottom: '0.35rem', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={filterTypes.includes(t)}
+                    onChange={(e) => {
+                      if (e.target.checked) setFilterTypes([...filterTypes, t]);
+                      else setFilterTypes(filterTypes.filter(x => x !== t));
+                    }}
+                  />
+                  {t}
+                </label>
+              ))}
+            </div>
+
+            {/* Status Checkboxes */}
+            <div>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>Status</h4>
+              {['Active', 'Inactive', 'Archived'].map(s => (
+                <label key={s} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', marginBottom: '0.35rem', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={filterStatuses.includes(s)}
+                    onChange={(e) => {
+                      if (e.target.checked) setFilterStatuses([...filterStatuses, s]);
+                      else setFilterStatuses(filterStatuses.filter(x => x !== s));
+                    }}
+                  />
+                  {s}
+                </label>
+              ))}
+            </div>
+
+            {/* Outstanding Slabs */}
+            <div>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>Outstanding Balance</h4>
+              {[
+                { value: 'none', label: 'No Due (Cleared)' },
+                { value: '1-1000', label: '₹1 – ₹1,000' },
+                { value: '1000-5000', label: '₹1,000 – ₹5,000' },
+                { value: '5000+', label: '₹5,000+' }
+              ].map(slab => (
+                <label key={slab.value} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', marginBottom: '0.35rem', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={filterOutstandings.includes(slab.value)}
+                    onChange={(e) => {
+                      if (e.target.checked) setFilterOutstandings([...filterOutstandings, slab.value]);
+                      else setFilterOutstandings(filterOutstandings.filter(x => x !== slab.value));
+                    }}
+                  />
+                  {slab.label}
+                </label>
+              ))}
+            </div>
+
+            {/* Last Order Timeframe */}
+            <div>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>Last Order Time</h4>
+              <select 
+                value={filterLastOrder} 
+                onChange={(e) => setFilterLastOrder(e.target.value)} 
+                className="form-control"
+                style={{ fontSize: '0.75rem', padding: '0.35rem' }}
+              >
+                <option value="all">All Time</option>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="7days">Last 7 Days</option>
+                <option value="30days">Last 30 Days</option>
+                <option value="none">No Orders</option>
+              </select>
+            </div>
+
+            {/* Assigned Salesman Dropdown */}
+            <div>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>Assigned Salesman</h4>
+              <select 
+                value={filterSalesman} 
+                onChange={(e) => setFilterSalesman(e.target.value)} 
+                className="form-control"
+                style={{ fontSize: '0.75rem', padding: '0.35rem' }}
+              >
+                <option value="all">All Salesmen</option>
+                {allSalesmen.map(s => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Geographic Filters */}
+            <div>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>Geography Details</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="State" 
+                  value={filterState} 
+                  onChange={(e) => setFilterState(e.target.value)}
+                  style={{ fontSize: '0.75rem', padding: '0.35rem' }}
+                />
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="City" 
+                  value={filterCity} 
+                  onChange={(e) => setFilterCity(e.target.value)}
+                  style={{ fontSize: '0.75rem', padding: '0.35rem' }}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="Area / Route" 
+                  value={filterArea} 
+                  onChange={(e) => setFilterArea(e.target.value)}
+                  style={{ fontSize: '0.75rem', padding: '0.35rem' }}
+                />
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="Pincode" 
+                  value={filterPincode} 
+                  onChange={(e) => setFilterPincode(e.target.value)}
+                  style={{ fontSize: '0.75rem', padding: '0.35rem' }}
+                />
+              </div>
+            </div>
+
+            {/* Customer Source */}
+            <div>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>Source</h4>
+              <select 
+                value={filterSource} 
+                onChange={(e) => setFilterSource(e.target.value)} 
+                className="form-control"
+                style={{ fontSize: '0.75rem', padding: '0.35rem' }}
+              >
+                <option value="all">All Sources</option>
+                <option value="Manual">Manual Entry</option>
+                <option value="Website">Website Sync</option>
+                <option value="WhatsApp">WhatsApp Lead</option>
+                <option value="Import">Spreadsheet Import</option>
+              </select>
+            </div>
+
+            {/* Customer Rating */}
+            <div>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>Rating (Store Category)</h4>
+              <div style={{ display: 'flex', gap: '0.35rem', fontSize: '1.25rem', cursor: 'pointer' }}>
+                {[1, 2, 3, 4, 5].map(star => (
+                  <span 
+                    key={star} 
+                    onClick={() => setFilterRating(star === filterRating ? 0 : star)}
+                    style={{ color: star <= filterRating ? '#fbbf24' : '#cbd5e1' }}
+                  >
+                    ★
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Tags */}
+            <div>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>Custom Tags</h4>
+              {['Premium', 'VIP', 'Recovery'].map(tag => (
+                <label key={tag} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', marginBottom: '0.35rem', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={filterTags.includes(tag)}
+                    onChange={(e) => {
+                      if (e.target.checked) setFilterTags([...filterTags, tag]);
+                      else setFilterTags(filterTags.filter(x => x !== tag));
+                    }}
+                  />
+                  {tag}
+                </label>
+              ))}
+            </div>
+
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
+            <button 
+              type="button" 
+              className="btn btn-secondary btn-block" 
+              style={{ flex: 1, padding: '0.5rem', fontSize: '0.8rem', fontWeight: 700 }}
+              onClick={() => {
+                setFilterTypes([]);
+                setFilterStatuses([]);
+                setFilterOutstandings([]);
+                setFilterLastOrder('all');
+                setFilterState('');
+                setFilterCity('');
+                setFilterArea('');
+                setFilterPincode('');
+                setFilterSalesman('all');
+                setFilterSource('all');
+                setFilterRating(0);
+                setFilterTags([]);
+              }}
+            >
+              🔄 Reset Filters
+            </button>
+            <button 
+              type="button" 
+              className="btn btn-primary btn-block" 
+              style={{ flex: 1, padding: '0.5rem', fontSize: '0.8rem', fontWeight: 700 }}
+              onClick={() => setFilterPanelOpen(false)}
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  const renderBulkActionsToolbar = () => {
+    if (selectedIds.length === 0) return null;
+    return (
+      <div style={{
+        position: 'fixed',
+        bottom: '80px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        backgroundColor: 'var(--brand-primary)',
+        color: '#fff',
+        padding: '0.75rem 1.5rem',
+        borderRadius: '35px',
+        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
+        zIndex: 2500,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '1rem',
+        flexWrap: 'wrap',
+        fontFamily: 'Inter, sans-serif'
+      }}>
+        <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{selectedIds.length} Selected</span>
+        
+        <select 
+          onChange={async (e) => {
+            const salesmanId = e.target.value;
+            if (!salesmanId) return;
+            if (window.confirm(`Assign selected ${selectedIds.length} accounts to this salesman?`)) {
+              try {
+                await Promise.all(selectedIds.map(id => customersApi.update(id, { assignedSalesmanId: salesmanId })));
+                toast('Accounts assigned successfully', 'success');
+                setSelectedIds([]);
+                loadCustomers();
+              } catch {
+                toast('Failed to update accounts', 'error');
+              }
+            }
+          }}
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            color: '#fff',
+            border: '1px solid rgba(255,255,255,0.3)',
+            borderRadius: '15px',
+            fontSize: '0.75rem',
+            padding: '0.2rem 0.6rem',
+            outline: 'none',
+            cursor: 'pointer'
+          }}
+        >
+          <option value="" style={{ color: '#334155' }}>Assign Salesman...</option>
+          {allSalesmen.map(s => (
+            <option key={s.id} value={s.id} style={{ color: '#334155' }}>{s.name}</option>
+          ))}
+        </select>
+
+        <button 
+          type="button"
+          onClick={() => {
+            const template = prompt("Enter broadcast message to send to selected contacts:");
+            if (template) {
+              selectedIds.forEach(id => {
+                const c = customers.find(x => x.id === id || x._id === id);
+                if (c && c.phone) {
+                  let phone = c.phone.replace(/\D/g, '');
+                  if (phone.length === 10) phone = '91' + phone;
+                  const url = `https://wa.me/${phone}?text=${encodeURIComponent(template)}`;
+                  window.open(url, '_blank');
+                }
+              });
+              toast('WhatsApp links launched in new tabs', 'success');
+              setSelectedIds([]);
+            }
+          }}
+          style={{ background: 'none', border: 'none', color: '#fff', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+        >
+          💬 Broadcast
+        </button>
+
+        <button 
+          type="button"
+          onClick={() => {
+            let csv = "Customer Name,Business Name,Phone,Email,Outstanding Balance,Type\n";
+            selectedIds.forEach(id => {
+              const c = customers.find(x => x.id === id || x._id === id);
+              if (c) {
+                csv += `"${c.name}","${c.businessName || ''}","${c.phone || ''}","${c.email || ''}",${c.balance || 0},"${c.customerType}"\n`;
+              }
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `Bulk_Export_Customers.csv`;
+            link.click();
+            toast('Export download started', 'success');
+            setSelectedIds([]);
+          }}
+          style={{ background: 'none', border: 'none', color: '#fff', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+        >
+          📥 Export CSV
+        </button>
+
+        <button 
+          type="button" 
+          onClick={() => setSelectedIds([])}
+          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', cursor: 'pointer' }}
+        >
+          ✕ Cancel
+        </button>
+      </div>
+    );
+  };
+
+  const renderImportWizard = () => {
+    if (!importWizardOpen) return null;
+    return (
+      <>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 3000 }} onClick={() => setImportWizardOpen(false)} />
+        <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '650px',
+          maxWidth: '95%',
+          backgroundColor: 'var(--bg-card)',
+          borderRadius: '16px',
+          border: '1px solid var(--border)',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+          zIndex: 3001,
+          padding: '1.5rem',
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: '90vh',
+          fontFamily: 'Inter, sans-serif'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+            <h3 style={{ margin: 0, fontWeight: 800, color: 'var(--text-primary)' }}>📤 Customer Spreadsheet Import Wizard</h3>
+            <button type="button" style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setImportWizardOpen(false)}>✕</button>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1rem' }}>
+            {/* Step Indicators */}
+            <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.5rem', justifyContent: 'space-between', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+              {['Upload', 'Map Columns', 'Duplicate Check', 'Preview', 'Importing'].map((label, idx) => {
+                const stepNum = idx + 1;
+                const isCurrent = importStep === stepNum || (stepNum === 3 && importStep === 5);
+                const isDone = importStep > stepNum;
+                return (
+                  <div key={label} style={{
+                    color: isCurrent ? 'var(--brand-primary)' : isDone ? '#22c55e' : '#94a3b8',
+                    borderBottom: `3px solid ${isCurrent ? 'var(--brand-primary)' : isDone ? '#22c55e' : '#e2e8f0'}`,
+                    flex: 1,
+                    textAlign: 'center',
+                    paddingBottom: '0.4rem'
+                  }}>
+                    {stepNum}. {label}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Step 1: Upload File */}
+            {importStep === 1 && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '2px dashed var(--border)', borderRadius: '12px', padding: '3rem 1.5rem', textAlign: 'center' }}>
+                <span style={{ fontSize: '3rem', marginBottom: '1rem' }}>📄</span>
+                <h4 style={{ fontWeight: 800, margin: '0 0 0.5rem 0' }}>Upload your Customer Spreadsheet</h4>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', maxWidth: '320px', margin: '0 auto 1.5rem auto' }}>
+                  Supports CSV formatted database exports. Make sure headers are present on the first row.
+                </p>
+                <input 
+                  type="file" 
+                  accept=".csv"
+                  onChange={handleCSVUpload}
+                  style={{ display: 'none' }}
+                  id="csv-upload-input"
+                />
+                <label htmlFor="csv-upload-input" className="btn btn-primary" style={{ padding: '0.5rem 1.5rem', fontWeight: 700, cursor: 'pointer' }}>
+                  Choose File
+                </label>
+              </div>
+            )}
+
+            {/* Step 2: Field Mapping */}
+            {importStep === 2 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <h4 style={{ fontWeight: 800, margin: 0, fontSize: '0.85rem' }}>Map Spreadsheet Columns to CRM Properties</h4>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  Ensure each required property matches your spreadsheet columns correctly.
+                </p>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  {['name', 'businessName', 'phone', 'email', 'gstNumber', 'address', 'state', 'pincode', 'customerType'].map(field => {
+                    const mappedIdx = importFieldMapping[field];
+                    return (
+                      <div key={field} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'capitalize' }}>
+                          {field === 'businessName' ? 'Company Name' : field === 'customerType' ? 'Customer Type' : field === 'gstNumber' ? 'GSTIN' : field}
+                        </span>
+                        <select
+                          value={mappedIdx !== undefined ? mappedIdx : ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setImportFieldMapping({
+                              ...importFieldMapping,
+                              [field]: val !== '' ? Number(val) : undefined
+                            });
+                          }}
+                          className="form-control"
+                          style={{ width: '200px', fontSize: '0.75rem', padding: '0.25rem' }}
+                        >
+                          <option value="">Ignore Field</option>
+                          {importHeaders.map((h, idx) => (
+                            <option key={idx} value={idx}>{h}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Duplicate Rule */}
+            {importStep === 3 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <h4 style={{ fontWeight: 800, margin: 0, fontSize: '0.85rem' }}>Set Duplicate Conflict Handling Rules</h4>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  Duplicates will be identified by checking phone numbers, email, or GSTIN matches.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+                  {[
+                    { value: 'skip', label: '⏭️ Skip Duplicates', desc: 'Ignore rows matching existing contacts and continue importing new entries' },
+                    { value: 'merge', label: '🔄 Merge Fields', desc: 'Overwrites blank existing customer fields with imported cell data' },
+                    { value: 'replace', label: '🔁 Replace Record', desc: 'Replaces the entire existing customer database profile with imported row info' }
+                  ].map(rule => (
+                    <label key={rule.value} style={{ display: 'flex', gap: '0.75rem', padding: '0.75rem', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', backgroundColor: importDuplicateRule === rule.value ? 'rgba(249,115,22,0.05)' : 'transparent', borderColor: importDuplicateRule === rule.value ? 'var(--brand-primary)' : 'var(--border)' }}>
+                      <input 
+                        type="radio" 
+                        name="dup-rule" 
+                        value={rule.value}
+                        checked={importDuplicateRule === rule.value}
+                        onChange={() => setImportDuplicateRule(rule.value)}
+                        style={{ marginTop: '0.2rem' }}
+                      />
+                      <div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{rule.label}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>{rule.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Step 5: Preview */}
+            {importStep === 5 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <h4 style={{ fontWeight: 800, margin: 0, fontSize: '0.85rem' }}>Verify Mapped Preview ({importPreviewData.length} records)</h4>
+                
+                <div style={{ maxHeight: '250px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                  <table className="data-table" style={{ fontSize: '0.75rem', margin: 0 }}>
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>GSTIN</th>
+                        <th>Type</th>
+                        <th>State</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importPreviewData.map((row, idx) => (
+                        <tr key={idx}>
+                          <td><strong>{row.name || 'N/A'}</strong></td>
+                          <td>{row.phone || 'N/A'}</td>
+                          <td>{row.gstNumber || 'N/A'}</td>
+                          <td>{row.customerType}</td>
+                          <td>{row.state || 'N/A'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Step 6: Importing */}
+            {importStep === 6 && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem 0' }}>
+                <LoadingSpinner />
+                <h4 style={{ fontWeight: 800, marginTop: '1.25rem', marginBottom: '0.5rem' }}>Processing database writes...</h4>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  Please do not close this modal or refresh the page.
+                </p>
+              </div>
+            )}
+
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '1rem', gap: '0.5rem' }}>
+            {importStep > 1 && importStep !== 6 && (
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                style={{ padding: '0.45rem 1.25rem', fontWeight: 700 }}
+                onClick={() => {
+                  if (importStep === 5) setImportStep(3);
+                  else setImportStep(importStep - 1);
+                }}
+              >
+                Back
+              </button>
+            )}
+            
+            <div style={{ flex: 1 }} />
+
+            {importStep === 2 && (
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ padding: '0.45rem 1.5rem', fontWeight: 700 }}
+                onClick={() => setImportStep(3)}
+              >
+                Next
+              </button>
+            )}
+
+            {importStep === 3 && (
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ padding: '0.45rem 1.5rem', fontWeight: 700 }}
+                onClick={processImportPreview}
+              >
+                Preview Data
+              </button>
+            )}
+
+            {importStep === 5 && (
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ padding: '0.45rem 1.75rem', fontWeight: 700 }}
+                onClick={executeSpreadsheetImport}
+              >
+                Start Import
+              </button>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  };
 
   // Load 360 detailed logs for selected customer
   const loadCustomer360Details = useCallback(async (cId) => {
@@ -1999,17 +2893,64 @@ export default function Customers() {
         onClick={() => setMobileDrawerOpen(false)}
       />
 
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 className="page-title" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>💼 Customer Relationship CRM</h1>
-          <p className="page-subtitle" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem', marginBottom: 0 }}>
-            Perform CRM Intelligence scans, check timeline feeds, and record allocations.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button type="button" className="btn btn-primary" onClick={() => openFormModal()} style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem' }}>
-            + Add Customer
-          </button>
+      {renderFilterPanel()}
+      {renderImportWizard()}
+      {renderBulkActionsToolbar()}
+
+      <div className="page-header" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h1 className="page-title" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>💼 Customer Relationship CRM</h1>
+            <p className="page-subtitle" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem', marginBottom: 0 }}>
+              FMCG beat plans, instant spreadsheet imports, visual map pins, and WhatsApp communications.
+            </p>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={() => setFilterPanelOpen(true)}
+              style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+            >
+              🔍 Filters {(filterTypes.length + filterStatuses.length + filterOutstandings.length + (filterLastOrder !== 'all' ? 1 : 0) + (filterSalesman !== 'all' ? 1 : 0) + (filterSource !== 'all' ? 1 : 0) + (filterRating > 0 ? 1 : 0) + filterTags.length) > 0 && <span style={{ backgroundColor: 'var(--brand-primary)', color: '#fff', borderRadius: '50%', width: '18px', height: '18px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', marginLeft: '0.25rem' }}>{(filterTypes.length + filterStatuses.length + filterOutstandings.length + (filterLastOrder !== 'all' ? 1 : 0) + (filterSalesman !== 'all' ? 1 : 0) + (filterSource !== 'all' ? 1 : 0) + (filterRating > 0 ? 1 : 0) + filterTags.length)}</span>}
+            </button>
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={() => setImportWizardOpen(true)}
+              style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem' }}
+            >
+              📥 Import CSV
+            </button>
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={() => {
+                let csv = "Customer Name,Business Name,Phone,Email,Outstanding Balance,Type,State,Pincode\n";
+                customers.forEach(c => {
+                  csv += `"${c.name}","${c.businessName || ''}","${c.phone || ''}","${c.email || ''}",${c.balance || 0},"${c.customerType}","${c.state || ''}","${c.pincode || ''}"\n`;
+                });
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = `All_Customers_Export.csv`;
+                link.click();
+                toast('Export downloaded', 'success');
+              }}
+              style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem' }}
+            >
+              📤 Export CSV
+            </button>
+            <button 
+              type="button" 
+              className="btn btn-primary" 
+              onClick={() => openFormModal()} 
+              style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem' }}
+            >
+              + Add Customer
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2094,13 +3035,14 @@ export default function Customers() {
           <div className="crm-dir-list" style={{ flex: 1, overflowY: 'auto' }}>
             {loading ? (
               <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}><LoadingSpinner /></div>
-            ) : customers.length === 0 ? (
+            ) : filteredCustomersList.length === 0 ? (
               <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>No accounts matched filters.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {customers.map((c) => {
+                {filteredCustomersList.map((c) => {
                   const isSelected = selectedCustomerId === (c.id || c._id);
                   const outstandingAmt = Number(c.balance || 0);
+                  const isChecked = selectedIds.includes(c.id || c._id);
                   
                   // Status Dot Indicator
                   let statusDotColor = '#10b981'; // Active
@@ -2124,6 +3066,26 @@ export default function Customers() {
                   const lastOrd = c.lastOrderDate ? new Date(c.lastOrderDate).toLocaleDateString() : 'No orders';
                   const typeColors = getCustomerTypeColors(c.customerType);
 
+                  const handleTouchStart = (e, id) => {
+                    const touch = e.touches[0];
+                    touchStartX.current = touch.clientX;
+                    touchId.current = id;
+                  };
+
+                  const handleTouchEnd = (e, cust) => {
+                    if (touchStartX.current === null) return;
+                    const touch = e.changedTouches[0];
+                    const diff = touch.clientX - touchStartX.current;
+                    touchStartX.current = null;
+                    if (diff > 80) {
+                      toast(`Creating order for ${cust.name}...`, 'info');
+                      navigate(`/sales?tab=new&customerId=${cust.id || cust._id}`);
+                    } else if (diff < -80) {
+                      toast(`Recording payment for ${cust.name}...`, 'info');
+                      navigate(`/sales?tab=payments&customerId=${cust.id || cust._id}`);
+                    }
+                  };
+
                   return (
                     <div 
                       key={c.id || c._id} 
@@ -2132,7 +3094,19 @@ export default function Customers() {
                         setMobileDrawerOpen(false); // Auto close drawer on mobile selection
                       }}
                       className={`crm-row-item ${isSelected ? 'active' : ''}`}
+                      onTouchStart={(e) => handleTouchStart(e, c.id || c._id)}
+                      onTouchEnd={(e) => handleTouchEnd(e, c)}
                     >
+                      <input 
+                        type="checkbox"
+                        checked={isChecked}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedIds([...selectedIds, c.id || c._id]);
+                          else setSelectedIds(selectedIds.filter(x => x !== (c.id || c._id)));
+                        }}
+                        style={{ marginRight: '0.4rem', cursor: 'pointer', transform: 'scale(1.15)' }}
+                      />
                       <div className="crm-avatar" style={{ backgroundColor: typeColors.bg, color: typeColors.text, borderColor: typeColors.color }}>{initials}</div>
                       <div className="crm-row-details">
                         <div className="crm-row-title-row">
