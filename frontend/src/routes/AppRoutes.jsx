@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
 import RoleRoute from './RoleRoute';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 function DesktopOnlyRoute({ children }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -28,59 +29,63 @@ function DesktopOnlyRoute({ children }) {
 
   return children;
 }
+
 import AppLayout from '../layout/AppLayout';
-import Login from '../pages/Login';
-import Dashboard from '../pages/Dashboard';
-import ProductsPage from '../pages/ProductsPage';
-import SalesPage from '../pages/SalesPage';
-import SaleView from '../pages/SaleView';
-import SalePrint from '../pages/SalePrint';
-import CustomersPage from '../pages/CustomersPage';
-import Users from '../pages/Users';
-import Settings from '../pages/Settings';
-import InventoryPage from '../pages/InventoryPage';
-import ReportsPage from '../pages/ReportsPage';
-import Suppliers from '../pages/Suppliers';
-import AIAssistant from '../pages/AIAssistant';
-import PublicTracking from '../pages/PublicTracking';
-import ManufacturingPage from '../pages/ManufacturingPage';
-import OrderNoting from '../pages/OrderNoting';
-import RoutePlanner from '../pages/RoutePlanner';
-import CustomerVisits from '../pages/CustomerVisits';
-import MobileCatalog from '../pages/MobileCatalog';
-import FieldOrdering from '../pages/FieldOrdering';
-import DeliveryTracking from '../pages/DeliveryTracking';
-import ReviewPortal from '../pages/ReviewPortal';
-import IntegrationsMarketplace from '../pages/IntegrationsMarketplace';
-import DeveloperCenter from '../pages/DeveloperCenter';
+
+// Lazy Loaded Pages
+const Login = lazy(() => import('../pages/Login'));
+const Dashboard = lazy(() => import('../pages/Dashboard'));
+const ProductsPage = lazy(() => import('../pages/ProductsPage'));
+const SalesPage = lazy(() => import('../pages/SalesPage'));
+const SaleView = lazy(() => import('../pages/SaleView'));
+const SalePrint = lazy(() => import('../pages/SalePrint'));
+const CustomersPage = lazy(() => import('../pages/CustomersPage'));
+const Users = lazy(() => import('../pages/Users'));
+const Settings = lazy(() => import('../pages/Settings'));
+const InventoryPage = lazy(() => import('../pages/InventoryPage'));
+const ReportsPage = lazy(() => import('../pages/ReportsPage'));
+const Suppliers = lazy(() => import('../pages/Suppliers'));
+const AIAssistant = lazy(() => import('../pages/AIAssistant'));
+const PublicTracking = lazy(() => import('../pages/PublicTracking'));
+const ManufacturingPage = lazy(() => import('../pages/ManufacturingPage'));
+const OrderNoting = lazy(() => import('../pages/OrderNoting'));
+const RoutePlanner = lazy(() => import('../pages/RoutePlanner'));
+const CustomerVisits = lazy(() => import('../pages/CustomerVisits'));
+const MobileCatalog = lazy(() => import('../pages/MobileCatalog'));
+const FieldOrdering = lazy(() => import('../pages/FieldOrdering'));
+const DeliveryTracking = lazy(() => import('../pages/DeliveryTracking'));
+const ReviewPortal = lazy(() => import('../pages/ReviewPortal'));
+const IntegrationsMarketplace = lazy(() => import('../pages/IntegrationsMarketplace'));
+const DeveloperCenter = lazy(() => import('../pages/DeveloperCenter'));
 
 // CRM Pages
-import CrmDashboard from '../pages/CrmDashboard';
-import Leads from '../pages/Leads';
-import AiLeadImporter from '../pages/AiLeadImporter';
-import Opportunities from '../pages/Opportunities';
-import FollowUps from '../pages/FollowUps';
-import CustomerReviews from '../pages/CustomerReviews';
-import CustomerMap from '../pages/CustomerMap';
-import ReEngagement from '../pages/ReEngagement';
-import WhatsAppLogs from '../pages/WhatsAppLogs';
-import SalesTargets from '../pages/SalesTargets';
+const CrmDashboard = lazy(() => import('../pages/CrmDashboard'));
+const Leads = lazy(() => import('../pages/Leads'));
+const AiLeadImporter = lazy(() => import('../pages/AiLeadImporter'));
+const Opportunities = lazy(() => import('../pages/Opportunities'));
+const FollowUps = lazy(() => import('../pages/FollowUps'));
+const CustomerReviews = lazy(() => import('../pages/CustomerReviews'));
+const CustomerMap = lazy(() => import('../pages/CustomerMap'));
+const ReEngagement = lazy(() => import('../pages/ReEngagement'));
+const WhatsAppLogs = lazy(() => import('../pages/WhatsAppLogs'));
+const SalesTargets = lazy(() => import('../pages/SalesTargets'));
 
 // SFA Pages
-import FieldSalesDashboard from '../pages/FieldSalesDashboard';
-import FieldSalesAnalytics from '../pages/FieldSalesAnalytics';
+const FieldSalesDashboard = lazy(() => import('../pages/FieldSalesDashboard'));
+const FieldSalesAnalytics = lazy(() => import('../pages/FieldSalesAnalytics'));
 
-import CatalogCenter from '../pages/CatalogCenter';
-import PublicCatalog from '../pages/PublicCatalog';
+const CatalogCenter = lazy(() => import('../pages/CatalogCenter'));
+const PublicCatalog = lazy(() => import('../pages/PublicCatalog'));
 
 export default function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/catalog" element={<PublicCatalog />} />
-      <Route path="/track/:trackingNumber" element={<PublicTracking />} />
-      <Route path="/track" element={<PublicTracking />} />
-      <Route path="/reviews/portal/:token" element={<ReviewPortal />} />
+    <Suspense fallback={<LoadingSpinner />}>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/catalog" element={<PublicCatalog />} />
+        <Route path="/track/:trackingNumber" element={<PublicTracking />} />
+        <Route path="/track" element={<PublicTracking />} />
+        <Route path="/reviews/portal/:token" element={<ReviewPortal />} />
       <Route
         path="/sales/:id/print"
         element={
@@ -392,5 +397,6 @@ export default function AppRoutes() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   );
 }
