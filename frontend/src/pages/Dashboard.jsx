@@ -82,7 +82,7 @@ const StatCard = ({ label, value, subtext, className = '', style = {}, onClick }
   >
     <div className="label" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem', ...style.labelStyle }}>{label}</div>
     <div className="value" style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', ...style.valueStyle }}>
-      <AnimatedNumber value={value} />
+      {typeof value === 'object' ? value : <AnimatedNumber value={value} />}
     </div>
     {subtext && (
       <div className="subtext" style={{ fontSize: '0.75rem', marginTop: '0.25rem', color: 'var(--text-secondary)', opacity: 0.8, ...style.subtextStyle }}>
@@ -176,7 +176,8 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { isInstallable, isInstalled, installApp } = usePWA();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -234,7 +235,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const loadDashboardData = async () => {
-      setLoading(true);
+      setDataLoading(true);
       try {
         if (isSuperAdmin) {
           const [dashRes, alertsRes, boRes, wooRes, trackRes, visitsRes, sfaAnalRes] = await Promise.allSettled([
@@ -320,7 +321,7 @@ export default function Dashboard() {
       } catch (err) {
         console.error('Error loading role dashboard data:', err);
       } finally {
-        setLoading(false);
+        setDataLoading(false);
       }
     };
 
@@ -328,8 +329,6 @@ export default function Dashboard() {
       loadDashboardData();
     }
   }, [user, role, isSuperAdmin]);
-
-  if (loading) return <LoadingSpinner />;
 
   // 1. Rendering Super Admin / Admin Dashboard
   if (isSuperAdmin) {
@@ -552,11 +551,11 @@ export default function Dashboard() {
             ) : (
               <>
                 <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-                  <StatCard label="Today's Sales" value={fmt(cards.todaySales)} />
-                  <StatCard label="Monthly Revenue" value={fmt(cards.monthlyRevenue)} />
+                  <StatCard label="Today's Sales" value={dataLoading ? <span className="skeleton-loader" /> : fmt(cards.todaySales)} />
+                  <StatCard label="Monthly Revenue" value={dataLoading ? <span className="skeleton-loader" /> : fmt(cards.monthlyRevenue)} />
                   <StatCard
                     label="Outstanding Receivables"
-                    value={fmt(outstandingValue)}
+                    value={dataLoading ? <span className="skeleton-loader" /> : fmt(outstandingValue)}
                     subtext="Pending Customer Collections"
                     onClick={() => navigate('/sales?tab=outstanding')}
                     style={{
@@ -567,12 +566,12 @@ export default function Dashboard() {
                       subtextStyle: { color: outStyle.color }
                     }}
                   />
-                  <StatCard label="Pending Dispatch Orders" value={cards.pendingDispatchOrders || 0} />
-                  <StatCard label="Low Stock Products" value={cards.lowStockCount || 0} className={cards.lowStockCount > 0 ? 'danger' : ''} />
+                  <StatCard label="Pending Dispatch Orders" value={dataLoading ? <span className="skeleton-loader" /> : cards.pendingDispatchOrders || 0} />
+                  <StatCard label="Low Stock Products" value={dataLoading ? <span className="skeleton-loader" /> : cards.lowStockCount || 0} className={!dataLoading && cards.lowStockCount > 0 ? 'danger' : ''} />
                   <StatCard
                     label="Top Selling Product"
-                    value={charts.topProducts?.[0]?.name || 'N/A'}
-                    subtext={charts.topProducts?.[0]?.qty ? `${charts.topProducts[0].qty} units sold` : ''}
+                    value={dataLoading ? <span className="skeleton-loader" /> : (charts.topProducts?.[0]?.name || 'N/A')}
+                    subtext={!dataLoading && charts.topProducts?.[0]?.qty ? `${charts.topProducts[0].qty} units sold` : ''}
                   />
                 </div>
 
@@ -581,10 +580,10 @@ export default function Dashboard() {
                     📦 Manufacturing & Packing Overview
                   </h3>
                   <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-                    <StatCard label="Bulk Stock Value" value={fmt(cards.bulkStockValue || 0)} />
-                    <StatCard label="Retail Pack Stock" value={`${cards.retailPackStock || 0} Packs`} />
-                    <StatCard label="Packing Done Today" value={`${cards.packingDoneToday || 0} Packs`} />
-                    <StatCard label="Manufacturing Done Today" value={`${cards.mfgDoneToday || 0} KG`} />
+                    <StatCard label="Bulk Stock Value" value={dataLoading ? <span className="skeleton-loader" /> : fmt(cards.bulkStockValue || 0)} />
+                    <StatCard label="Retail Pack Stock" value={dataLoading ? <span className="skeleton-loader" /> : `${cards.retailPackStock || 0} Packs`} />
+                    <StatCard label="Packing Done Today" value={dataLoading ? <span className="skeleton-loader" /> : `${cards.packingDoneToday || 0} Packs`} />
+                    <StatCard label="Manufacturing Done Today" value={dataLoading ? <span className="skeleton-loader" /> : `${cards.mfgDoneToday || 0} KG`} />
                   </div>
 
                   {/* Detailed Bulk Stock & Packed Today KPIs */}

@@ -14,7 +14,15 @@ export function AuthProvider({ children }) {
       return null;
     }
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    try {
+      const token = localStorage.getItem('token');
+      const saved = localStorage.getItem('user');
+      return !(token && saved);
+    } catch (e) {
+      return true;
+    }
+  });
   const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
   const [connectionError, setConnectionError] = useState(false);
   const [healthStatus, setHealthStatus] = useState(null); // 'checking-internet' | 'checking-server' | 'connecting-db' | 'loading-erp' | 'retrying-X'
@@ -148,10 +156,6 @@ export function AuthProvider({ children }) {
       const result = await checkHealth();
       
       if (result.ok) {
-        setHealthStatus('connecting-db');
-        await wait(400);
-        setHealthStatus('loading-erp');
-        await wait(400);
         setHealthStatus(null);
         setConnectionError(false);
         setErrorDetails(null);
@@ -178,7 +182,13 @@ export function AuthProvider({ children }) {
   }, []);
 
   const runHealthCheck = useCallback(async () => {
-    setLoading(true);
+    const token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    if (token && savedUser) {
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     const ok = await checkHealthWithRetry();
     if (ok) {
       await loadUser();

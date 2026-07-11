@@ -1138,4 +1138,27 @@ table.data-table tr:hover td {
   }
 }
 
+@keyframes skeleton-shimmer {
+  0% {
+    background-color: var(--border);
+    opacity: 0.6;
+  }
+  50% {
+    background-color: var(--border);
+    opacity: 1;
+  }
+  100% {
+    background-color: var(--border);
+    opacity: 0.6;
+  }
+}
+
+.skeleton-loader {
+  display: inline-block;
+  height: 1.5em;
+  width: 80%;
+  border-radius: 6px;
+  animation: skeleton-shimmer 1.5s infinite ease-in-out;
+}
+
 
