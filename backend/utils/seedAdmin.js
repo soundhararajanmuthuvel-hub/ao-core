@@ -34,7 +34,7 @@ const seed = async () => {
     if (!settings) {
       await Settings.create({
         companyName: 'AO Core Organic Products',
-        logo: '',
+        logo: '/uploads/default-logo.png',
         address: '123 Wellness Way, Green Valley',
         phone: '+91 9876543210',
         gstDetails: '29AAAAA1111A1Z1',

@@ -67,7 +67,73 @@ const dropStaleSqliteBackupTables = async () => {
   }
 };
 
+const tableNameMap = {
+  User: 'users',
+  Customer: 'customers',
+  Supplier: 'suppliers',
+  Product: 'products',
+  Settings: 'settings',
+  SyncLog: 'sync_logs',
+  ActivityLog: 'activity_logs',
+  Notification: 'notifications',
+  StockMovement: 'stock_movements',
+  Invoice: 'invoices',
+  InvoiceItem: 'invoice_items',
+  Purchase: 'purchases',
+  PurchaseItem: 'purchase_items',
+  RepackRecipe: 'repack_recipes',
+  RepackRecipeMaterial: 'repack_recipe_materials',
+  RepackEntry: 'repack_entries',
+  RepackEntryMaterial: 'repack_entry_materials',
+  RawMaterial: 'raw_materials',
+  RawMaterialMovement: 'raw_material_movements',
+  ManufacturingRecipe: 'manufacturing_recipes',
+  ManufacturingRecipeMaterial: 'manufacturing_recipe_materials',
+  ManufacturingEntry: 'manufacturing_entries',
+  ManufacturingEntryMaterial: 'manufacturing_entry_materials',
+  Shipment: 'shipments',
+  ProductPackSize: 'product_pack_sizes',
+  Courier: 'couriers',
+  StockLoss: 'stock_losses',
+  Order: 'orders',
+  Payment: 'payments',
+  MigrationHistory: 'migration_histories',
+  MigrationDetailLog: 'migration_detail_logs',
+  CrmNote: 'crm_notes',
+  CrmFollowUp: 'crm_follow_ups',
+  ReminderHistory: 'reminder_histories',
+  Route: 'routes',
+  Visit: 'visits',
+  SalesmanLocation: 'salesman_locations',
+  CustomerReview: 'customer_reviews',
+  Lead: 'leads',
+  CrmOpportunity: 'crm_opportunities',
+  AiSuggestion: 'ai_suggestions',
+  WhatsAppSettings: 'whatsapp_settings',
+  WhatsAppLog: 'whatsapp_logs',
+  PackingConversion: 'packing_conversions',
+  PackingConversionItem: 'packing_conversion_items',
+  SalesTarget: 'sales_targets'
+};
+
+// Global hook to enforce lowercase table names mapping to prevent Linux/MySQL case sensitivity issues
+sequelize.addHook('afterDefine', (model) => {
+  const mappedName = tableNameMap[model.name];
+  if (mappedName) {
+    model.tableName = mappedName;
+  }
+});
+
 const runSqliteSyncSafely = async (syncOptions) => {
+  if (dialect === 'mysql') {
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0;');
+    try {
+      return await sequelize.sync(syncOptions);
+    } finally {
+      await sequelize.query('SET FOREIGN_KEY_CHECKS = 1;');
+    }
+  }
+
   if (dialect !== 'sqlite') {
     return sequelize.sync(syncOptions);
   }
@@ -160,22 +226,23 @@ const connectDB = async () => {
 
   // Safe table alterations helper
   const addColumnIfNotExist = async (tableName, columnName, columnDefSql) => {
+    const resolvedTableName = tableNameMap[tableName] || tableNameMap[tableName.replace(/s$/, '')] || tableName.toLowerCase();
     try {
       let columnNames = [];
       if (dialect === 'mysql') {
-        const columns = await sequelize.query(`SHOW COLUMNS FROM ${tableName};`, { type: Sequelize.QueryTypes.SELECT });
+        const columns = await sequelize.query(`SHOW COLUMNS FROM ${resolvedTableName};`, { type: Sequelize.QueryTypes.SELECT });
         columnNames = columns.map(col => (col.Field || col.field || '').toLowerCase());
       } else {
-        const tableInfo = await sequelize.query(`PRAGMA table_info(${tableName});`, { type: Sequelize.QueryTypes.SELECT });
+        const tableInfo = await sequelize.query(`PRAGMA table_info(${resolvedTableName});`, { type: Sequelize.QueryTypes.SELECT });
         columnNames = tableInfo.map(col => (col.name || '').toLowerCase());
       }
 
       if (!columnNames.includes(columnName.toLowerCase())) {
-        console.log(`Adding missing column ${columnName} to table ${tableName}...`);
-        await sequelize.query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefSql};`);
+        console.log(`Adding missing column ${columnName} to table ${resolvedTableName}...`);
+        await sequelize.query(`ALTER TABLE ${resolvedTableName} ADD COLUMN ${columnName} ${columnDefSql};`);
       }
     } catch (err) {
-      console.error(`Error adding column ${columnName} to ${tableName}:`, err.message);
+      console.error(`Error adding column ${columnName} to ${resolvedTableName}:`, err.message);
     }
   };
 
@@ -355,9 +422,9 @@ const connectDB = async () => {
   try {
     if (dialect === 'mysql') {
       console.log('Modifying Products.productType column to VARCHAR(255)...');
-      await sequelize.query("ALTER TABLE Products MODIFY COLUMN productType VARCHAR(255) DEFAULT 'BULK_PRODUCT';");
+      await sequelize.query("ALTER TABLE products MODIFY COLUMN productType VARCHAR(255) DEFAULT 'BULK_PRODUCT';");
       console.log('Modifying StockMovements.type column to VARCHAR(255)...');
-      await sequelize.query("ALTER TABLE StockMovements MODIFY COLUMN type VARCHAR(255) NOT NULL;");
+      await sequelize.query("ALTER TABLE stock_movements MODIFY COLUMN type VARCHAR(255) NOT NULL;");
     }
   } catch (err) {
     console.error('Failed to alter column types for mysql:', err.message);
@@ -367,7 +434,7 @@ const connectDB = async () => {
   try {
     if (dialect === 'mysql') {
       console.log('Modifying Settings.logo column to VARCHAR(1000)...');
-      await sequelize.query("ALTER TABLE Settings MODIFY COLUMN logo VARCHAR(1000) DEFAULT '';");
+      await sequelize.query("ALTER TABLE settings MODIFY COLUMN logo VARCHAR(1000) DEFAULT '';");
     }
   } catch (err) {
     console.error('Failed to alter Settings.logo column type:', err.message);

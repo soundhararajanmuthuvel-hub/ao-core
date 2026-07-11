@@ -80,7 +80,7 @@ exports.getSettingsLogo = async (req, res, next) => {
   try {
     const settings = await getSettings();
     res.json({
-      logo: settings.logoUrl || settings.logo || "https://amudhasurabiy.com/wp-content/uploads/2026/05/logo.jpg"
+      logo: settings.logoUrl || settings.logo || "/uploads/default-logo.png"
     });
   } catch (err) {
     next(err);
@@ -90,7 +90,7 @@ exports.getSettingsLogo = async (req, res, next) => {
 exports.getCompanyLogoImage = async (req, res, next) => {
   try {
     const settings = await getSettings();
-    const logoUrl = settings.logoUrl || settings.logo || "https://amudhasurabiy.com/wp-content/uploads/2026/05/logo.jpg";
+    const logoUrl = settings.logoUrl || settings.logo || "/uploads/default-logo.png";
 
     const cacheDir = path.join(__dirname, '../uploads');
     if (!fs.existsSync(cacheDir)) {

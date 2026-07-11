@@ -42,7 +42,7 @@ const updateStock = async (productId, delta, opts = {}) => {
     // Find active batches with positive remaining stock
     const activeBatches = await StockMovement.sequelize.query(
       `SELECT batchNumber, expiryDate, SUM(quantity) AS remaining
-       FROM StockMovements
+       FROM stock_movements
        WHERE productId = :productId AND batchNumber IS NOT NULL AND batchNumber != ''
        GROUP BY batchNumber, expiryDate
        HAVING remaining > 0

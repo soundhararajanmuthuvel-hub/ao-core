@@ -46,15 +46,15 @@ exports.getDashboard = async (req, res, next) => {
            COUNT(DISTINCT i.id) AS totalSales,
            COALESCE(SUM(i.grandTotal), 0) AS revenue,
            COALESCE(SUM((ii.qty * ii.unitPrice) - ((ii.qty + COALESCE(ii.freeQty, 0)) * COALESCE(ii.purchasePrice, 0))), 0) AS profit
-         FROM Invoices i
-         LEFT JOIN InvoiceItems ii ON i.id = ii.invoiceId`,
+         FROM invoices i
+         LEFT JOIN invoice_items ii ON i.id = ii.invoiceId`,
         { type: sequelize.QueryTypes.SELECT }
       ),
       sequelize.query(
         `SELECT 
            COALESCE(SUM(grandTotal), 0) AS todaySales,
            COUNT(id) AS todayOrders
-         FROM Invoices
+         FROM invoices
          WHERE date >= :today AND date < :tomorrow AND type = 'invoice' AND status NOT IN ('Draft', 'Cancelled')`,
         {
           replacements: { today, tomorrow },
@@ -99,8 +99,8 @@ exports.getDashboard = async (req, res, next) => {
       }),
       sequelize.query(
         `SELECT COALESCE(SUM(pci.qty), 0) AS total
-         FROM PackingConversions pc
-         JOIN PackingConversionItems pci ON pc.id = pci.packingConversionId
+         FROM packing_conversions pc
+         JOIN packing_conversion_items pci ON pc.id = pci.packingConversionId
          WHERE pc.date >= :today AND pc.date < :tomorrow AND pc.status = 'completed'`,
         {
           replacements: { today, tomorrow },
@@ -109,7 +109,7 @@ exports.getDashboard = async (req, res, next) => {
       ),
       sequelize.query(
         `SELECT COALESCE(SUM(qtyToProduce), 0) AS total
-         FROM ManufacturingEntries
+         FROM manufacturing_entries
          WHERE date >= :today AND date < :tomorrow AND status = 'completed'`,
         {
           replacements: { today, tomorrow },
@@ -283,8 +283,8 @@ exports.getDashboard = async (req, res, next) => {
            COALESCE(SUM(i.grandTotal), 0) AS revenue,
            COUNT(DISTINCT i.id) AS orders,
            COALESCE(SUM((ii.qty * ii.unitPrice) - ((ii.qty + COALESCE(ii.freeQty, 0)) * COALESCE(ii.purchasePrice, 0))), 0) AS profit
-         FROM Invoices i
-         LEFT JOIN InvoiceItems ii ON i.id = ii.invoiceId
+         FROM invoices i
+         LEFT JOIN invoice_items ii ON i.id = ii.invoiceId
          GROUP BY YEAR(i.date), MONTH(i.date)
          ORDER BY year ASC, month ASC
          LIMIT 12`
@@ -294,8 +294,8 @@ exports.getDashboard = async (req, res, next) => {
            COALESCE(SUM(i.grandTotal), 0) AS revenue,
            COUNT(DISTINCT i.id) AS orders,
            COALESCE(SUM((ii.qty * ii.unitPrice) - ((ii.qty + COALESCE(ii.freeQty, 0)) * COALESCE(ii.purchasePrice, 0))), 0) AS profit
-         FROM Invoices i
-         LEFT JOIN InvoiceItems ii ON i.id = ii.invoiceId
+         FROM invoices i
+         LEFT JOIN invoice_items ii ON i.id = ii.invoiceId
          GROUP BY strftime('%Y', i.date), strftime('%m', i.date)
          ORDER BY year ASC, month ASC
          LIMIT 12`;
@@ -309,7 +309,7 @@ exports.getDashboard = async (req, res, next) => {
          ii.name,
          SUM(ii.qty) AS totalQty,
          SUM(ii.lineTotal) AS revenue
-       FROM InvoiceItems ii
+       FROM invoice_items ii
        GROUP BY ii.productId, ii.name
        ORDER BY totalQty DESC
        LIMIT 5`,
@@ -322,7 +322,7 @@ exports.getDashboard = async (req, res, next) => {
            DATE_FORMAT(date, '%Y-%m-%d') AS date,
            COALESCE(SUM(grandTotal), 0) AS total,
            COUNT(id) AS count
-         FROM Invoices
+         FROM invoices
          GROUP BY DATE_FORMAT(date, '%Y-%m-%d')
          ORDER BY date ASC
          LIMIT 30`
@@ -330,7 +330,7 @@ exports.getDashboard = async (req, res, next) => {
            strftime('%Y-%m-%d', date) AS date,
            COALESCE(SUM(grandTotal), 0) AS total,
            COUNT(id) AS count
-         FROM Invoices
+         FROM invoices
          GROUP BY strftime('%Y-%m-%d', date)
          ORDER BY date ASC
          LIMIT 30`;
