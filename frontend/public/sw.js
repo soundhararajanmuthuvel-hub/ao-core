@@ -43,6 +43,11 @@ self.addEventListener('message', (event) => {
 
 // Fetch Event
 self.addEventListener('fetch', (event) => {
+  // Only handle GET requests
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   // Only handle HTTP/HTTPS protocols (avoid chrome-extension and external requests)
   const isApiRequest = event.request.url.includes('/api/');
   if (!event.request.url.startsWith(self.location.origin) && !isApiRequest) {
@@ -67,12 +72,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. API requests - Network-First
-  if (event.request.url.includes('/api/')) {
+  // 2. API requests - Network-First, fallback to cache if available, else custom error response
+  if (isApiRequest) {
     event.respondWith(
       fetch(event.request)
         .catch(() => {
-          return caches.match(event.request);
+          return caches.match(event.request).then((cachedResponse) => {
+            if (cachedResponse) return cachedResponse;
+            // Return a valid JSON response so it doesn't crash the fetch event with TypeError
+            return new Response(JSON.stringify({ 
+              success: false, 
+              message: 'You are currently offline. This data is not available cached.' 
+            }), {
+              status: 503,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          });
         })
     );
     return;
