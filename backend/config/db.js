@@ -151,11 +151,36 @@ const renameTablesToLowercaseIfMySql = async (sequelizeInstance) => {
     return;
   }
   try {
-    console.log('Checking for mixed-case tables to rename to lowercase (Linux compatibility)...');
-    const [tables] = await sequelizeInstance.query('SHOW TABLES;');
+    const dbName = sequelizeInstance.config.database;
+    console.log('Detecting and dropping legacy capitalized foreign key constraints (Linux compatibility)...');
     
     await sequelizeInstance.query('SET FOREIGN_KEY_CHECKS = 0;');
     try {
+      // Find all constraints referencing mixed-case legacy table names or belonging to mixed-case tables
+      const [legacyFks] = await sequelizeInstance.query(`
+        SELECT TABLE_NAME, CONSTRAINT_NAME 
+        FROM information_schema.KEY_COLUMN_USAGE 
+        WHERE TABLE_SCHEMA = '${dbName}' 
+          AND REFERENCED_TABLE_NAME IS NOT NULL 
+          AND (REFERENCED_TABLE_NAME != LOWER(REFERENCED_TABLE_NAME) OR TABLE_NAME != LOWER(TABLE_NAME));
+      `);
+      
+      for (const fk of legacyFks) {
+        const tName = fk.TABLE_NAME || fk.table_name;
+        const fkName = fk.CONSTRAINT_NAME || fk.constraint_name;
+        if (tName && fkName) {
+          console.log(`Dropping legacy foreign key constraint ${fkName} on ${tName}...`);
+          try {
+            await sequelizeInstance.query(`ALTER TABLE \`${tName}\` DROP FOREIGN KEY \`${fkName}\`;`);
+          } catch (dropErr) {
+            console.error(`Failed to drop constraint ${fkName} on table ${tName}:`, dropErr.message);
+          }
+        }
+      }
+      
+      console.log('Checking for mixed-case tables to rename to lowercase...');
+      const [tables] = await sequelizeInstance.query('SHOW TABLES;');
+      
       for (const row of tables) {
         const tableName = Object.values(row)[0];
         if (tableName && tableName !== tableName.toLowerCase()) {
@@ -167,9 +192,9 @@ const renameTablesToLowercaseIfMySql = async (sequelizeInstance) => {
     } finally {
       await sequelizeInstance.query('SET FOREIGN_KEY_CHECKS = 1;');
     }
-    console.log('✓ Table renaming check completed.');
+    console.log('✓ Table renaming and constraint migrations completed.');
   } catch (err) {
-    console.error('Failed to rename tables to lowercase:', err.message);
+    console.error('Failed to migrate tables and constraints:', err.message);
   }
 };
 
