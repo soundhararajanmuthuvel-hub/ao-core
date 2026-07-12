@@ -12,7 +12,7 @@ const { isValidGstin, getStateCodeByName } = require('../utils/gst');
 
 exports.getSales = async (req, res, next) => {
   try {
-    await exports.reconcileInvoicesHelper();
+    // Deferred global invoice reconciliation to manual endpoint to prevent DB connection locks
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const search = req.query.search || '';
@@ -97,7 +97,7 @@ exports.getSales = async (req, res, next) => {
 
 exports.getSale = async (req, res, next) => {
   try {
-    await exports.reconcileInvoicesHelper();
+    // Deferred global invoice reconciliation to manual endpoint to prevent DB connection locks
     const sale = await Invoice.findByPk(req.params.id, {
       include: [
         { model: Customer, as: 'customer' },

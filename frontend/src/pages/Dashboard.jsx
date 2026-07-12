@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
-import { analyticsApi, productsApi, manufacturingApi, rawMaterialsApi, salesApi, customersApi, inventoryApi, shippingApi, integrationsApi, sfaApi } from '../api';
+import { analyticsApi, productsApi, manufacturingApi, rawMaterialsApi, salesApi, customersApi, inventoryApi, shippingApi, integrationsApi, sfaApi, aiApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { usePWA } from '../context/PWAContext';
 import { resolveAssetUrl } from '../utils/url';
