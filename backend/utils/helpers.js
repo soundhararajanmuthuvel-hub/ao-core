@@ -2,13 +2,25 @@ const Settings = require('../models/Settings');
 const ActivityLog = require('../models/ActivityLog');
 const Notification = require('../models/Notification');
 
+let cachedSettings = null;
+
 const getSettings = async (opts = {}) => {
   const queryOpts = opts && opts.commit ? { transaction: opts.commit } : opts;
+  if (cachedSettings && !queryOpts.transaction) {
+    return cachedSettings;
+  }
   let settings = await Settings.findOne(queryOpts);
   if (!settings) {
     settings = await Settings.create({}, queryOpts);
   }
+  if (!queryOpts.transaction) {
+    cachedSettings = settings;
+  }
   return settings;
+};
+
+const clearSettingsCache = () => {
+  cachedSettings = null;
 };
 
 const logActivity = async (userId, action, module, details, metadata = {}) => {
@@ -188,6 +200,7 @@ const getNextPaymentNumber = async (opts = {}) => {
 
 module.exports = {
   getSettings,
+  clearSettingsCache,
   logActivity,
   createNotification,
   calcLineTotal,

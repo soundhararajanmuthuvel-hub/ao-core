@@ -17,6 +17,8 @@ exports.updateSettings = async (req, res, next) => {
     let settings = await getSettings();
     Object.assign(settings, req.body);
     await settings.save();
+    const { clearSettingsCache } = require('../utils/helpers');
+    clearSettingsCache();
     await logActivity(req.user.id, 'update', 'settings', 'Updated company settings');
     res.json({ settings });
   } catch (err) {
@@ -30,6 +32,8 @@ exports.uploadLogo = async (req, res, next) => {
     let settings = await getSettings();
     settings.logo = `/uploads/logos/${req.file.filename}`;
     await settings.save();
+    const { clearSettingsCache } = require('../utils/helpers');
+    clearSettingsCache();
     res.json({ settings });
   } catch (err) {
     next(err);
