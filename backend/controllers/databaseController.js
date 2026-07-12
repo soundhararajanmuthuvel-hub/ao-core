@@ -339,6 +339,7 @@ exports.factoryReset = async (req, res) => {
     // Re-seed default Users
     const defaultUsers = [
       { name: 'Super Admin', email: 'admin@aocore.com', password: 'Admin@123', role: 'Super Admin', isActive: true },
+      { name: 'Developer', email: 'developer@aocore.com', password: 'Developer@123', role: 'Super Admin', isActive: true },
       { name: 'Manufacturing Manager', email: 'mfg@aocore.com', password: 'Mfg@123', role: 'Manufacturing Manager', isActive: true },
       { name: 'Billing Executive', email: 'billing@aocore.com', password: 'Billing@123', role: 'Billing Executive', isActive: true },
       { name: 'Store Keeper', email: 'store@aocore.com', password: 'Store@123', role: 'Store Keeper', isActive: true },

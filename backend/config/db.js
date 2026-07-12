@@ -518,6 +518,30 @@ const connectDB = async () => {
   } catch (err) {
     console.error('Error correcting product types on startup:', err);
   }
+
+  // Auto-seed basic admin and developer roles if they don't exist
+  try {
+    const User = require('../models/User');
+    const usersToSeed = [
+      { name: 'Super Admin', email: 'admin@aocore.com', password: 'Admin@123', role: 'Super Admin' },
+      { name: 'Developer', email: 'developer@aocore.com', password: 'Developer@123', role: 'Super Admin' }
+    ];
+    for (const u of usersToSeed) {
+      const existing = await User.findOne({ where: { email: u.email } });
+      if (!existing) {
+        await User.create({
+          name: u.name,
+          email: u.email,
+          password: u.password,
+          role: u.role,
+          isActive: true
+        });
+        console.log(`✓ Auto-Seeded User on startup: ${u.email}`);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to auto-seed default users:', err.message);
+  }
 };
 
 connectDB.sequelize = sequelize;

@@ -30,6 +30,7 @@ export default function Login() {
     // Default seeded roles prefill credentials
     const credentials = {
       'Super Admin': { email: 'admin@aocore.com', pass: 'Admin@123' },
+      'Developer': { email: 'developer@aocore.com', pass: 'Developer@123' },
       'Manufacturing': { email: 'mfg@aocore.com', pass: 'Mfg@123' },
       'Sales': { email: 'sales@aocore.com', pass: 'Sales@123' },
       'Inventory': { email: 'store@aocore.com', pass: 'Store@123' },
@@ -166,6 +167,7 @@ export default function Login() {
                   >
                     <option value="">-- Choose Role --</option>
                     <option value="Super Admin">Super Admin</option>
+                    <option value="Developer">Developer</option>
                     <option value="Manufacturing">Manufacturing</option>
                     <option value="Sales">Sales</option>
                     <option value="Inventory">Inventory</option>

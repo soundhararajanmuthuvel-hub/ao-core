@@ -52,6 +52,7 @@ const seed = async () => {
     // 2. Seed Default Users by Role
     const usersToSeed = [
       { name: 'Super Admin', email: 'admin@aocore.com', password: 'Admin@123', role: 'Super Admin' },
+      { name: 'Developer', email: 'developer@aocore.com', password: 'Developer@123', role: 'Super Admin' },
       { name: 'Manufacturing Manager', email: 'mfg@aocore.com', password: 'Mfg@123', role: 'Manufacturing Manager' },
       { name: 'Billing Executive', email: 'billing@aocore.com', password: 'Billing@123', role: 'Billing Executive' },
       { name: 'Store Keeper', email: 'store@aocore.com', password: 'Store@123', role: 'Store Keeper' },
