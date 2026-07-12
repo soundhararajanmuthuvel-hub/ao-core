@@ -146,9 +146,38 @@ const runSqliteSyncSafely = async (syncOptions) => {
   }
 };
 
+const renameTablesToLowercaseIfMySql = async (sequelizeInstance) => {
+  if (dialect !== 'mysql') {
+    return;
+  }
+  try {
+    console.log('Checking for mixed-case tables to rename to lowercase (Linux compatibility)...');
+    const [tables] = await sequelizeInstance.query('SHOW TABLES;');
+    
+    await sequelizeInstance.query('SET FOREIGN_KEY_CHECKS = 0;');
+    try {
+      for (const row of tables) {
+        const tableName = Object.values(row)[0];
+        if (tableName && tableName !== tableName.toLowerCase()) {
+          const lowerTableName = tableName.toLowerCase();
+          console.log(`Renaming table ${tableName} to ${lowerTableName}...`);
+          await sequelizeInstance.query(`RENAME TABLE \`${tableName}\` TO \`${lowerTableName}\`;`);
+        }
+      }
+    } finally {
+      await sequelizeInstance.query('SET FOREIGN_KEY_CHECKS = 1;');
+    }
+    console.log('✓ Table renaming check completed.');
+  } catch (err) {
+    console.error('Failed to rename tables to lowercase:', err.message);
+  }
+};
+
 const connectDB = async () => {
   await sequelize.authenticate();
   console.log(`${dialect === 'mysql' ? 'MySQL' : 'SQLite'} connected successfully via Sequelize.`);
+  
+  await renameTablesToLowercaseIfMySql(sequelize);
   
   // Dynamically require all models to register them with Sequelize before syncing.
   require('../models/User');
