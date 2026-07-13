@@ -183,7 +183,7 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
         }}
       >
         {/* Company Logo */}
-        {format !== 'Thermal' && (settings?.logo || settings?.logoUrl) && (
+        {format !== 'Thermal' && logoUrl && (
           <div 
             className="invoice-logo-container" 
             style={{ 
