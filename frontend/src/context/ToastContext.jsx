@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSettings } from './SettingsContext';
-import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
+import { resolveAssetUrl } from '../utils/url';
+import { useCompanyBrand } from './CompanyBrandContext';
 
 const ToastContext = createContext(null);
 
@@ -41,7 +42,8 @@ export function ToastProvider({ children }) {
   const slideAlerts = toasts.filter((t) => t.type === 'info' || t.type === 'warning' || t.type === 'success' || t.type === 'error');
   const overlayAlerts = toasts.filter((t) => t.type === 'success' || t.type === 'error');
 
-  const logoSrc = getActiveLogoUrl(settings);
+  const { logoUrl } = useCompanyBrand();
+  const logoSrc = logoUrl;
 
   return (
     <ToastContext.Provider value={{ toast }}>

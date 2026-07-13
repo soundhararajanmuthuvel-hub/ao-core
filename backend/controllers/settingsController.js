@@ -5,6 +5,12 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 
+let cachedBrand = null;
+
+const invalidateBrandCache = () => {
+  cachedBrand = null;
+};
+
 exports.getSettings = async (req, res, next) => {
   try {
     const settings = await getSettings();
@@ -21,6 +27,7 @@ exports.updateSettings = async (req, res, next) => {
     await settings.save();
     const { clearSettingsCache } = require('../utils/helpers');
     clearSettingsCache();
+    invalidateBrandCache();
     await logActivity(req.user.id, 'update', 'settings', 'Updated company settings');
     res.json({ settings });
   } catch (err) {
@@ -36,6 +43,7 @@ exports.uploadLogo = async (req, res, next) => {
     await settings.save();
     const { clearSettingsCache } = require('../utils/helpers');
     clearSettingsCache();
+    invalidateBrandCache();
     res.json({ settings });
   } catch (err) {
     next(err);
@@ -144,3 +152,26 @@ exports.getCompanyLogoImage = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getCompanyBrand = async (req, res, next) => {
+  try {
+    if (cachedBrand) {
+      return res.json(cachedBrand);
+    }
+    const settings = await getSettings();
+    cachedBrand = {
+      companyName: settings.companyName || "Amudhasurabiy Organics",
+      logo: settings.logoUrl || settings.logo || "/uploads/default-logo.png",
+      favicon: settings.favicon || "/favicon.png",
+      themeColor: settings.brandColor || "#5a2d0c",
+      website: settings.websiteUrl || "",
+      email: settings.email || "",
+      phone: settings.phone || "",
+      address: settings.address || ""
+    };
+    res.json(cachedBrand);
+  } catch (err) {
+    next(err);
+  }
+};
+

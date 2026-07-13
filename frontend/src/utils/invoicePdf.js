@@ -142,7 +142,16 @@ export async function buildInvoicePdfDoc(sale, settings) {
   let logoImg = null;
   if (settings?.logo || settings?.logoUrl) {
     try {
-      const logoUrl = getActiveLogoUrl(settings);
+      let logoUrl = null;
+      try {
+        const cached = localStorage.getItem('cached_brand_data');
+        if (cached) {
+          logoUrl = JSON.parse(cached).logoUrl;
+        }
+      } catch (_) {}
+      if (!logoUrl) {
+        logoUrl = getActiveLogoUrl(settings);
+      }
       logoImg = await loadImage(logoUrl);
       logoLoaded = true;
     } catch (err) {

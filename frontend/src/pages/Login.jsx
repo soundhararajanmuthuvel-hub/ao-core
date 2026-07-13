@@ -3,7 +3,8 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { useToast } from '../context/ToastContext';
-import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
+import { resolveAssetUrl } from '../utils/url';
+import { useCompanyBrand } from '../context/CompanyBrandContext';
 import './Login.css';
 
 export default function Login() {
@@ -18,6 +19,7 @@ export default function Login() {
   const { settings } = useSettings();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { logoUrl } = useCompanyBrand();
 
   if (user) {
     return <Navigate to="/" replace />;
@@ -72,13 +74,9 @@ export default function Login() {
           {/* Top Logo Badge (Glassmorphic) */}
           <div className="brand-glass-badge">
             <img
-              src={getActiveLogoUrl(settings)}
+              src={logoUrl}
               alt="AO Core Logo"
               className="brand-logo-top"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = '/default-logo.png';
-              }}
             />
             <span className="brand-logo-text-top">AO CORE ERP</span>
           </div>
@@ -138,13 +136,9 @@ export default function Login() {
               {/* Mobile Header Branding */}
               <div className="mobile-logo-header">
                   <img
-                    src={getActiveLogoUrl(settings)}
+                    src={logoUrl}
                     alt="Logo"
                     className="mobile-logo"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = '/default-logo.png';
-                    }}
                   />
                 <h3>AO CORE ERP</h3>
               </div>

@@ -5,7 +5,8 @@ import { Brain } from 'lucide-react';
 import AIInsightsModal from '../components/AIInsightsModal';
 import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
-import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
+import { resolveAssetUrl } from '../utils/url';
+import { useCompanyBrand } from '../context/CompanyBrandContext';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -90,6 +91,7 @@ export default function Customers() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { settings } = useSettings();
+  const { logoUrl } = useCompanyBrand();
   const [customers, setCustomers] = useState([]);
   
   // V3 Advanced Filters & Bulk Actions
@@ -1858,7 +1860,7 @@ export default function Customers() {
           ctx.fillText('🌿', 540, 100);
           triggerDownload();
         };
-        logo.src = getActiveLogoUrl(settings);
+        logo.src = logoUrl;
       } else {
         triggerDownload();
       }

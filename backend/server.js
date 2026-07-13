@@ -57,6 +57,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/api/assets/company-logo', require('./controllers/settingsController').getCompanyLogoImage);
 app.get('/api/company/logo', require('./controllers/settingsController').getCompanyLogoImage);
+app.get('/api/company/brand', require('./controllers/settingsController').getCompanyBrand);
 
 /* =========================
    ROOT ROUTE

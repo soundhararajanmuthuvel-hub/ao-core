@@ -4,7 +4,8 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
+import { resolveAssetUrl } from '../utils/url';
+import { useCompanyBrand } from '../context/CompanyBrandContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import UserTour from '../components/UserTour';
 import { usePWA } from '../context/PWAContext';
@@ -18,6 +19,7 @@ export default function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { logoUrl } = useCompanyBrand();
 
   if (user?.role === 'Salesman') {
     return <SalesmanApp />;
@@ -336,12 +338,8 @@ export default function AppLayout() {
                   }}
                 >
                   <img
-                    src={getActiveLogoUrl(settings)}
+                    src={logoUrl}
                     alt="Logo"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = '/default-logo.png';
-                    }}
                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                   />
                 </motion.div>
@@ -471,12 +469,8 @@ export default function AppLayout() {
                 zIndex: 2
               }}>
                 <img
-                  src={getActiveLogoUrl(settings)}
+                  src={logoUrl}
                   alt="Logo"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = '/default-logo.png';
-                  }}
                   style={{
                     width: '100%',
                     height: '100%',

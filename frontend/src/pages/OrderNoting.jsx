@@ -2,10 +2,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { ordersApi, productsApi, customersApi, settingsApi } from '../api';
 import { useToast } from '../context/ToastContext';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
+import { resolveAssetUrl } from '../utils/url';
+import { useCompanyBrand } from '../context/CompanyBrandContext';
 
 export default function OrderNoting() {
   const { toast } = useToast();
+  const { logoUrl } = useCompanyBrand();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('ledger'); // 'ledger', 'new', 'slip'
   
@@ -1080,12 +1082,8 @@ export default function OrderNoting() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1 }}>
                     {(settings?.logo || settings?.logoUrl) && (
                       <img
-                        src={getActiveLogoUrl(settings)}
+                        src={logoUrl}
                         alt="Logo"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = '/default-logo.png';
-                        }}
                         style={{
                           height: isCompact ? '38px' : '52px',
                           maxHeight: isCompact ? '38px' : '52px',

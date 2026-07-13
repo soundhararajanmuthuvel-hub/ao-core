@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
+import { CompanyBrandProvider } from './context/CompanyBrandContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { PWAProvider } from './context/PWAContext';
@@ -84,15 +85,17 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <BrowserRouter>
         <SettingsProvider>
-          <ThemeProvider>
-            <AuthProvider>
-              <ToastProvider>
-                <PWAProvider>
-                  <App />
-                </PWAProvider>
-              </ToastProvider>
-            </AuthProvider>
-          </ThemeProvider>
+          <CompanyBrandProvider>
+            <ThemeProvider>
+              <AuthProvider>
+                <ToastProvider>
+                  <PWAProvider>
+                    <App />
+                  </PWAProvider>
+                </ToastProvider>
+              </AuthProvider>
+            </ThemeProvider>
+          </CompanyBrandProvider>
         </SettingsProvider>
       </BrowserRouter>
     </ErrorBoundary>

@@ -3,13 +3,15 @@ import { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { motion, AnimatePresence } from 'framer-motion';
-import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
+import { resolveAssetUrl } from '../utils/url';
+import { useCompanyBrand } from '../context/CompanyBrandContext';
 import client from '../api/client';
 import Modal from './Modal';
 import { useToast } from '../context/ToastContext';
 
 export default function PaymentReminderGenerator({ invoice, customer, settings, onClose }) {
   const { toast } = useToast();
+  const { logoUrl: brandLogoUrl } = useCompanyBrand();
   const [template, setTemplate] = useState('gold'); // 'classic', 'gold', 'green', 'dark'
   const [loading, setLoading] = useState(true);
   const [loadingText, setLoadingText] = useState('Generating Reminder...');
@@ -107,7 +109,7 @@ export default function PaymentReminderGenerator({ invoice, customer, settings, 
   useEffect(() => {
     const preloadAssets = async () => {
       // 1. Logo
-      const logoUrl = getActiveLogoUrl(settings);
+      const logoUrl = brandLogoUrl;
       const logoB64 = await getBase64Image(logoUrl);
       setLogoBase64(logoB64);
 

@@ -360,6 +360,7 @@ export default function SaleView() {
       }
     }
 
+    setBusy('loading-edit');
     try {
       const [pRes, cRes] = await Promise.all([
         productsApi.list({ limit: 200 }),
@@ -402,6 +403,8 @@ export default function SaleView() {
     } catch (err) {
       console.error(err);
       toast('Failed to load customers or products list', 'error');
+    } finally {
+      setBusy('');
     }
   };
 
@@ -716,8 +719,14 @@ export default function SaleView() {
       <div className="btn-group" style={{ display: 'flex', gap: '0.25rem', border: '1px solid #cbd5e1', padding: '2px', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
         {user && ['Super Admin', 'Admin', 'admin', 'Billing Executive', 'Sales Executive'].includes(user.role) && (
           <>
-            <button type="button" className="btn btn-sm btn-secondary" onClick={startEdit} style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#475569' }}>
-              ✏️ Edit
+            <button 
+              type="button" 
+              className="btn btn-sm btn-secondary" 
+              onClick={startEdit} 
+              disabled={!!busy}
+              style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#475569' }}
+            >
+              {busy === 'loading-edit' ? '⏳ Loading...' : '✏️ Edit'}
             </button>
             {sale && sale.paymentStatus !== 'paid' && (
               <button type="button" className="btn btn-sm btn-success" onClick={() => setShowPaymentModal(true)} style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#10b981' }}>

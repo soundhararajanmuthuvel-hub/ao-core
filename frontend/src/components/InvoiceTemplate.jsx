@@ -1,5 +1,5 @@
 import '../styles/invoice-template.css';
-import { getActiveLogoUrl } from '../utils/url';
+import { useCompanyBrand } from '../context/CompanyBrandContext';
 
 // Indian Rupees Number-to-Words conversion helper
 function convertNumberToWords(amount) {
@@ -54,6 +54,7 @@ function convertNumberToWords(amount) {
 }
 
 export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-capture' }) {
+  const { logoUrl } = useCompanyBrand();
   if (!sale) return null;
 
   // Determine GST SPLIT
@@ -200,13 +201,9 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
             }}
           >
             <img 
-              src={getActiveLogoUrl(settings) || '/default-logo.png'} 
+              src={logoUrl || '/default-logo.png'} 
               alt="Logo" 
               className="invoice-logo-img" 
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = '/default-logo.png';
-              }}
               style={{ maxWidth: '85%', maxHeight: '85%', objectFit: 'contain' }}
               crossOrigin="anonymous" 
             />

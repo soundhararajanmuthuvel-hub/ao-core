@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { catalogApi } from '../api';
-import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
+import { resolveAssetUrl } from '../utils/url';
+import { useCompanyBrand } from '../context/CompanyBrandContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function PublicCatalog() {
+  const { logoUrl } = useCompanyBrand();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
@@ -111,9 +113,9 @@ export default function PublicCatalog() {
         boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
       }}>
         <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-          {settings ? (
+          {logoUrl ? (
             <img 
-              src={getActiveLogoUrl(settings)} 
+              src={logoUrl} 
               alt="Logo" 
               style={{ height: '70px', objectFit: 'contain', marginBottom: '0.5rem', filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.2))' }} 
               onError={(e) => { e.target.style.display = 'none'; }}

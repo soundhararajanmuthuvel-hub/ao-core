@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useSettings } from '../context/SettingsContext';
-import { getActiveLogoUrl } from '../utils/url';
+import { useCompanyBrand } from '../context/CompanyBrandContext';
 import PWAInstallButton from '../components/PWAInstallButton';
 import { usePWA } from '../context/PWAContext';
 import { searchApi, notificationsApi, salesApi } from '../api';
@@ -13,6 +13,7 @@ export default function Header({ onMenuToggle }) {
   const { darkMode, toggleDarkMode } = useTheme();
   const { settings } = useSettings();
   const navigate = useNavigate();
+  const { logoUrl } = useCompanyBrand();
   const [search, setSearch] = useState('');
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [results, setResults] = useState(null);
@@ -432,12 +433,8 @@ export default function Header({ onMenuToggle }) {
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <img 
-                src={getActiveLogoUrl(settings)} 
+                src={logoUrl} 
                 alt="Logo" 
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = '/default-logo.png';
-                }}
                 style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain' }} 
               />
               <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{settings?.companyName || 'AO Core'}</span>
@@ -676,12 +673,8 @@ export default function Header({ onMenuToggle }) {
             
             <div className="header-brand" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.75rem' }}>
               <img 
-                src={getActiveLogoUrl(settings)} 
+                src={logoUrl} 
                 alt="Logo" 
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = '/default-logo.png';
-                }}
                 style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain' }} 
               />
               <span className="company-name-text" style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', letterSpacing: '0.2px' }}>

@@ -1,7 +1,8 @@
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import { resolveAssetUrl, getActiveLogoUrl } from '../utils/url';
+import { resolveAssetUrl } from '../utils/url';
+import { useCompanyBrand } from '../context/CompanyBrandContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { sfaApi, ordersApi, shippingApi, productsApi, customersApi } from '../api';
@@ -136,6 +137,7 @@ const badgeStyle = {
 };
 
 export default function Sidebar({ collapsed, open, onClose }) {
+  const { logoUrl } = useCompanyBrand();
   const { user } = useAuth();
   const { settings } = useSettings();
   const location = useLocation();
@@ -252,13 +254,9 @@ export default function Sidebar({ collapsed, open, onClose }) {
         <div className="brand-header-flex">
           <div className="brand-logo-container">
             <img
-              src={getActiveLogoUrl(settings)}
+              src={logoUrl}
               alt="Logo"
               className="brand-logo-img"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = '/default-logo.png';
-              }}
             />
           </div>
           {!collapsed && (
