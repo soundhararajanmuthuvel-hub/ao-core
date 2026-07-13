@@ -199,7 +199,20 @@ const renameTablesToLowercaseIfMySql = async (sequelizeInstance) => {
 };
 
 const connectDB = async () => {
-  await sequelize.authenticate();
+  let retries = 5;
+  while (retries > 0) {
+    try {
+      await sequelize.authenticate();
+      break;
+    } catch (err) {
+      retries--;
+      console.error(`Database connection failed. Retries remaining: ${retries}. Error: ${err.message}`);
+      if (retries === 0) {
+        throw err;
+      }
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+  }
   console.log(`${dialect === 'mysql' ? 'MySQL' : 'SQLite'} connected successfully via Sequelize.`);
   
   await renameTablesToLowercaseIfMySql(sequelize);
