@@ -2,6 +2,8 @@ const Settings = require('../models/Settings');
 const { getSettings, logActivity } = require('../utils/helpers');
 const WooCommerceService = require('../utils/wooService');
 const fs = require('fs');
+const path = require('path');
+const axios = require('axios');
 
 exports.getSettings = async (req, res, next) => {
   try {

@@ -382,6 +382,7 @@ export default function AppRoutes() {
         />
 
         {/* Redirects for backward compatibility */}
+        <Route path="sales/create" element={<Navigate to="/sales?tab=new" replace />} />
         <Route path="sales/new" element={<Navigate to="/sales?tab=new" replace />} />
         <Route path="repack" element={<Navigate to="/manufacturing?tab=repacking" replace />} />
         <Route path="raw-materials" element={<Navigate to="/products?tab=raw-materials" replace />} />

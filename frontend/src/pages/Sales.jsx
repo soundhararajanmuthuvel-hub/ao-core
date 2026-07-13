@@ -399,7 +399,7 @@ export default function Sales() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <Link to="/sales/create" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <Link to="/sales?tab=new" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.85rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
             + Create Invoice
           </Link>
         </div>
