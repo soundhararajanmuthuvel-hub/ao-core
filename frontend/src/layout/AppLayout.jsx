@@ -47,6 +47,17 @@ export default function AppLayout() {
   const [apiLoadingMessage, setApiLoadingMessage] = useState('Processing request...');
   const [apiLoadingType, setApiLoadingType] = useState('general');
 
+  // Safety timeout to prevent permanent loading states
+  useEffect(() => {
+    if (activeRequests > 0) {
+      const timer = setTimeout(() => {
+        console.warn('[PWA] Active requests hung for too long. Force clearing loading overlay.');
+        setActiveRequests(0);
+      }, 25000); // 25 seconds safety timeout
+      return () => clearTimeout(timer);
+    }
+  }, [activeRequests]);
+
   useEffect(() => {
     const hasSeen = sessionStorage.getItem('hasSeenAppLaunch');
     if (!hasSeen && user) {
