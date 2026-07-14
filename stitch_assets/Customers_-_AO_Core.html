@@ -1,0 +1,464 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>AO Core ERP - CRM Customers</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700&amp;family=Inter:wght@400;600&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed": "#ffdbc8",
+                        "surface-container-highest": "#ece0db",
+                        "error-container": "#ffdad6",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed": "#c3e8ff",
+                        "on-tertiary-fixed-variant": "#174c63",
+                        "surface-bright": "#fff8f5",
+                        "on-secondary": "#ffffff",
+                        "surface-dim": "#e4d8d2",
+                        "tertiary-fixed-dim": "#9ecde9",
+                        "on-tertiary-container": "#7aa9c4",
+                        "outline-variant": "#d7c3b8",
+                        "on-error-container": "#93000a",
+                        "tertiary": "#002737",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#fef1ec",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-fixed": "#001e2c",
+                        "secondary-fixed": "#dae2fd",
+                        "on-primary-fixed": "#321300",
+                        "primary-fixed-dim": "#feb78b",
+                        "on-surface-variant": "#52443c",
+                        "on-secondary-container": "#5c647a",
+                        "primary-container": "#5a2d0c",
+                        "surface-container": "#f8ebe6",
+                        "error": "#ba1a1a",
+                        "surface": "#fff8f5",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed-variant": "#6b3a19",
+                        "on-surface": "#201a17",
+                        "background": "#fff8f5",
+                        "on-secondary-fixed-variant": "#3f465c",
+                        "secondary": "#565e74",
+                        "secondary-container": "#dae2fd",
+                        "surface-tint": "#87512e",
+                        "surface-container-high": "#f2e6e0",
+                        "inverse-surface": "#362f2c",
+                        "tertiary-container": "#003e55",
+                        "on-secondary-fixed": "#131b2e",
+                        "inverse-primary": "#feb78b",
+                        "on-background": "#201a17",
+                        "secondary-fixed-dim": "#bec6e0",
+                        "on-primary-container": "#d6946b",
+                        "primary": "#3e1900",
+                        "outline": "#84746b",
+                        "inverse-on-surface": "#fbeee9",
+                        "surface-variant": "#ece0db"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "16px",
+                        "gutter": "16px",
+                        "container-margin": "32px",
+                        "xs": "4px",
+                        "lg": "24px",
+                        "sm": "8px",
+                        "xl": "32px",
+                        "base": "4px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "data-mono": ["JetBrains Mono"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-sm": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "data-mono": ["13px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-sm": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "display-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d7c3b8;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #84746b;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-fade-in {
+                animation: fadeIn 0.4s ease-out forwards;
+            }
+        </style></head>
+<body class="bg-background text-on-background font-body-md min-h-screen">
+<!-- NavigationDrawer Shell -->
+<aside class="fixed left-0 top-0 h-full w-[260px] bg-primary shadow-md flex flex-col py-lg z-50">
+<div class="px-lg mb-xl">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJxR6LpV_2p8q_7UaA2Ub3JazjZ1aN-j9ODlhLcJCcqLAwVIOmbDRkgl2XpTk_zNuD7PvJT1DuzTKEVepxb9JGPSuuonNLRHAUzzIVj1nSpQEbeHqvRqZFFQzb0nssgBa54D8j7Z-JDDFkWDvBf0J5tunn0Y0nH29axJnGKqDkObioAipCPIyHnsKQzNWRxQUzJR9ZSN5X5T68qQdqvWIl0_2AnL2xymmIzE3Ra91UZf-aus3p-J02YGYs1iXiWdoMwSY6zDxXaxY" alt="Amudhasurabiy Organics Logo" class="h-16 w-auto object-contain">
+</div>
+<nav class="flex-1 space-y-1">
+<div class="flex items-center text-outline-variant hover:text-on-primary-fixed p-2 mx-2 cursor-pointer transition-all duration-200 hover:bg-primary-container/10 rounded-lg">
+<span class="material-symbols-outlined mr-md">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</div>
+<div class="flex items-center text-outline-variant hover:text-on-primary-fixed p-2 mx-2 cursor-pointer transition-all duration-200 hover:bg-primary-container/10 rounded-lg">
+<span class="material-symbols-outlined mr-md">inventory_2</span>
+<span class="font-body-md text-body-md">Inventory</span>
+</div>
+<div class="flex items-center text-outline-variant hover:text-on-primary-fixed p-2 mx-2 cursor-pointer transition-all duration-200 hover:bg-primary-container/10 rounded-lg">
+<span class="material-symbols-outlined mr-md">local_shipping</span>
+<span class="font-body-md text-body-md">Supply Chain</span>
+</div>
+<!-- Active State for CRM/Customers context -->
+<div class="flex items-center text-primary-fixed-dim font-bold bg-primary-container/20 rounded-lg mx-2 p-2 cursor-pointer transition-all duration-200">
+<span class="material-symbols-outlined mr-md">shopping_cart</span>
+<span class="font-body-md text-body-md">Orders</span>
+</div>
+<div class="flex items-center text-outline-variant hover:text-on-primary-fixed p-2 mx-2 cursor-pointer transition-all duration-200 hover:bg-primary-container/10 rounded-lg">
+<span class="material-symbols-outlined mr-md">bar_chart</span>
+<span class="font-body-md text-body-md">Analytics</span>
+</div>
+<div class="flex items-center text-outline-variant hover:text-on-primary-fixed p-2 mx-2 cursor-pointer transition-all duration-200 hover:bg-primary-container/10 rounded-lg">
+<span class="material-symbols-outlined mr-md">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</div>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-[260px] min-h-screen">
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 left-[260px] h-16 bg-surface border-b border-outline-variant flex items-center justify-between px-xl w-full z-40">
+<div class="flex items-center gap-md"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJxR6LpV_2p8q_7UaA2Ub3JazjZ1aN-j9ODlhLcJCcqLAwVIOmbDRkgl2XpTk_zNuD7PvJT1DuzTKEVepxb9JGPSuuonNLRHAUzzIVj1nSpQEbeHqvRqZFFQzb0nssgBa54D8j7Z-JDDFkWDvBf0J5tunn0Y0nH29axJnGKqDkObioAipCPIyHnsKQzNWRxQUzJR9ZSN5X5T68qQdqvWIl0_2AnL2xymmIzE3Ra91UZf-aus3p-J02YGYs1iXiWdoMwSY6zDxXaxY" alt="Logo" class="h-8 w-auto object-contain mr-2">
+<button class="material-symbols-outlined text-primary focus:outline-none transition-all hover:bg-surface-container-high p-2 rounded-full">menu</button>
+<div class="flex items-center text-on-surface-variant font-body-sm space-x-2">
+<span class="">CRM</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="text-on-surface font-bold">Customers</span>
+</div>
+</div>
+<div class="flex items-center gap-lg">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="bg-surface-container-low border border-outline-variant rounded-full pl-10 pr-4 py-1.5 text-body-sm focus:ring-1 focus:ring-primary-container focus:border-primary-container outline-none w-64 transition-all" placeholder="Search customers..." type="text">
+</div>
+<button class="bg-primary-container text-on-primary-container px-lg py-sm rounded-lg font-label-md transition-all hover:opacity-90">ADD NEW</button>
+</div>
+</header>
+<!-- Canvas -->
+<div class="pt-24 pb-12 px-container-margin max-w-[1600px] mx-auto">
+<!-- Page Header & Tabs -->
+<div class="mb-xl">
+<h2 class="font-display-lg text-display-lg text-primary mb-md">Customer Management</h2>
+<div class="flex border-b border-outline-variant">
+<button class="px-lg py-md text-primary font-bold border-b-2 border-primary-container transition-all">Leads</button>
+<button class="px-lg py-md text-on-surface-variant hover:text-on-surface transition-all">Customers</button>
+<button class="px-lg py-md text-on-surface-variant hover:text-on-surface transition-all flex items-center gap-2">
+                        Follow Ups
+                        <span class="bg-error text-on-error text-[10px] px-1.5 rounded-full">3</span>
+</button>
+</div>
+</div>
+<!-- Dashboard Layout: Grid -->
+<div class="grid grid-cols-12 gap-lg">
+<!-- Left: List View -->
+<div class="col-span-12 lg:col-span-8">
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant">
+<th class="p-md font-label-md text-on-surface-variant">NAME</th>
+<th class="p-md font-label-md text-on-surface-variant">SOURCE</th>
+<th class="p-md font-label-md text-on-surface-variant">STATUS</th>
+<th class="p-md font-label-md text-on-surface-variant text-right">VALUE</th>
+<th class="p-md"></th>
+</tr>
+</thead>
+<tbody>
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container transition-colors cursor-pointer border-b border-outline-variant last:border-0" onclick="showDetail('row1')">
+<td class="p-md">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center text-on-primary-fixed font-bold">
+                                                    AS
+                                                </div>
+<div>
+<div class="font-headline-sm text-headline-sm text-on-surface">Artisan Sprouts</div>
+<div class="text-body-sm text-on-surface-variant">sprouts@artisan.io</div>
+</div>
+</div>
+</td>
+<td class="p-md">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">globe</span>
+<span class="text-body-sm">Web Inquiry</span>
+</div>
+</td>
+<td class="p-md">
+<span class="bg-secondary-container/30 text-on-secondary-container px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider">Active Lead</span>
+</td>
+<td class="p-md text-right font-data-mono text-on-surface">$12,400.00</td>
+<td class="p-md text-right">
+<span class="material-symbols-outlined text-outline">chevron_right</span>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container transition-colors cursor-pointer border-b border-outline-variant last:border-0">
+<td class="p-md">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed flex items-center justify-center text-on-tertiary-fixed font-bold">
+                                                    NH
+                                                </div>
+<div>
+<div class="font-headline-sm text-headline-sm text-on-surface">Nature's Harvest</div>
+<div class="text-body-sm text-on-surface-variant">contact@naturesharvest.com</div>
+</div>
+</div>
+</td>
+<td class="p-md">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">handshake</span>
+<span class="text-body-sm">Referral</span>
+</div>
+</td>
+<td class="p-md">
+<span class="bg-primary-fixed/30 text-on-primary-fixed-variant px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider">Negotiation</span>
+</td>
+<td class="p-md text-right font-data-mono text-on-surface">$45,000.00</td>
+<td class="p-md text-right">
+<span class="material-symbols-outlined text-outline">chevron_right</span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container transition-colors cursor-pointer border-b border-outline-variant last:border-0">
+<td class="p-md">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface-variant font-bold">
+                                                    OL
+                                                </div>
+<div>
+<div class="font-headline-sm text-headline-sm text-on-surface">Organic Living Co.</div>
+<div class="text-body-sm text-on-surface-variant">sales@organicliving.co</div>
+</div>
+</div>
+</td>
+<td class="p-md">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">ads_click</span>
+<span class="text-body-sm">Paid Search</span>
+</div>
+</td>
+<td class="p-md">
+<span class="bg-error-container text-on-error-container px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider">Hot Lead</span>
+</td>
+<td class="p-md text-right font-data-mono text-on-surface">$8,900.00</td>
+<td class="p-md text-right">
+<span class="material-symbols-outlined text-outline">chevron_right</span>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container transition-colors cursor-pointer border-b border-outline-variant last:border-0">
+<td class="p-md">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed font-bold">
+                                                    GR
+                                                </div>
+<div>
+<div class="font-headline-sm text-headline-sm text-on-surface">Green Roots Dist.</div>
+<div class="text-body-sm text-on-surface-variant">info@greenroots.org</div>
+</div>
+</div>
+</td>
+<td class="p-md">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">groups</span>
+<span class="text-body-sm">Trade Show</span>
+</div>
+</td>
+<td class="p-md">
+<span class="bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider">Dormant</span>
+</td>
+<td class="p-md text-right font-data-mono text-on-surface">$2,100.00</td>
+<td class="p-md text-right">
+<span class="material-symbols-outlined text-outline">chevron_right</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-md bg-surface-container-low border-t border-outline-variant flex items-center justify-between">
+<span class="text-body-sm text-on-surface-variant">Showing 1 to 4 of 124 leads</span>
+<div class="flex gap-2">
+<button class="w-8 h-8 rounded border border-outline-variant flex items-center justify-center text-on-surface hover:bg-surface"><span class="material-symbols-outlined text-[18px]">chevron_left</span></button>
+<button class="w-8 h-8 rounded border border-outline-variant flex items-center justify-center text-on-surface hover:bg-surface"><span class="material-symbols-outlined text-[18px]">chevron_right</span></button>
+</div>
+</div>
+</div>
+</div>
+<!-- Right: Details Sidebar (Adaptive Bento Card) -->
+<div class="col-span-12 lg:col-span-4 space-y-lg">
+<!-- Detail Pane -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-lg p-lg animate-fade-in" id="detail-view">
+<div class="flex justify-between items-start mb-lg">
+<h3 class="font-headline-sm text-headline-sm text-primary">Customer Details</h3>
+<div class="flex gap-2">
+<button class="p-2 hover:bg-surface-container rounded-full text-outline transition-all"><span class="material-symbols-outlined">edit</span></button>
+<button class="p-2 hover:bg-surface-container rounded-full text-outline transition-all"><span class="material-symbols-outlined">more_vert</span></button>
+</div>
+</div>
+<!-- Main Identity -->
+<div class="text-center mb-xl">
+<div class="w-24 h-24 mx-auto mb-md rounded-2xl bg-primary-fixed flex items-center justify-center shadow-md">
+<span class="text-3xl font-bold text-on-primary-fixed">AS</span>
+</div>
+<h4 class="font-headline-md text-headline-md text-on-surface">Artisan Sprouts</h4>
+<p class="text-body-sm text-on-surface-variant">Retail Distributor • Oregon, USA</p>
+</div>
+<!-- Quick Info Grid -->
+<div class="grid grid-cols-2 gap-md mb-xl">
+<div class="p-md bg-surface-bright border border-outline-variant rounded-lg">
+<div class="font-label-md text-on-surface-variant mb-xs">LIFETIME VALUE</div>
+<div class="font-data-mono text-lg text-primary">$48,200</div>
+</div>
+<div class="p-md bg-surface-bright border border-outline-variant rounded-lg">
+<div class="font-label-md text-on-surface-variant mb-xs">LAST ORDER</div>
+<div class="font-data-mono text-lg text-primary">12 Oct 23</div>
+</div>
+</div>
+<!-- Contact Info List -->
+<div class="space-y-md mb-xl">
+<div class="flex items-start gap-md">
+<span class="material-symbols-outlined text-outline">alternate_email</span>
+<div>
+<div class="text-body-sm text-on-surface">sprouts@artisan.io</div>
+<div class="font-label-md text-on-surface-variant">Primary Email</div>
+</div>
+</div>
+<div class="flex items-start gap-md">
+<span class="material-symbols-outlined text-outline">call</span>
+<div>
+<div class="text-body-sm text-on-surface">+1 (503) 555-0192</div>
+<div class="font-label-md text-on-surface-variant">Work Phone</div>
+</div>
+</div>
+<div class="flex items-start gap-md">
+<span class="material-symbols-outlined text-outline">location_on</span>
+<div>
+<div class="text-body-sm text-on-surface">882 SE 10th Ave, Portland, OR 97214</div>
+<div class="font-label-md text-on-surface-variant">Billing Address</div>
+</div>
+</div>
+</div>
+<!-- Order History Table Minimal -->
+<div>
+<h5 class="font-label-md text-on-surface-variant mb-sm">RECENT HISTORY</h5>
+<div class="space-y-sm">
+<div class="flex justify-between items-center p-sm hover:bg-surface transition-colors rounded">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-on-secondary-container">inventory</span>
+<span class="text-body-sm">Order #8821</span>
+</div>
+<span class="text-body-sm font-data-mono">$1,200</span>
+</div>
+<div class="flex justify-between items-center p-sm hover:bg-surface transition-colors rounded">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-on-secondary-container">inventory</span>
+<span class="text-body-sm">Order #8719</span>
+</div>
+<span class="text-body-sm font-data-mono">$3,450</span>
+</div>
+<div class="flex justify-between items-center p-sm hover:bg-surface transition-colors rounded">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-on-secondary-container">mail</span>
+<span class="text-body-sm">Follow-up Call</span>
+</div>
+<span class="text-[10px] uppercase font-bold text-outline">Completed</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Visual Context Card -->
+<div class="bg-surface-container-high rounded-xl overflow-hidden shadow-sm relative h-48 group">
+<div class="absolute inset-0 z-0 transition-transform duration-500 group-hover:scale-105" data-alt="A macro shot of organic green sprouts emerging from dark, nutrient-rich soil in a modern wooden crate. The lighting is soft morning sunlight, filtering through a warehouse skylight, creating a professional and earthy aesthetic. Shallow depth of field emphasizes the texture of the sprouts and soil. Colors are deep forest greens and warm cedar browns." style="background-image: url('https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-primary/80 to-transparent z-10 p-md flex flex-col justify-end">
+<span class="font-label-md text-on-primary/60 uppercase tracking-widest">Industry Insight</span>
+<h4 class="text-on-primary font-headline-sm">Organic Sprout Market growing 12% in Pacific NW</h4>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+        // Simple micro-interaction for detail view
+        function showDetail(id) {
+            const detailPane = document.getElementById('detail-view');
+            detailPane.classList.remove('animate-fade-in');
+            void detailPane.offsetWidth; // Trigger reflow
+            detailPane.classList.add('animate-fade-in');
+            
+            // In a real app, this would fetch data and update the DOM
+            console.log('Fetching details for:', id);
+        }
+
+        // Add custom fade-in animation
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-fade-in {
+                animation: fadeIn 0.4s ease-out forwards;
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+
+
+</body></html>

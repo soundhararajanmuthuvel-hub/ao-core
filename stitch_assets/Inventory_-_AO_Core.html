@@ -1,0 +1,493 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>AO Core ERP | Inventory &amp; Stock</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=Hanken+Grotesk:wght@600;700;800&amp;family=JetBrains+Mono&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@100..900&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-fixed": "#ffdbc8",
+                    "surface-container-highest": "#ece0db",
+                    "error-container": "#ffdad6",
+                    "on-error": "#ffffff",
+                    "tertiary-fixed": "#c3e8ff",
+                    "on-tertiary-fixed-variant": "#174c63",
+                    "surface-bright": "#fff8f5",
+                    "on-secondary": "#ffffff",
+                    "surface-dim": "#e4d8d2",
+                    "tertiary-fixed-dim": "#9ecde9",
+                    "on-tertiary-container": "#7aa9c4",
+                    "outline-variant": "#d7c3b8",
+                    "on-error-container": "#93000a",
+                    "tertiary": "#002737",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-low": "#fef1ec",
+                    "on-primary": "#ffffff",
+                    "on-tertiary-fixed": "#001e2c",
+                    "secondary-fixed": "#dae2fd",
+                    "on-primary-fixed": "#321300",
+                    "primary-fixed-dim": "#feb78b",
+                    "on-surface-variant": "#52443c",
+                    "on-secondary-container": "#5c647a",
+                    "primary-container": "#5a2d0c",
+                    "surface-container": "#f8ebe6",
+                    "error": "#ba1a1a",
+                    "surface": "#fff8f5",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-fixed-variant": "#6b3a19",
+                    "on-surface": "#201a17",
+                    "background": "#fff8f5",
+                    "on-secondary-fixed-variant": "#3f465c",
+                    "secondary": "#565e74",
+                    "secondary-container": "#dae2fd",
+                    "surface-tint": "#87512e",
+                    "surface-container-high": "#f2e6e0",
+                    "inverse-surface": "#362f2c",
+                    "tertiary-container": "#003e55",
+                    "on-secondary-fixed": "#131b2e",
+                    "inverse-primary": "#feb78b",
+                    "on-background": "#201a17",
+                    "secondary-fixed-dim": "#bec6e0",
+                    "on-primary-container": "#d6946b",
+                    "primary": "#3e1900",
+                    "outline": "#84746b",
+                    "inverse-on-surface": "#fbeee9",
+                    "surface-variant": "#ece0db"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "md": "16px",
+                    "gutter": "16px",
+                    "container-margin": "32px",
+                    "xs": "4px",
+                    "lg": "24px",
+                    "sm": "8px",
+                    "xl": "32px",
+                    "base": "4px"
+            },
+            "fontFamily": {
+                    "body-md": ["Inter"],
+                    "data-mono": ["JetBrains Mono"],
+                    "headline-md": ["Hanken Grotesk"],
+                    "label-md": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-sm": ["Hanken Grotesk"],
+                    "display-lg": ["Hanken Grotesk"],
+                    "body-sm": ["Inter"]
+            },
+            "fontSize": {
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "data-mono": ["13px", {"lineHeight": "16px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-sm": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                    "display-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #d7c3b8;
+            border-radius: 10px;
+        }
+        .glass-effect {
+            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.8);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background font-body-md selection:bg-primary-fixed selection:text-primary">
+<!-- Sidebar Navigation -->
+<aside class="fixed left-0 top-0 h-full w-[260px] bg-primary text-on-primary shadow-md flex flex-col py-lg z-50">
+<div class="px-lg mb-xl">
+<div class="flex items-center h-12"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJxR6LpV_2p8q_7UaA2Ub3JazjZ1aN-j9ODlhLcJCcqLAwVIOmbDRkgl2XpTk_zNuD7PvJT1DuzTKEVepxb9JGPSuuonNLRHAUzzIVj1nSpQEbeHqvRqZFFQzb0nssgBa54D8j7Z-JDDFkWDvBf0J5tunn0Y0nH29axJnGKqDkObioAipCPIyHnsKQzNWRxQUzJR9ZSN5X5T68qQdqvWIl0_2AnL2xymmIzE3Ra91UZf-aus3p-J02YGYs1iXiWdoMwSY6zDxXaxY" alt="Amudhasurabiy Organics Logo" class="h-full w-auto object-contain"></div>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="text-outline-variant hover:text-on-primary-fixed p-2 mx-2 cursor-pointer transition-all duration-200 hover:bg-primary-container/10 flex items-center gap-md">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</div>
+<div class="text-primary-fixed-dim font-bold bg-primary-container/20 rounded-lg mx-2 p-2 flex items-center gap-md">
+<span class="material-symbols-outlined" data-icon="inventory_2" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+<span class="font-body-md text-body-md">Inventory</span>
+</div>
+<div class="text-outline-variant hover:text-on-primary-fixed p-2 mx-2 cursor-pointer transition-all duration-200 hover:bg-primary-container/10 flex items-center gap-md">
+<span class="material-symbols-outlined" data-icon="local_shipping">local_shipping</span>
+<span class="font-body-md text-body-md">Supply Chain</span>
+</div>
+<div class="text-outline-variant hover:text-on-primary-fixed p-2 mx-2 cursor-pointer transition-all duration-200 hover:bg-primary-container/10 flex items-center gap-md">
+<span class="material-symbols-outlined" data-icon="shopping_cart">shopping_cart</span>
+<span class="font-body-md text-body-md">Orders</span>
+</div>
+<div class="text-outline-variant hover:text-on-primary-fixed p-2 mx-2 cursor-pointer transition-all duration-200 hover:bg-primary-container/10 flex items-center gap-md">
+<span class="material-symbols-outlined" data-icon="bar_chart">bar_chart</span>
+<span class="font-body-md text-body-md">Analytics</span>
+</div>
+<div class="text-outline-variant hover:text-on-primary-fixed p-2 mx-2 cursor-pointer transition-all duration-200 hover:bg-primary-container/10 flex items-center gap-md">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</div>
+</nav>
+<div class="mt-auto px-lg pt-lg border-t border-primary-container/20">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center text-primary font-bold">JD</div>
+<div>
+<p class="font-label-md text-label-md text-on-primary">Jane Doe</p>
+<p class="text-[10px] text-outline-variant">Operations Lead</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Top App Bar -->
+<header class="fixed top-0 right-0 left-[260px] h-16 bg-surface border-b border-outline-variant flex items-center justify-between px-xl w-full z-40">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-primary cursor-pointer" data-icon="menu">menu</span><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJxR6LpV_2p8q_7UaA2Ub3JazjZ1aN-j9ODlhLcJCcqLAwVIOmbDRkgl2XpTk_zNuD7PvJT1DuzTKEVepxb9JGPSuuonNLRHAUzzIVj1nSpQEbeHqvRqZFFQzb0nssgBa54D8j7Z-JDDFkWDvBf0J5tunn0Y0nH29axJnGKqDkObioAipCPIyHnsKQzNWRxQUzJR9ZSN5X5T68qQdqvWIl0_2AnL2xymmIzE3Ra91UZf-aus3p-J02YGYs1iXiWdoMwSY6zDxXaxY" alt="Logo" class="h-8 w-auto object-contain ml-2">
+<div class="flex items-center text-on-surface-variant font-body-sm">
+<span class="">Inventory</span>
+<span class="material-symbols-outlined text-[16px] mx-1" data-icon="chevron_right">chevron_right</span>
+<span class="text-on-surface font-semibold">Stock Management</span>
+</div>
+</div>
+<div class="flex items-center gap-lg">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline" data-icon="search">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm focus:outline-none focus:ring-1 focus:ring-primary w-64 transition-all" placeholder="Search inventory..." type="text">
+</div>
+<div class="flex items-center gap-md">
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-high p-2 rounded-full transition-all" data-icon="notifications">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-high p-2 rounded-full transition-all" data-icon="help_outline">help_outline</button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-[260px] pt-16 min-h-screen bg-surface-bright">
+<div class="max-w-[1600px] mx-auto p-xl space-y-lg">
+<!-- Page Header -->
+<div class="flex items-end justify-between">
+<div>
+<h2 class="font-headline-md text-display-lg text-on-surface">Inventory &amp; Stock</h2>
+<p class="text-on-surface-variant font-body-md">Manage your organic raw materials and finished products across 3 warehouses.</p>
+</div>
+<div class="flex gap-md">
+<button class="flex items-center gap-2 px-lg py-sm bg-surface-container-low border border-outline-variant text-primary rounded-lg font-label-md hover:bg-surface-container-high transition-all">
+<span class="material-symbols-outlined text-[18px]" data-icon="file_download">file_download</span> Export CSV
+                    </button>
+<button class="flex items-center gap-2 px-lg py-sm bg-primary-container text-on-primary-container rounded-lg font-label-md hover:opacity-90 shadow-sm transition-all" onclick="toggleModal('stockAdjustmentModal')">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span> Adjust Stock
+                    </button>
+</div>
+</div>
+<!-- Dashboard Highlights (Bento-ish Row) -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-lg">
+<div class="bg-surface-container-lowest p-lg rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between h-32">
+<div class="flex justify-between text-outline">
+<span class="font-label-md">TOTAL SKUs</span>
+<span class="material-symbols-outlined" data-icon="category">category</span>
+</div>
+<div class="text-display-lg font-bold text-on-surface">1,284</div>
+</div>
+<div class="bg-surface-container-lowest p-lg rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between h-32">
+<div class="flex justify-between text-outline">
+<span class="font-label-md">LOW STOCK ALERTS</span>
+<span class="material-symbols-outlined text-error" data-icon="warning">warning</span>
+</div>
+<div class="text-display-lg font-bold text-error">12</div>
+</div>
+<div class="bg-surface-container-lowest p-lg rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between h-32">
+<div class="flex justify-between text-outline">
+<span class="font-label-md">TOTAL VALUE</span>
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+</div>
+<div class="text-display-lg font-bold text-on-surface">€42,850</div>
+</div>
+<div class="bg-surface-container-lowest p-lg rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between h-32">
+<div class="flex justify-between text-outline">
+<span class="font-label-md">MOVEMENTS (24H)</span>
+<span class="material-symbols-outlined" data-icon="sync_alt">sync_alt</span>
+</div>
+<div class="text-display-lg font-bold text-on-surface">84</div>
+</div>
+</div>
+<!-- Main Inventory Grid -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-lg">
+<!-- Stock Table Card -->
+<div class="xl:col-span-2 bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden flex flex-col">
+<div class="px-lg py-md border-b border-outline-variant bg-surface-container-low flex items-center justify-between">
+<h3 class="font-headline-sm text-on-surface">Live Inventory Status</h3>
+<div class="flex gap-sm">
+<button class="px-md py-1 rounded bg-surface-bright border border-outline-variant text-body-sm font-label-md text-on-surface-variant">All Warehouses</button>
+<button class="px-md py-1 rounded border border-transparent text-body-sm font-label-md text-outline">Filters</button>
+</div>
+</div>
+<div class="overflow-x-auto custom-scrollbar">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container-low/50 sticky top-0 border-b border-outline-variant">
+<tr>
+<th class="px-lg py-md font-label-md text-on-surface-variant">ITEM DETAILS</th>
+<th class="px-lg py-md font-label-md text-on-surface-variant">CATEGORY</th>
+<th class="px-lg py-md font-label-md text-on-surface-variant">WAREHOUSE</th>
+<th class="px-lg py-md font-label-md text-on-surface-variant text-right">CURRENT STOCK</th>
+<th class="px-lg py-md font-label-md text-on-surface-variant">STATUS</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container-low/30 transition-colors group">
+<td class="px-lg py-md">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 bg-surface-variant rounded-lg overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="High-resolution studio photography of organic raw whole wheat grains in a ceramic bowl, warm natural lighting, earthy brown tones, professional ERP catalog style." src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg">
+</div>
+<div>
+<div class="font-label-md text-on-surface">Organic Whole Wheat</div>
+<div class="text-data-mono text-outline uppercase">RAW-WHT-001</div>
+</div>
+</div>
+</td>
+<td class="px-lg py-md font-body-md text-on-surface-variant">Grains</td>
+<td class="px-lg py-md font-body-md text-on-surface-variant">Hub-North</td>
+<td class="px-lg py-md text-right font-data-mono font-bold text-on-surface">4,200 kg</td>
+<td class="px-lg py-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#22c55e1a] text-[#22c55e] uppercase">Optimal</span>
+</td>
+</tr>
+<tr class="hover:bg-error-container/10 bg-error-container/5 transition-colors group">
+<td class="px-lg py-md">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 bg-surface-variant rounded-lg overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="Close up detail of organic dried hibiscus petals in a dark wooden container, vibrant magenta colors, high-end organic food processing factory lighting." src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg">
+</div>
+<div>
+<div class="font-label-md text-on-surface">Hibiscus Extract</div>
+<div class="text-data-mono text-outline uppercase">EXT-HIB-042</div>
+</div>
+</div>
+</td>
+<td class="px-lg py-md font-body-md text-on-surface-variant">Extracts</td>
+<td class="px-lg py-md font-body-md text-on-surface-variant">Hub-South</td>
+<td class="px-lg py-md text-right font-data-mono font-bold text-error">12 L</td>
+<td class="px-lg py-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-error-container text-on-error-container uppercase">Critical</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/30 transition-colors group">
+<td class="px-lg py-md">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 bg-surface-variant rounded-lg overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="Pure golden organic honey pouring from a glass jar, warm backlit lighting, professional minimalist aesthetic for high-quality food tracking software." src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg">
+</div>
+<div>
+<div class="font-label-md text-on-surface">Clover Honey (Gallon)</div>
+<div class="text-data-mono text-outline uppercase">SWT-HNY-092</div>
+</div>
+</div>
+</td>
+<td class="px-lg py-md font-body-md text-on-surface-variant">Sweeteners</td>
+<td class="px-lg py-md font-body-md text-on-surface-variant">Main-WH</td>
+<td class="px-lg py-md text-right font-data-mono font-bold text-on-surface">340 units</td>
+<td class="px-lg py-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-secondary-container text-on-secondary-container uppercase">Moderate</span>
+</td>
+</tr>
+<tr class="hover:bg-error-container/10 bg-error-container/5 transition-colors group">
+<td class="px-lg py-md">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 bg-surface-variant rounded-lg overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="Sacks of organic biodegradable cornstarch, clean warehouse environment, white and cream textures, corporate enterprise resource planning photography." src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg">
+</div>
+<div>
+<div class="font-label-md text-on-surface">Cornstarch Sacks</div>
+<div class="text-data-mono text-outline uppercase">PK-CRN-773</div>
+</div>
+</div>
+</td>
+<td class="px-lg py-md font-body-md text-on-surface-variant">Additives</td>
+<td class="px-lg py-md font-body-md text-on-surface-variant">Hub-North</td>
+<td class="px-lg py-md text-right font-data-mono font-bold text-error">45 units</td>
+<td class="px-lg py-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-error-container text-on-error-container uppercase">Critical</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Activity Log Sidebar -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm flex flex-col max-h-[600px]">
+<div class="px-lg py-md border-b border-outline-variant bg-surface-container-low">
+<h3 class="font-headline-sm text-on-surface">Movement History</h3>
+</div>
+<div class="flex-1 overflow-y-auto p-lg space-y-md custom-scrollbar">
+<!-- Movement Item -->
+<div class="flex gap-md">
+<div class="mt-1">
+<div class="w-8 h-8 rounded-full bg-[#22c55e1a] text-[#22c55e] flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]" data-icon="add_circle">add_circle</span>
+</div>
+</div>
+<div class="flex-1 border-b border-outline-variant pb-md">
+<div class="flex justify-between items-start mb-1">
+<span class="font-label-md text-on-surface">Stock Inbound</span>
+<span class="text-data-mono text-[11px] text-outline">10:42 AM</span>
+</div>
+<p class="text-body-sm text-on-surface-variant">+500 kg Organic Whole Wheat</p>
+<p class="text-[11px] text-outline mt-1 uppercase">Ref: PO-99201 • Warehouse: North</p>
+</div>
+</div>
+<div class="flex gap-md">
+<div class="mt-1">
+<div class="w-8 h-8 rounded-full bg-error-container text-error flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]" data-icon="remove_circle">remove_circle</span>
+</div>
+</div>
+<div class="flex-1 border-b border-outline-variant pb-md">
+<div class="flex justify-between items-start mb-1">
+<span class="font-label-md text-on-surface">Production Draw</span>
+<span class="text-data-mono text-[11px] text-outline">09:15 AM</span>
+</div>
+<p class="text-body-sm text-on-surface-variant">-12 L Hibiscus Extract</p>
+<p class="text-[11px] text-outline mt-1 uppercase">Batch: PROD-742 • User: M. Chen</p>
+</div>
+</div>
+<div class="flex gap-md">
+<div class="mt-1">
+<div class="w-8 h-8 rounded-full bg-secondary-container text-secondary flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]" data-icon="edit">edit</span>
+</div>
+</div>
+<div class="flex-1 border-b border-outline-variant pb-md">
+<div class="flex justify-between items-start mb-1">
+<span class="font-label-md text-on-surface">Cycle Count Adjustment</span>
+<span class="text-data-mono text-[11px] text-outline">Yesterday</span>
+</div>
+<p class="text-body-sm text-on-surface-variant">+2 units Clover Honey</p>
+<p class="text-[11px] text-outline mt-1 uppercase">Adj: Variance Found • User: J. Doe</p>
+</div>
+</div>
+<div class="flex gap-md">
+<div class="mt-1">
+<div class="w-8 h-8 rounded-full bg-[#22c55e1a] text-[#22c55e] flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]" data-icon="add_circle">add_circle</span>
+</div>
+</div>
+<div class="flex-1 border-b border-outline-variant pb-md">
+<div class="flex justify-between items-start mb-1">
+<span class="font-label-md text-on-surface">Stock Inbound</span>
+<span class="text-data-mono text-[11px] text-outline">Yesterday</span>
+</div>
+<p class="text-body-sm text-on-surface-variant">+1,200 units Cornstarch Sacks</p>
+<p class="text-[11px] text-outline mt-1 uppercase">Ref: PO-99188 • Warehouse: South</p>
+</div>
+</div>
+</div>
+<button class="w-full py-md text-center text-primary font-label-md hover:bg-surface-container-high transition-colors">
+                        View Full History Log
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- Modal Backdrop -->
+<div class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-inverse-surface/40 backdrop-blur-sm p-md" id="stockAdjustmentModal">
+<!-- Modal Content -->
+<div class="bg-surface-container-lowest w-full max-w-lg rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+<div class="px-xl py-lg border-b border-outline-variant flex items-center justify-between bg-surface-container-low">
+<h3 class="font-headline-sm text-on-surface">Manual Stock Adjustment</h3>
+<button class="material-symbols-outlined text-outline hover:text-on-surface p-1" data-icon="close" onclick="toggleModal('stockAdjustmentModal')">close</button>
+</div>
+<div class="p-xl space-y-lg">
+<div class="space-y-sm">
+<label class="font-label-md text-on-surface-variant uppercase">Select Product SKU</label>
+<select class="w-full p-md bg-surface border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+<option>Organic Whole Wheat (RAW-WHT-001)</option>
+<option>Hibiscus Extract (EXT-HIB-042)</option>
+<option>Clover Honey (SWT-HNY-092)</option>
+<option>Cornstarch Sacks (PK-CRN-773)</option>
+</select>
+</div>
+<div class="grid grid-cols-2 gap-lg">
+<div class="space-y-sm">
+<label class="font-label-md text-on-surface-variant uppercase">Adjustment Type</label>
+<select class="w-full p-md bg-surface border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+<option>Inbound (+)</option>
+<option>Outbound (-)</option>
+<option>Lost/Damaged (-)</option>
+<option>Returned (+)</option>
+</select>
+</div>
+<div class="space-y-sm">
+<label class="font-label-md text-on-surface-variant uppercase">Quantity</label>
+<input class="w-full p-md bg-surface border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="0" type="number">
+</div>
+</div>
+<div class="space-y-sm">
+<label class="font-label-md text-on-surface-variant uppercase">Warehouse Location</label>
+<select class="w-full p-md bg-surface border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+<option>Main-WH (Primary)</option>
+<option>Hub-North</option>
+<option>Hub-South</option>
+</select>
+</div>
+<div class="space-y-sm">
+<label class="font-label-md text-on-surface-variant uppercase">Reason for Adjustment</label>
+<textarea class="w-full p-md bg-surface border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none resize-none" placeholder="Explain the stock movement..." rows="3"></textarea>
+</div>
+</div>
+<div class="px-xl py-lg border-t border-outline-variant flex justify-end gap-md bg-surface-container-low">
+<button class="px-xl py-md font-label-md text-on-surface-variant hover:bg-surface-container-highest rounded-lg transition-all" onclick="toggleModal('stockAdjustmentModal')">Cancel</button>
+<button class="px-xl py-md font-label-md bg-primary-container text-on-primary-container rounded-lg hover:opacity-90 transition-all shadow-sm" onclick="toggleModal('stockAdjustmentModal')">Save Adjustment</button>
+</div>
+</div>
+</div>
+<!-- Micro-interaction Scripts -->
+<script>
+        function toggleModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            } else {
+                modal.classList.add('hidden');
+                document.body.style.overflow = 'auto';
+            }
+        }
+
+        // Close modal on outside click
+        window.onclick = function(event) {
+            const modal = document.getElementById('stockAdjustmentModal');
+            if (event.target == modal) {
+                toggleModal('stockAdjustmentModal');
+            }
+        }
+    </script>
+
+
+</body></html>
