@@ -46,6 +46,10 @@ const User = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
     },
+    mustChangePassword: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
     tourCompleted: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,

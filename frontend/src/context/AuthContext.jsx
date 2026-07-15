@@ -280,6 +280,17 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const changePassword = async (newPassword) => {
+    try {
+      const { data } = await authApi.changePassword(newPassword);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setUser(data.user);
+      return data;
+    } catch (err) {
+      throw err;
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -667,6 +678,7 @@ export function AuthProvider({ children }) {
       isAdmin: user?.role === 'admin',
       loadUser,
       updateTourCompleted,
+      changePassword,
       isOffline,
       connectionError,
       offlineMode

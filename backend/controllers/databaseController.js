@@ -188,6 +188,16 @@ exports.resetDemoData = async (req, res) => {
           await sequelize.models[modelName].destroy({ where: {}, force: true });
         }
       }
+      
+      if (req.body.includeUsers) {
+        const { Op } = require('sequelize');
+        await User.destroy({
+          where: {
+            id: { [Op.ne]: req.user.id }
+          },
+          force: true
+        });
+      }
     } finally {
       if (sequelize.options.dialect === 'sqlite') {
         await sequelize.query('PRAGMA foreign_keys = ON;');
@@ -254,6 +264,16 @@ exports.clearTransactions = async (req, res) => {
         if (sequelize.models[modelName]) {
           await sequelize.models[modelName].destroy({ where: {}, force: true });
         }
+      }
+
+      if (req.body.includeUsers) {
+        const { Op } = require('sequelize');
+        await User.destroy({
+          where: {
+            id: { [Op.ne]: req.user.id }
+          },
+          force: true
+        });
       }
     } finally {
       if (sequelize.options.dialect === 'sqlite') {
@@ -336,23 +356,38 @@ exports.factoryReset = async (req, res) => {
       purchaseCounter: 0,
     });
 
+    const crypto = require('crypto');
+    
     // Re-seed default Users
     const defaultUsers = [
-      { name: 'Super Admin', email: 'admin@aocore.com', password: 'Admin@123', role: 'Super Admin', isActive: true },
-      { name: 'Developer', email: 'developer@aocore.com', password: 'Developer@123', role: 'Super Admin', isActive: true },
-      { name: 'Manufacturing Manager', email: 'mfg@aocore.com', password: 'Mfg@123', role: 'Manufacturing Manager', isActive: true },
-      { name: 'Billing Executive', email: 'billing@aocore.com', password: 'Billing@123', role: 'Billing Executive', isActive: true },
-      { name: 'Store Keeper', email: 'store@aocore.com', password: 'Store@123', role: 'Store Keeper', isActive: true },
-      { name: 'Dispatch Executive', email: 'dispatch@aocore.com', password: 'Dispatch@123', role: 'Dispatch Executive', isActive: true },
-      { name: 'Sales Executive', email: 'sales@aocore.com', password: 'Sales@123', role: 'Sales Executive', isActive: true },
+      { name: 'Super Admin', email: 'admin@aocore.com', role: 'Super Admin', isActive: true },
+      { name: 'Developer', email: 'developer@aocore.com', role: 'Super Admin', isActive: true },
+      { name: 'Manufacturing Manager', email: 'mfg@aocore.com', role: 'Manufacturing Manager', isActive: true },
+      { name: 'Billing Executive', email: 'billing@aocore.com', role: 'Billing Executive', isActive: true },
+      { name: 'Store Keeper', email: 'store@aocore.com', role: 'Store Keeper', isActive: true },
+      { name: 'Dispatch Executive', email: 'dispatch@aocore.com', role: 'Dispatch Executive', isActive: true },
+      { name: 'Sales Executive', email: 'sales@aocore.com', role: 'Sales Executive', isActive: true },
     ];
 
+    const generatedCredentials = [];
     let seededAdminId = 1;
+
     for (const u of defaultUsers) {
-      const newUser = await User.create(u);
+      const plainPassword = crypto.randomBytes(9).toString('base64');
+      const newUser = await User.create({
+        ...u,
+        password: plainPassword,
+        mustChangePassword: true
+      });
       if (u.role === 'Super Admin') {
         seededAdminId = newUser.id;
       }
+      generatedCredentials.push({
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        password: plainPassword
+      });
     }
 
     // Re-require ActivityLog since sequelize sync wiped context and re-register
@@ -374,7 +409,8 @@ exports.factoryReset = async (req, res) => {
     res.json({
       success: true,
       message: 'Factory reset successfully completed. ERP returned to first-install state.',
-      backupFileName: backup.backupFileName
+      backupFileName: backup.backupFileName,
+      credentials: generatedCredentials
     });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to perform factory reset', error: err.message });

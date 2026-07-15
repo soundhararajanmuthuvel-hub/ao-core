@@ -1822,19 +1822,20 @@ exports.getMigrationLogs = async (req, res) => {
 // Full system database backup export zip
 exports.exportBackup = async (req, res) => {
   try {
-    const [
-      users, settings, customers, products, invoices, invoiceItems, payments,
-      orders, shipments, stockMovements, rawMaterials, manufacturingEntries, repackEntries
-    ] = await Promise.all([
-      User.findAll(), Settings.findAll(), Customer.findAll(), Product.findAll(), Invoice.findAll(),
-      InvoiceItem.findAll(), Payment.findAll(), Order.findAll(), Shipment.findAll(),
-      StockMovement.findAll(), RawMaterial.findAll(), ManufacturingEntry.findAll(), RepackEntry.findAll()
-    ]);
+    const backupData = {};
+    for (const modelName of Object.keys(sequelize.models)) {
+      const model = sequelize.models[modelName];
+      if (modelName === 'User') {
+        backupData[modelName] = await model.scope('withPassword').findAll({ raw: true });
+      } else {
+        backupData[modelName] = await model.findAll({ raw: true });
+      }
+    }
 
-    const backupData = {
-      users, settings, customers, products, invoices, invoiceItems, payments,
-      orders, shipments, stockMovements, rawMaterials, manufacturingEntries, repackEntries
-    };
+    const customers = backupData['Customer'] || [];
+    const products = backupData['Product'] || [];
+    const invoices = backupData['Invoice'] || [];
+    const payments = backupData['Payment'] || [];
 
     const zip = new AdmZip();
     zip.addFile('db_backup.json', Buffer.from(JSON.stringify(backupData, null, 2), 'utf8'));
@@ -1877,13 +1878,16 @@ exports.restoreBackup = async (req, res) => {
   }
 
   const zipPath = req.file.path;
-  const t = await sequelize.transaction();
+  const dialect = sequelize.getDialect();
+  const useTransaction = dialect !== 'sqlite';
+  const t = useTransaction ? await sequelize.transaction() : null;
+  const opt = t ? { transaction: t } : {};
 
   try {
     const zip = new AdmZip(zipPath);
     const entry = zip.getEntry('db_backup.json');
     if (!entry) {
-      await t.rollback();
+      if (t) await t.rollback();
       try { fs.unlinkSync(zipPath); } catch {}
       return res.status(400).json({ success: false, message: 'Invalid AO Core backup: missing db_backup.json file' });
     }
@@ -1891,54 +1895,79 @@ exports.restoreBackup = async (req, res) => {
     const backup = JSON.parse(entry.getData().toString('utf8'));
 
     // Disable SQLite/MySQL foreign keys checks prior to truncate
-    const dialect = sequelize.getDialect();
     if (dialect === 'sqlite') {
-      await sequelize.query('PRAGMA foreign_keys = OFF;', { transaction: t });
+      await sequelize.query('PRAGMA foreign_keys = OFF;');
     } else {
-      await sequelize.query('SET FOREIGN_KEY_CHECKS = 0;', { transaction: t });
+      await sequelize.query('SET FOREIGN_KEY_CHECKS = 0;', opt);
     }
 
-    // Truncate tables
-    await Promise.all([
-      InvoiceItem.destroy({ where: {}, force: true, transaction: t }),
-      Invoice.destroy({ where: {}, force: true, transaction: t }),
-      Payment.destroy({ where: {}, force: true, transaction: t }),
-      Order.destroy({ where: {}, force: true, transaction: t }),
-      Shipment.destroy({ where: {}, force: true, transaction: t }),
-      StockMovement.destroy({ where: {}, force: true, transaction: t }),
-      Product.destroy({ where: {}, force: true, transaction: t }),
-      Customer.destroy({ where: {}, force: true, transaction: t }),
-      RawMaterial.destroy({ where: {}, force: true, transaction: t }),
-      ManufacturingEntry.destroy({ where: {}, force: true, transaction: t }),
-      RepackEntry.destroy({ where: {}, force: true, transaction: t })
-    ]);
+    // Dynamic model iteration
+    const { Op } = require('sequelize');
+    const modelNames = Object.keys(sequelize.models);
 
-    // Bulk reload
-    if (backup.customers?.length > 0) await Customer.bulkCreate(backup.customers, { transaction: t });
-    if (backup.products?.length > 0) await Product.bulkCreate(backup.products, { transaction: t });
-    if (backup.invoices?.length > 0) await Invoice.bulkCreate(backup.invoices, { transaction: t });
-    if (backup.invoiceItems?.length > 0) await InvoiceItem.bulkCreate(backup.invoiceItems, { transaction: t });
-    if (backup.payments?.length > 0) await Payment.bulkCreate(backup.payments, { transaction: t });
-    if (backup.orders?.length > 0) await Order.bulkCreate(backup.orders, { transaction: t });
-    if (backup.shipments?.length > 0) await Shipment.bulkCreate(backup.shipments, { transaction: t });
-    if (backup.stockMovements?.length > 0) await StockMovement.bulkCreate(backup.stockMovements, { transaction: t });
-    if (backup.rawMaterials?.length > 0) await RawMaterial.bulkCreate(backup.rawMaterials, { transaction: t });
-    if (backup.manufacturingEntries?.length > 0) await ManufacturingEntry.bulkCreate(backup.manufacturingEntries, { transaction: t });
-    if (backup.repackEntries?.length > 0) await RepackEntry.bulkCreate(backup.repackEntries, { transaction: t });
+    for (const modelName of modelNames) {
+      const model = sequelize.models[modelName];
+
+      // Retrieve records from backup using case-insensitive plural fallback
+      let records = backup[modelName];
+      if (!records) {
+        const pluralKey = modelName.toLowerCase() + 's';
+        records = backup[pluralKey];
+      }
+      if (!records && modelName === 'InvoiceItem') {
+        records = backup['invoiceItems'];
+      }
+      if (!records && modelName === 'StockMovement') {
+        records = backup['stockMovements'];
+      }
+      if (!records && modelName === 'RawMaterial') {
+        records = backup['rawMaterials'];
+      }
+      if (!records && modelName === 'ManufacturingEntry') {
+        records = backup['manufacturingEntries'];
+      }
+      if (!records && modelName === 'RepackEntry') {
+        records = backup['repackEntries'];
+      }
+
+      if (modelName === 'User') {
+        // Safeguard: never destroy or replace the current active admin performing the restore
+        await model.destroy({
+          where: {
+            id: { [Op.ne]: req.user.id }
+          },
+          force: true,
+          ...opt
+        });
+
+        if (records && records.length > 0) {
+          const usersToInsert = records.filter(u => Number(u.id) !== Number(req.user.id));
+          if (usersToInsert.length > 0) {
+            await model.bulkCreate(usersToInsert, opt);
+          }
+        }
+      } else {
+        // Destroy all rows
+        await model.destroy({ where: {}, force: true, ...opt });
+        if (records && records.length > 0) {
+          await model.bulkCreate(records, opt);
+        }
+      }
+    }
 
     // Enable foreign keys back
     if (dialect === 'sqlite') {
-      await sequelize.query('PRAGMA foreign_keys = ON;', { transaction: t });
+      await sequelize.query('PRAGMA foreign_keys = ON;');
     } else {
-      await sequelize.query('SET FOREIGN_KEY_CHECKS = 1;', { transaction: t });
+      await sequelize.query('SET FOREIGN_KEY_CHECKS = 1;', opt);
     }
 
-    await t.commit();
+    if (t) await t.commit();
     try { fs.unlinkSync(zipPath); } catch {}
 
     res.json({ success: true, message: 'Database successfully restored from backup ZIP archive snapshot' });
   } catch (err) {
-    await t.rollback();
+    if (t) await t.rollback();
     console.error('Database restore crashed:', err);
     try { fs.unlinkSync(zipPath); } catch {}
     res.status(500).json({ success: false, message: 'Backup restoration failed', error: err.message });

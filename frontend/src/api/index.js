@@ -4,6 +4,7 @@ export const authApi = {
   login: (data) => client.post('/auth/login', data),
   me: () => client.get('/auth/me'),
   updateTour: (tourCompleted) => client.put('/auth/me/tour', { tourCompleted }),
+  changePassword: (password) => client.put('/auth/me/change-password', { password }),
 };
 
 export const usersApi = {
@@ -362,8 +363,8 @@ export const whatsappApi = {
 export const databaseApi = {
   getCounts: () => client.get('/settings/database/counts'),
   verifyPassword: (password) => client.post('/settings/database/verify-password', { password }),
-  resetDemoData: (password) => client.post('/settings/database/reset-demo', { password }),
-  clearTransactions: (password) => client.post('/settings/database/clear-transactions', { password }),
+  resetDemoData: (password, includeUsers) => client.post('/settings/database/reset-demo', { password, includeUsers }),
+  clearTransactions: (password, includeUsers) => client.post('/settings/database/clear-transactions', { password, includeUsers }),
   factoryReset: (password) => client.post('/settings/database/factory-reset', { password }),
   backup: () => client.get('/settings/database/backup', { responseType: 'blob' }),
 };

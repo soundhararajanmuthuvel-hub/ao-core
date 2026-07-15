@@ -1,0 +1,130 @@
+{
+  "name": "assets/498f0fb6619b4b7b8b1b02aeaff3036e",
+  "designSystem": {
+    "displayName": "Organic Aurum",
+    "styleGuidelines": "## Brand & Style\nThe design system embodies \"Modern Organic Luxury,\" a direction that blends the tactile warmth of physical craftsmanship with the precision of high-end digital interfaces. The aesthetic is rooted in a dark, atmospheric palette that evokes materials like aged leather, heavy linen, and brushed brass.\n\nThe style is **Tactile Minimalism**. It avoids the sterility of flat design by using subtle inner glows, soft embossing, and hairline borders to create a sense of physical presence. The target audience values exclusivity, sustainability, and sensory richness. The UI should feel like a private concierge or a premium heritage brand—quiet, confident, and deeply grounded.\n\n## Layout & Spacing\nThis design system utilizes a **Fixed Grid** philosophy for desktop to maintain a sense of structured, editorial composition. \n\n- **Desktop:** 12-column grid, 1200px max-width, 24px gutters.\n- **Tablet:** 8-column fluid grid, 32px side margins.\n- **Mobile:** 4-column fluid grid, 20px side margins.\n\nSpacing is generous to evoke a premium \"quiet\" luxury. Use vertical rhythm to create distinct \"rooms\" for content, rather than crowding elements together. Large whitespace (or \"dark-space\") is a key signifier of the brand's premium nature.\n\n## Elevation & Depth\nDepth is achieved through material metaphors rather than traditional drop shadows.\n\n- **Surface Layers:** Higher elevation levels are indicated by slightly lighter versions of the espresso base, moving toward a warm charcoal.\n- **Hairline Borders:** Use 1px borders in Gold (#C9A25D) at 15-20% opacity to define edges without breaking the organic flow.\n- **Inner Glows:** For interactive containers, use a subtle top-down inner glow (light cream at 5% opacity) to simulate an embossed or \"pressed\" edge.\n- **Shadows:** Use large, extremely soft shadows with a warm tint (`rgba(43, 29, 20, 0.4)`) to make cards feel like they are resting on a leather or linen surface.\n\n## Components\n- **Buttons:** Primary buttons use the Aged Brass background with dark espresso text. Secondary buttons are ghost-style with a hairline gold border. Hover states should introduce a soft \"inner glow\" rather than a drastic color change.\n- **Input Fields:** These should feel \"recessed\" into the UI. Use a slightly darker background than the surface and a 1px bottom border in muted gold.\n- **Status Chips:** Use the \"Muted Tonal\" palette. For example, a \"Success\" chip uses a deep forest green background with the secondary Sage Green text—high enough contrast for legibility but low enough to remain understated.\n- **Cards:** Cards should have no visible background change from the main surface; instead, they are defined by a soft outer shadow and a 1px low-opacity gold hairline border.\n- **Lists:** Use linen-like dividers (1px height, warm neutral, 10% opacity) with generous vertical padding (16px - 24px) to keep the layout feeling airy.",
+    "theme": {
+      "colorMode": "DARK",
+      "font": "PLAYFAIR_DISPLAY",
+      "roundness": "ROUND_FOUR",
+      "customColor": "#2b1d14",
+      "headlineFont": "PLAYFAIR_DISPLAY",
+      "bodyFont": "INTER",
+      "labelFont": "INTER",
+      "namedColors": {
+        "background": "#16130f",
+        "error": "#ffb4ab",
+        "error_container": "#93000a",
+        "inverse_on_surface": "#34302c",
+        "inverse_primary": "#6e5a4f",
+        "inverse_surface": "#eae1db",
+        "on_background": "#eae1db",
+        "on_error": "#690005",
+        "on_error_container": "#ffdad6",
+        "on_primary": "#3d2d23",
+        "on_primary_container": "#998377",
+        "on_primary_fixed": "#261910",
+        "on_primary_fixed_variant": "#554339",
+        "on_secondary": "#422d00",
+        "on_secondary_container": "#d7af69",
+        "on_secondary_fixed": "#271900",
+        "on_secondary_fixed_variant": "#5e4203",
+        "on_surface": "#eae1db",
+        "on_surface_variant": "#d2c4bd",
+        "on_tertiary": "#24351d",
+        "on_tertiary_container": "#7a8d6f",
+        "on_tertiary_fixed": "#101f09",
+        "on_tertiary_fixed_variant": "#3a4c31",
+        "outline": "#9b8e88",
+        "outline_variant": "#4e453f",
+        "primary": "#dbc2b3",
+        "primary_container": "#2b1d14",
+        "primary_fixed": "#f8ddcf",
+        "primary_fixed_dim": "#dbc2b3",
+        "secondary": "#eac078",
+        "secondary_container": "#5e4203",
+        "secondary_fixed": "#ffdea9",
+        "secondary_fixed_dim": "#eac078",
+        "surface": "#16130f",
+        "surface_bright": "#3d3834",
+        "surface_container": "#231f1b",
+        "surface_container_high": "#2e2925",
+        "surface_container_highest": "#393430",
+        "surface_container_low": "#1f1b17",
+        "surface_container_lowest": "#110e0a",
+        "surface_dim": "#16130f",
+        "surface_tint": "#dbc2b3",
+        "surface_variant": "#393430",
+        "tertiary": "#b8cdab",
+        "tertiary_container": "#14240e",
+        "tertiary_fixed": "#d4e9c5",
+        "tertiary_fixed_dim": "#b8cdab"
+      },
+      "designMd": "---\nname: Organic Aurum\ncolors:\n  surface: '#16130f'\n  surface-dim: '#16130f'\n  surface-bright: '#3d3834'\n  surface-container-lowest: '#110e0a'\n  surface-container-low: '#1f1b17'\n  surface-container: '#231f1b'\n  surface-container-high: '#2e2925'\n  surface-container-highest: '#393430'\n  on-surface: '#eae1db'\n  on-surface-variant: '#d2c4bd'\n  inverse-surface: '#eae1db'\n  inverse-on-surface: '#34302c'\n  outline: '#9b8e88'\n  outline-variant: '#4e453f'\n  surface-tint: '#dbc2b3'\n  primary: '#dbc2b3'\n  on-primary: '#3d2d23'\n  primary-container: '#2b1d14'\n  on-primary-container: '#998377'\n  inverse-primary: '#6e5a4f'\n  secondary: '#eac078'\n  on-secondary: '#422d00'\n  secondary-container: '#5e4203'\n  on-secondary-container: '#d7af69'\n  tertiary: '#b8cdab'\n  on-tertiary: '#24351d'\n  tertiary-container: '#14240e'\n  on-tertiary-container: '#7a8d6f'\n  error: '#ffb4ab'\n  on-error: '#690005'\n  error-container: '#93000a'\n  on-error-container: '#ffdad6'\n  primary-fixed: '#f8ddcf'\n  primary-fixed-dim: '#dbc2b3'\n  on-primary-fixed: '#261910'\n  on-primary-fixed-variant: '#554339'\n  secondary-fixed: '#ffdea9'\n  secondary-fixed-dim: '#eac078'\n  on-secondary-fixed: '#271900'\n  on-secondary-fixed-variant: '#5e4203'\n  tertiary-fixed: '#d4e9c5'\n  tertiary-fixed-dim: '#b8cdab'\n  on-tertiary-fixed: '#101f09'\n  on-tertiary-fixed-variant: '#3a4c31'\n  background: '#16130f'\n  on-background: '#eae1db'\n  surface-variant: '#393430'\ntypography:\n  display-lg:\n    fontFamily: Playfair Display\n    fontSize: 48px\n    fontWeight: '700'\n    lineHeight: 56px\n    letterSpacing: -0.02em\n  headline-lg:\n    fontFamily: Playfair Display\n    fontSize: 32px\n    fontWeight: '600'\n    lineHeight: 40px\n  headline-md:\n    fontFamily: Playfair Display\n    fontSize: 24px\n    fontWeight: '600'\n    lineHeight: 32px\n  body-lg:\n    fontFamily: Inter\n    fontSize: 18px\n    fontWeight: '400'\n    lineHeight: 28px\n  body-md:\n    fontFamily: Inter\n    fontSize: 16px\n    fontWeight: '400'\n    lineHeight: 24px\n  label-md:\n    fontFamily: Inter\n    fontSize: 14px\n    fontWeight: '500'\n    lineHeight: 20px\n    letterSpacing: 0.05em\n  headline-lg-mobile:\n    fontFamily: Playfair Display\n    fontSize: 28px\n    fontWeight: '600'\n    lineHeight: 36px\nrounded:\n  sm: 0.125rem\n  DEFAULT: 0.25rem\n  md: 0.375rem\n  lg: 0.5rem\n  xl: 0.75rem\n  full: 9999px\nspacing:\n  base: 8px\n  container-margin: 32px\n  gutter: 24px\n  section-gap: 80px\n  stack-sm: 12px\n  stack-md: 24px\n---\n\n## Brand & Style\nThe design system embodies \"Modern Organic Luxury,\" a direction that blends the tactile warmth of physical craftsmanship with the precision of high-end digital interfaces. The aesthetic is rooted in a dark, atmospheric palette that evokes materials like aged leather, heavy linen, and brushed brass.\n\nThe style is **Tactile Minimalism**. It avoids the sterility of flat design by using subtle inner glows, soft embossing, and hairline borders to create a sense of physical presence. The target audience values exclusivity, sustainability, and sensory richness. The UI should feel like a private concierge or a premium heritage brand—quiet, confident, and deeply grounded.\n\n## Colors\nThe palette is strictly dark and warm, avoiding pure blacks or whites to maintain a \"material\" feel.\n\n- **Primary Base:** Deep Espresso (#2B1D14) serves as the core surface color. \n- **Accent Gold:** Aged Brass (#C9A25D) is reserved for high-priority actions, active states, and refined iconography.\n- **Organic Secondary:** Muted Sage (#8FA383) provides a soft, natural counterpoint, used for secondary actions or decorative elements.\n- **Neutrals:** Warm charcoals and creams (#EBE4D9) replace standard greys to ensure the interface feels expensive and welcoming.\n- **Semantic States:** Rather than bright signals, use muted tonal variations: Soft Amber for warnings, Soft Sage for success, and Soft Rust for errors.\n\n## Typography\nThe typographic scale relies on a high-contrast pairing. **Playfair Display** provides editorial elegance for headlines, while **Inter** ensures absolute clarity for functional UI elements.\n\nAll labels and small data points should use Inter with a slightly increased letter spacing and medium weight to maintain legibility against the dark, textured backgrounds. Headlines should use tight tracking to emphasize their serif character and luxury feel.\n\n## Layout & Spacing\nThis design system utilizes a **Fixed Grid** philosophy for desktop to maintain a sense of structured, editorial composition. \n\n- **Desktop:** 12-column grid, 1200px max-width, 24px gutters.\n- **Tablet:** 8-column fluid grid, 32px side margins.\n- **Mobile:** 4-column fluid grid, 20px side margins.\n\nSpacing is generous to evoke a premium \"quiet\" luxury. Use vertical rhythm to create distinct \"rooms\" for content, rather than crowding elements together. Large whitespace (or \"dark-space\") is a key signifier of the brand's premium nature.\n\n## Elevation & Depth\nDepth is achieved through material metaphors rather than traditional drop shadows.\n\n- **Surface Layers:** Higher elevation levels are indicated by slightly lighter versions of the espresso base, moving toward a warm charcoal.\n- **Hairline Borders:** Use 1px borders in Gold (#C9A25D) at 15-20% opacity to define edges without breaking the organic flow.\n- **Inner Glows:** For interactive containers, use a subtle top-down inner glow (light cream at 5% opacity) to simulate an embossed or \"pressed\" edge.\n- **Shadows:** Use large, extremely soft shadows with a warm tint (`rgba(43, 29, 20, 0.4)`) to make cards feel like they are resting on a leather or linen surface.\n\n## Shapes\nShapes are \"Soft\" (0.25rem - 0.75rem). This avoids the clinical feel of sharp corners while remaining more sophisticated and architectural than fully rounded \"pill\" shapes. \n\nLarge sections and primary cards should use `rounded-lg` (0.5rem), while buttons and input fields use the base `rounded` (0.25rem) to maintain a crisp, professional edge.\n\n## Components\n- **Buttons:** Primary buttons use the Aged Brass background with dark espresso text. Secondary buttons are ghost-style with a hairline gold border. Hover states should introduce a soft \"inner glow\" rather than a drastic color change.\n- **Input Fields:** These should feel \"recessed\" into the UI. Use a slightly darker background than the surface and a 1px bottom border in muted gold.\n- **Status Chips:** Use the \"Muted Tonal\" palette. For example, a \"Success\" chip uses a deep forest green background with the secondary Sage Green text—high enough contrast for legibility but low enough to remain understated.\n- **Cards:** Cards should have no visible background change from the main surface; instead, they are defined by a soft outer shadow and a 1px low-opacity gold hairline border.\n- **Lists:** Use linen-like dividers (1px height, warm neutral, 10% opacity) with generous vertical padding (16px - 24px) to keep the layout feeling airy.",
+      "colorVariant": "FIDELITY",
+      "overridePrimaryColor": "#2b1d14",
+      "overrideSecondaryColor": "#c9a25d",
+      "overrideTertiaryColor": "#8fa383",
+      "overrideNeutralColor": "#3d3834",
+      "spacingScale": 2,
+      "typography": {
+        "body-lg": {
+          "fontFamily": "Inter",
+          "fontSize": "18px",
+          "fontWeight": "400",
+          "lineHeight": "28px"
+        },
+        "body-md": {
+          "fontFamily": "Inter",
+          "fontSize": "16px",
+          "fontWeight": "400",
+          "lineHeight": "24px"
+        },
+        "display-lg": {
+          "fontFamily": "Playfair Display",
+          "fontSize": "48px",
+          "fontWeight": "700",
+          "lineHeight": "56px",
+          "letterSpacing": "-0.02em"
+        },
+        "headline-lg": {
+          "fontFamily": "Playfair Display",
+          "fontSize": "32px",
+          "fontWeight": "600",
+          "lineHeight": "40px"
+        },
+        "headline-lg-mobile": {
+          "fontFamily": "Playfair Display",
+          "fontSize": "28px",
+          "fontWeight": "600",
+          "lineHeight": "36px"
+        },
+        "headline-md": {
+          "fontFamily": "Playfair Display",
+          "fontSize": "24px",
+          "fontWeight": "600",
+          "lineHeight": "32px"
+        },
+        "label-md": {
+          "fontFamily": "Inter",
+          "fontSize": "14px",
+          "fontWeight": "500",
+          "lineHeight": "20px",
+          "letterSpacing": "0.05em"
+        }
+      },
+      "spacing": {
+        "base": "8px",
+        "container-margin": "32px",
+        "gutter": "24px",
+        "section-gap": "80px",
+        "stack-md": "24px",
+        "stack-sm": "12px"
+      },
+      "headlineFontFamily": "Playfair Display",
+      "bodyFontFamily": "Inter",
+      "labelFontFamily": "Inter"
+    }
+  },
+  "version": "1"
+}

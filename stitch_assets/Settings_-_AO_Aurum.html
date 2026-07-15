@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AO Core Settings</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Playfair+Display:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "primary-fixed": "#f8ddcf",
+                "tertiary-container": "#14240e",
+                "surface": "#16130f",
+                "on-primary-fixed": "#261910",
+                "on-secondary-fixed-variant": "#5e4203",
+                "inverse-on-surface": "#34302c",
+                "error-container": "#93000a",
+                "on-tertiary-fixed-variant": "#3a4c31",
+                "inverse-primary": "#6e5a4f",
+                "error": "#ffb4ab",
+                "tertiary-fixed": "#d4e9c5",
+                "surface-bright": "#3d3834",
+                "tertiary": "#b8cdab",
+                "surface-tint": "#dbc2b3",
+                "inverse-surface": "#eae1db",
+                "secondary-fixed-dim": "#eac078",
+                "primary": "#dbc2b3",
+                "surface-variant": "#393430",
+                "surface-dim": "#16130f",
+                "on-primary-fixed-variant": "#554339",
+                "surface-container-low": "#1f1b17",
+                "on-error": "#690005",
+                "surface-container-highest": "#393430",
+                "outline": "#9b8e88",
+                "on-tertiary-container": "#7a8d6f",
+                "secondary": "#eac078",
+                "on-primary": "#3d2d23",
+                "on-secondary-container": "#d7af69",
+                "secondary-fixed": "#ffdea9",
+                "on-primary-container": "#998377",
+                "outline-variant": "#4e453f",
+                "tertiary-fixed-dim": "#b8cdab",
+                "on-tertiary-fixed": "#101f09",
+                "on-surface-variant": "#d2c4bd",
+                "on-error-container": "#ffdad6",
+                "on-secondary-fixed": "#271900",
+                "secondary-container": "#5e4203",
+                "primary-container": "#2b1d14",
+                "background": "#16130f",
+                "on-surface": "#eae1db",
+                "surface-container-high": "#2e2925",
+                "surface-container-lowest": "#110e0a",
+                "on-tertiary": "#24351d",
+                "primary-fixed-dim": "#dbc2b3",
+                "on-secondary": "#422d00",
+                "surface-container": "#231f1b",
+                "on-background": "#eae1db"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "container-margin": "32px",
+                "stack-md": "24px",
+                "gutter": "24px",
+                "section-gap": "80px",
+                "stack-sm": "12px",
+                "base": "8px"
+        },
+        "fontFamily": {
+                "body-md": ["Inter"],
+                "headline-lg": ["Playfair Display"],
+                "headline-lg-mobile": ["Playfair Display"],
+                "display-lg": ["Playfair Display"],
+                "body-lg": ["Inter"],
+                "label-md": ["Inter"],
+                "headline-md": ["Playfair Display"]
+        },
+        "fontSize": {
+                "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}],
+                "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+        }
+    },
+    },
+  }
+</script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .active-tab {
+            border-bottom: 2px solid #eac078;
+            color: #eac078;
+            text-shadow: 0 0 12px rgba(234, 192, 120, 0.4);
+        }
+        .integration-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.5);
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f1b17;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4e453f;
+            border-radius: 10px;
+        }
+        .glass-input {
+            background: rgba(22, 19, 15, 0.6);
+            backdrop-filter: blur(8px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen overflow-x-hidden">
+<!-- NavigationDrawer -->
+<aside class="fixed left-0 top-0 h-full w-[260px] bg-surface-container-lowest border-r border-outline-variant flex flex-col py-lg z-50">
+<div class="px-xl mb-xl">
+<h1 class="font-headline-md text-headline-md font-bold text-secondary">AO Core ERP</h1>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="text-on-surface-variant hover:text-secondary p-2 mx-2 cursor-pointer transition-all duration-200 flex items-center gap-md">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</div>
+<div class="text-on-surface-variant hover:text-secondary p-2 mx-2 cursor-pointer transition-all duration-200 flex items-center gap-md">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-body-md text-body-md">Inventory</span>
+</div>
+<div class="text-on-surface-variant hover:text-secondary p-2 mx-2 cursor-pointer transition-all duration-200 flex items-center gap-md">
+<span class="material-symbols-outlined" data-icon="local_shipping">local_shipping</span>
+<span class="font-body-md text-body-md">Supply Chain</span>
+</div>
+<div class="text-on-surface-variant hover:text-secondary p-2 mx-2 cursor-pointer transition-all duration-200 flex items-center gap-md">
+<span class="material-symbols-outlined" data-icon="shopping_cart">shopping_cart</span>
+<span class="font-body-md text-body-md">Orders</span>
+</div>
+<div class="text-on-surface-variant hover:text-secondary p-2 mx-2 cursor-pointer transition-all duration-200 flex items-center gap-md">
+<span class="material-symbols-outlined" data-icon="bar_chart">bar_chart</span>
+<span class="font-body-md text-body-md">Analytics</span>
+</div>
+<!-- Settings Active -->
+<div class="text-secondary font-bold bg-secondary-container/10 rounded-lg mx-2 p-2 cursor-pointer transition-all duration-200 flex items-center gap-md">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</div>
+</nav>
+</aside>
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 left-[260px] h-16 bg-surface border-b border-outline-variant flex items-center justify-between px-xl w-full z-40">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-secondary" data-icon="menu">menu</span>
+<span class="font-headline-md text-headline-sm text-on-surface">Settings</span>
+</div>
+<div class="flex items-center gap-md">
+<button class="flex items-center gap-xs px-md py-xs rounded-lg hover:bg-surface-container-high transition-all text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+<span class="font-label-md text-label-md uppercase">Search</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-secondary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary" data-icon="account_circle">account_circle</span>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-[260px] pt-16 min-h-screen">
+<div class="max-w-[1600px] mx-auto p-xl">
+<!-- Header & Tabs -->
+<div class="mb-xl">
+<nav class="flex gap-xl border-b border-outline-variant overflow-x-auto">
+<button class="pb-md px-xs font-label-md text-label-md uppercase active-tab transition-all" id="tab-general" onclick="switchTab('general')">General Settings</button>
+<button class="pb-md px-xs font-label-md text-label-md uppercase text-on-surface-variant hover:text-secondary transition-all" id="tab-integrations" onclick="switchTab('integrations')">Integrations</button>
+<button class="pb-md px-xs font-label-md text-label-md uppercase text-on-surface-variant hover:text-secondary transition-all" id="tab-developer" onclick="switchTab('developer')">Developer Center</button>
+</nav>
+</div>
+<!-- Tab Content: General -->
+<div class="space-y-xl" id="content-general">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-xl">
+<!-- Brand Identity Card -->
+<div class="lg:col-span-2 space-y-md">
+<section class="bg-surface-container-low border border-outline-variant rounded-xl p-xl shadow-lg">
+<h3 class="font-headline-md text-headline-sm mb-lg text-primary">Brand Identity</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-lg">
+<div>
+<label class="font-label-md text-label-md block mb-xs uppercase text-on-secondary-container">Brand Logo</label>
+<div class="relative group h-40 w-full rounded-lg border border-outline-variant bg-surface-container flex items-center justify-center overflow-hidden transition-all">
+<img alt="AO Core Organics Logo" class="h-32 w-full object-contain p-md brightness-110" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAksnwV4lXejryckRInRGW1-PV2DgokAKxDuR6K1kZTFZjEJbO0wUnSSjkRROl8pNrZOk0bCQiz2D8D90HQ22AS15c7T8-rYk96Tt_4lSzC8tCCWtzImvF6X18VzNJ_mmSwnhjZDPxkSI5PqIv9m2SwDTEYtHf2lAV8sw0LrejOJEgxKJnVJUPkE5p2M-chotQHbk-5TM3S2jvgiT-lqtC8Oi-cr5zlF1t-4qK6dIAyKbCKCEX9NKKYQbzEnx1joC-HGywJXVcN7KI"/>
+<div class="absolute inset-0 bg-secondary-container/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+<div class="text-center text-on-secondary-container">
+<span class="material-symbols-outlined text-2xl mb-xs">edit</span>
+<p class="font-label-md text-label-md uppercase">Change Logo</p>
+</div>
+</div>
+</div>
+</div>
+<div class="space-y-lg">
+<div>
+<label class="font-label-md text-label-md block mb-xs uppercase text-on-secondary-container">Company Name</label>
+<input class="w-full glass-input border border-outline-variant rounded-lg px-md py-sm focus:border-secondary focus:ring-1 focus:ring-secondary outline-none transition-all text-on-surface" type="text" value="AO Core Organics"/>
+</div>
+<div>
+<label class="font-label-md text-label-md block mb-xs uppercase text-on-secondary-container">Primary Brand Color</label>
+<div class="flex gap-sm">
+<div class="h-10 w-10 rounded-lg bg-primary border border-outline-variant shrink-0"></div>
+<input class="w-full glass-input border border-outline-variant rounded-lg px-md py-sm focus:border-secondary outline-none font-mono" type="text" value="#3e1900"/>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="bg-surface-container-low border border-outline-variant rounded-xl p-xl shadow-lg">
+<h3 class="font-headline-md text-headline-sm mb-lg text-primary">Preferences</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-lg">
+<div>
+<label class="font-label-md text-label-md block mb-xs uppercase text-on-secondary-container">Language</label>
+<select class="w-full glass-input border border-outline-variant rounded-lg px-md py-sm focus:border-secondary outline-none transition-all text-on-surface">
+<option>English (United States)</option>
+<option>Spanish (ES)</option>
+<option>French (FR)</option>
+</select>
+</div>
+<div>
+<label class="font-label-md text-label-md block mb-xs uppercase text-on-secondary-container">Timezone</label>
+<select class="w-full glass-input border border-outline-variant rounded-lg px-md py-sm focus:border-secondary outline-none transition-all text-on-surface">
+<option>(GMT-08:00) Pacific Time</option>
+<option>(GMT-05:00) Eastern Time</option>
+<option>(GMT+00:00) UTC</option>
+</select>
+</div>
+</div>
+</section>
+</div>
+<!-- Summary / Side Card -->
+<div class="space-y-md">
+<div class="bg-primary-container text-primary border border-secondary/20 p-xl rounded-xl shadow-xl">
+<h4 class="font-headline-md text-headline-sm mb-sm">Active Plan</h4>
+<p class="font-body-md text-body-md mb-lg opacity-90 text-on-surface">Enterprise Pro - Annual</p>
+<div class="bg-surface-container/30 rounded-lg p-md mb-lg border border-outline-variant">
+<div class="flex justify-between items-center mb-xs">
+<span class="font-label-md text-label-md uppercase text-secondary">Storage</span>
+<span class="font-mono text-on-surface">82%</span>
+</div>
+<div class="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-secondary" style="width: 82%"></div>
+</div>
+</div>
+<button class="w-full bg-secondary text-on-secondary-fixed font-label-md text-label-md uppercase py-sm rounded-lg hover:bg-secondary-fixed-dim transition-all shadow-[0_0_15px_rgba(234,192,120,0.3)] hover:shadow-[0_0_25px_rgba(234,192,120,0.5)]">Upgrade Plan</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Tab Content: Integrations (Hidden by default) -->
+<div class="hidden" id="content-integrations">
+<div class="flex justify-between items-end mb-xl">
+<div>
+<h2 class="font-headline-md text-headline-md text-primary">Marketplace</h2>
+<p class="text-on-surface-variant font-body-md">Connect your ERP to the tools you use every day.</p>
+</div>
+<div class="flex gap-sm">
+<button class="px-md py-sm border border-outline-variant rounded-lg font-label-md text-label-md uppercase text-on-surface hover:bg-surface-container-high transition-all">Manage Connected</button>
+<button class="px-md py-sm bg-secondary text-on-secondary-fixed rounded-lg font-label-md text-label-md uppercase hover:shadow-[0_0_15px_rgba(234,192,120,0.3)] transition-all">Browse All</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-lg">
+<!-- Shopify -->
+<div class="integration-card bg-surface-container-low border border-outline-variant rounded-xl p-lg transition-all cursor-pointer">
+<div class="flex justify-between items-start mb-md">
+<div class="h-12 w-12 rounded-lg bg-[#95BF47]/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-[#95BF47]" data-icon="shopping_bag">shopping_bag</span>
+</div>
+<span class="bg-tertiary-container text-tertiary font-label-md text-[10px] px-xs py-0.5 rounded uppercase border border-tertiary/20">Connected</span>
+</div>
+<h4 class="font-headline-md text-headline-sm mb-xs text-on-surface">Shopify</h4>
+<p class="text-on-surface-variant font-body-sm mb-lg">Sync orders, products, and inventory in real-time.</p>
+<button class="w-full py-xs border border-outline-variant rounded-lg font-label-md text-label-md uppercase text-on-surface-variant hover:border-secondary hover:text-secondary transition-all">Configure</button>
+</div>
+<!-- QuickBooks -->
+<div class="integration-card bg-surface-container-low border border-outline-variant rounded-xl p-lg transition-all cursor-pointer">
+<div class="flex justify-between items-start mb-md">
+<div class="h-12 w-12 rounded-lg bg-[#2CA01C]/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-[#2CA01C]" data-icon="account_balance">account_balance</span>
+</div>
+</div>
+<h4 class="font-headline-md text-headline-sm mb-xs text-on-surface">QuickBooks</h4>
+<p class="text-on-surface-variant font-body-sm mb-lg">Automate your bookkeeping and financial reporting.</p>
+<button class="w-full py-xs bg-secondary text-on-secondary-fixed rounded-lg font-label-md text-label-md uppercase hover:bg-secondary-fixed-dim transition-all">Connect</button>
+</div>
+<!-- Stripe -->
+<div class="integration-card bg-surface-container-low border border-outline-variant rounded-xl p-lg transition-all cursor-pointer">
+<div class="flex justify-between items-start mb-md">
+<div class="h-12 w-12 rounded-lg bg-[#635BFF]/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-[#635BFF]" data-icon="payments">payments</span>
+</div>
+</div>
+<h4 class="font-headline-md text-headline-sm mb-xs text-on-surface">Stripe</h4>
+<p class="text-on-surface-variant font-body-sm mb-lg">Manage payments, invoices, and payouts globally.</p>
+<button class="w-full py-xs bg-secondary text-on-secondary-fixed rounded-lg font-label-md text-label-md uppercase hover:bg-secondary-fixed-dim transition-all">Connect</button>
+</div>
+<!-- Slack -->
+<div class="integration-card bg-surface-container-low border border-outline-variant rounded-xl p-lg transition-all cursor-pointer">
+<div class="flex justify-between items-start mb-md">
+<div class="h-12 w-12 rounded-lg bg-[#4A154B]/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-[#4A154B]" data-icon="forum">forum</span>
+</div>
+</div>
+<h4 class="font-headline-md text-headline-sm mb-xs text-on-surface">Slack</h4>
+<p class="text-on-surface-variant font-body-sm mb-lg">Get instant notifications for critical ERP events.</p>
+<button class="w-full py-xs bg-secondary text-on-secondary-fixed rounded-lg font-label-md text-label-md uppercase hover:bg-secondary-fixed-dim transition-all">Connect</button>
+</div>
+</div>
+</div>
+<!-- Tab Content: Developer (Hidden by default) -->
+<div class="hidden space-y-xl" id="content-developer">
+<div class="bg-surface-container-high border border-secondary/20 rounded-xl p-xl shadow-2xl overflow-hidden relative">
+<!-- Subtle background effect -->
+<div class="absolute top-0 right-0 opacity-5 pointer-events-none">
+<span class="material-symbols-outlined text-[200px] text-secondary" data-icon="code">code</span>
+</div>
+<div class="relative z-10">
+<h2 class="font-headline-md text-headline-md mb-md text-primary">API Access</h2>
+<p class="font-body-lg text-body-lg mb-xl max-w-2xl opacity-90 text-on-surface">Build custom integrations or automate your workflow using our GraphQL API. Keys should be kept confidential and never shared in client-side code.</p>
+<div class="space-y-lg">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-lg">
+<div class="flex justify-between items-center mb-md">
+<h4 class="font-label-md text-label-md uppercase text-secondary">Production API Key</h4>
+<span class="bg-secondary/20 text-secondary font-mono text-xs px-sm py-0.5 rounded border border-secondary/30">Active</span>
+</div>
+<div class="flex gap-md items-center">
+<div class="flex-1 glass-input p-sm rounded font-mono text-body-sm border border-outline-variant truncate text-on-surface">
+                                        ao_live_51M3v7XJ...k92zP0L
+                                    </div>
+<button class="p-sm hover:bg-secondary/10 rounded transition-all text-secondary">
+<span class="material-symbols-outlined" data-icon="content_copy">content_copy</span>
+</button>
+<button class="px-md py-sm bg-error-container text-on-error-container rounded-lg font-label-md text-label-md uppercase text-xs hover:bg-error transition-all hover:text-on-error">Revoke</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-lg">
+<div class="p-lg border border-outline-variant rounded-lg bg-surface-container-lowest">
+<h5 class="font-label-md text-label-md uppercase mb-sm text-secondary">Webhooks</h5>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-md">4 active endpoints configured.</p>
+<button class="text-secondary font-label-md text-label-md uppercase hover:underline">Manage Endpoints →</button>
+</div>
+<div class="p-lg border border-outline-variant rounded-lg bg-surface-container-lowest">
+<h5 class="font-label-md text-label-md uppercase mb-sm text-secondary">Documentation</h5>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-md">Review our latest API references.</p>
+<button class="text-secondary font-label-md text-label-md uppercase hover:underline">View Docs →</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Rate Limit Card -->
+<div class="bg-surface-container-low border border-outline-variant rounded-xl p-xl shadow-lg">
+<div class="flex justify-between items-center mb-lg">
+<h3 class="font-headline-md text-headline-sm text-primary">API Usage</h3>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Last 30 days</span>
+</div>
+<div class="h-32 w-full flex items-end gap-xs">
+<!-- Tiny mock bar chart -->
+<div class="flex-1 bg-secondary/10 rounded-t-sm h-[40%]"></div>
+<div class="flex-1 bg-secondary/10 rounded-t-sm h-[35%]"></div>
+<div class="flex-1 bg-secondary/10 rounded-t-sm h-[55%]"></div>
+<div class="flex-1 bg-secondary/30 rounded-t-sm h-[70%]"></div>
+<div class="flex-1 bg-secondary/20 rounded-t-sm h-[65%]"></div>
+<div class="flex-1 bg-secondary/40 rounded-t-sm h-[80%]"></div>
+<div class="flex-1 bg-secondary/60 rounded-t-sm h-[95%]"></div>
+<div class="flex-1 bg-secondary/30 rounded-t-sm h-[45%]"></div>
+<div class="flex-1 bg-secondary/10 rounded-t-sm h-[30%]"></div>
+<div class="flex-1 bg-secondary/10 rounded-t-sm h-[40%]"></div>
+<div class="flex-1 bg-secondary/10 rounded-t-sm h-[20%]"></div>
+<div class="flex-1 bg-secondary/10 rounded-t-sm h-[15%]"></div>
+</div>
+<div class="flex justify-between mt-md pt-md border-t border-outline-variant">
+<div>
+<p class="font-label-md text-label-md uppercase text-on-surface-variant">Remaining Calls</p>
+<p class="font-headline-md text-headline-sm text-on-surface">42,801 / 50,000</p>
+</div>
+<div class="text-right">
+<p class="font-label-md text-label-md uppercase text-on-surface-variant">Avg Response Time</p>
+<p class="font-headline-md text-headline-sm text-on-surface">114ms</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Action Button -->
+<button class="fixed bottom-xl right-xl h-14 px-lg rounded-full bg-secondary text-on-secondary-fixed shadow-[0_8px_25px_rgba(234,192,120,0.4)] flex items-center gap-md hover:bg-secondary-fixed-dim transition-all active:scale-95 z-50 border border-secondary/30" id="fab-save">
+<span class="material-symbols-outlined" data-icon="save">save</span>
+<span class="font-label-md text-label-md uppercase">Save Changes</span>
+</button>
+<script>
+        function switchTab(tabName) {
+            // Hide all contents
+            document.getElementById('content-general').classList.add('hidden');
+            document.getElementById('content-integrations').classList.add('hidden');
+            document.getElementById('content-developer').classList.add('hidden');
+            
+            // Remove active styles from all tabs
+            const tabs = ['general', 'integrations', 'developer'];
+            tabs.forEach(t => {
+                const el = document.getElementById('tab-' + t);
+                el.classList.remove('active-tab');
+                el.classList.add('text-on-surface-variant');
+            });
+            
+            // Show selected content
+            document.getElementById('content-' + tabName).classList.remove('hidden');
+            const activeTabEl = document.getElementById('tab-' + tabName);
+            activeTabEl.classList.add('active-tab');
+            activeTabEl.classList.remove('text-on-surface-variant');
+
+            // Handle FAB visibility
+            const fab = document.getElementById('fab-save');
+            if (tabName === 'general') {
+                fab.classList.remove('hidden');
+            } else {
+                fab.classList.add('hidden');
+            }
+        }
+
+        // Simple notification feedback simulation
+        document.getElementById('fab-save').addEventListener('click', () => {
+            const btn = document.getElementById('fab-save');
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = `<span class="material-symbols-outlined animate-spin" data-icon="sync">sync</span> <span class="font-label-md text-label-md uppercase">Saving...</span>`;
+            btn.classList.add('opacity-80');
+            
+            setTimeout(() => {
+                btn.innerHTML = `<span class="material-symbols-outlined" data-icon="check_circle">check_circle</span> <span class="font-label-md text-label-md uppercase">Saved!</span>`;
+                btn.classList.remove('bg-secondary');
+                btn.classList.add('bg-tertiary-container', 'text-tertiary');
+                btn.style.boxShadow = '0 8px 25px rgba(184, 205, 171, 0.4)';
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalContent;
+                    btn.classList.remove('bg-tertiary-container', 'text-tertiary', 'opacity-80');
+                    btn.classList.add('bg-secondary');
+                    btn.style.boxShadow = '0 8px 25px rgba(234, 192, 120, 0.4)';
+                }, 2000);
+            }, 1000);
+        });
+    </script>
+</body></html>

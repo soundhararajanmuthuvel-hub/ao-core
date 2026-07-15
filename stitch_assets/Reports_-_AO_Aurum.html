@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AO Core ERP | Reports</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet"/>
+<!-- Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed": "#f8ddcf",
+                        "tertiary-container": "#14240e",
+                        "surface": "#16130f",
+                        "on-primary-fixed": "#261910",
+                        "on-secondary-fixed-variant": "#5e4203",
+                        "inverse-on-surface": "#34302c",
+                        "error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#3a4c31",
+                        "inverse-primary": "#6e5a4f",
+                        "error": "#ffb4ab",
+                        "tertiary-fixed": "#d4e9c5",
+                        "surface-bright": "#3d3834",
+                        "tertiary": "#b8cdab",
+                        "surface-tint": "#dbc2b3",
+                        "inverse-surface": "#eae1db",
+                        "secondary-fixed-dim": "#eac078",
+                        "primary": "#dbc2b3",
+                        "surface-variant": "#393430",
+                        "surface-dim": "#16130f",
+                        "on-primary-fixed-variant": "#554339",
+                        "surface-container-low": "#1f1b17",
+                        "on-error": "#690005",
+                        "surface-container-highest": "#393430",
+                        "outline": "#9b8e88",
+                        "on-tertiary-container": "#7a8d6f",
+                        "secondary": "#eac078",
+                        "on-primary": "#3d2d23",
+                        "on-secondary-container": "#d7af69",
+                        "secondary-fixed": "#ffdea9",
+                        "on-primary-container": "#998377",
+                        "outline-variant": "#4e453f",
+                        "tertiary-fixed-dim": "#b8cdab",
+                        "on-tertiary-fixed": "#101f09",
+                        "on-surface-variant": "#d2c4bd",
+                        "on-error-container": "#ffdad6",
+                        "on-secondary-fixed": "#271900",
+                        "secondary-container": "#5e4203",
+                        "primary-container": "#2b1d14",
+                        "background": "#16130f",
+                        "on-surface": "#eae1db",
+                        "surface-container-high": "#2e2925",
+                        "surface-container-lowest": "#110e0a",
+                        "on-tertiary": "#24351d",
+                        "primary-fixed-dim": "#dbc2b3",
+                        "on-secondary": "#422d00",
+                        "surface-container": "#231f1b",
+                        "on-background": "#eae1db"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-margin": "32px",
+                        "stack-md": "24px",
+                        "gutter": "24px",
+                        "section-gap": "80px",
+                        "stack-sm": "12px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Playfair Display"],
+                        "headline-lg-mobile": ["Playfair Display"],
+                        "display-lg": ["Playfair Display"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-md": ["Playfair Display"],
+                        "data-mono": ["JetBrains Mono"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #16130f;
+            min-height: max(884px, 100dvh);
+        }
+        .chart-bar {
+            transition: height 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #4e453f;
+            border-radius: 10px;
+        }
+        .dark-glass {
+            background: rgba(35, 31, 27, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(234, 192, 120, 0.15); /* Gold hairline */
+        }
+        .gold-hairline {
+            border: 1px solid rgba(234, 192, 120, 0.2);
+        }
+    </style>
+</head>
+<body class="font-body-md text-on-surface">
+<!-- NavigationDrawer -->
+<aside class="fixed left-0 top-0 h-full w-[260px] bg-surface-container-lowest border-r border-outline-variant flex flex-col py-lg z-50">
+<div class="px-gutter mb-xl flex items-center justify-center">
+<img alt="AO Core ERP Logo" class="h-10 w-auto object-contain grayscale invert opacity-80" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJxR6LpV_2p8q_7UaA2Ub3JazjZ1aN-j9ODlhLcJCcqLAwVIOmbDRkgl2XpTk_zNuD7PvJT1DuzTKEVepxb9JGPSuuonNLRHAUzzIVj1nSpQEbeHqvRqZFFQzb0nssgBa54D8j7Z-JDDFkWDvBf0J5tunn0Y0nH29axJnGKqDkObioAipCPIyHnsKQzNWRxQUzJR9ZSN5X5T68qQdqvWIl0_2AnL2xymmIzE3Ra91UZf-aus3p-J02YGYs1iXiWdoMwSY6zDxXaxY"/>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="text-on-surface-variant hover:text-secondary p-2 mx-4 cursor-pointer transition-all duration-200 flex items-center gap-3">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</div>
+<div class="text-on-surface-variant hover:text-secondary p-2 mx-4 cursor-pointer transition-all duration-200 flex items-center gap-3">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-body-md text-body-md">Inventory</span>
+</div>
+<div class="text-on-surface-variant hover:text-secondary p-2 mx-4 cursor-pointer transition-all duration-200 flex items-center gap-3">
+<span class="material-symbols-outlined">local_shipping</span>
+<span class="font-body-md text-body-md">Supply Chain</span>
+</div>
+<div class="text-on-surface-variant hover:text-secondary p-2 mx-4 cursor-pointer transition-all duration-200 flex items-center gap-3">
+<span class="material-symbols-outlined">shopping_cart</span>
+<span class="font-body-md text-body-md">Orders</span>
+</div>
+<div class="text-secondary font-bold bg-secondary-container/10 border-r-2 border-secondary mx-0 px-6 p-2 flex items-center gap-3">
+<span class="material-symbols-outlined">bar_chart</span>
+<span class="font-body-md text-body-md">Analytics</span>
+</div>
+<div class="text-on-surface-variant hover:text-secondary p-2 mx-4 cursor-pointer transition-all duration-200 flex items-center gap-3">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</div>
+</nav>
+<div class="px-gutter mt-auto pt-lg border-t border-outline-variant/30">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-secondary-container flex items-center justify-center text-secondary font-bold text-[12px]">JD</div>
+<div class="flex flex-col">
+<span class="text-on-surface text-label-md font-semibold">Jane Doe</span>
+<span class="text-outline text-[10px] uppercase tracking-widest">Ops Manager</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 left-[260px] h-16 bg-surface/80 backdrop-blur-md border-b border-outline-variant/30 flex items-center justify-between px-xl w-full z-40">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-outline cursor-pointer hover:text-secondary">menu</span>
+<div class="flex items-center text-on-surface-variant text-label-md gap-2 ml-4">
+<span class="uppercase tracking-widest opacity-60">Analytics</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="font-semibold text-secondary uppercase tracking-widest">Report Builder</span>
+</div>
+</div>
+<div class="flex items-center gap-lg">
+<button class="flex items-center gap-2 px-md py-sm bg-surface-container rounded text-outline hover:text-secondary transition-all">
+<span class="material-symbols-outlined text-[20px]">search</span>
+<span class="font-label-md text-label-md uppercase">Search</span>
+</button>
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-outline cursor-pointer hover:text-secondary transition-colors">notifications</span>
+<span class="material-symbols-outlined text-outline cursor-pointer hover:text-secondary transition-colors">help_outline</span>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-[260px] mt-16 p-xl max-w-[1600px]">
+<!-- Header Section -->
+<div class="flex justify-between items-end mb-xl">
+<div>
+<h1 class="font-display-lg text-display-lg text-secondary mb-xs leading-tight">Organic Yield Performance</h1>
+<p class="text-on-surface-variant font-body-md italic opacity-80">Refining supply chain efficiency and raw material throughput for Q3 2024.</p>
+</div>
+<div class="flex gap-md">
+<!-- Brass Style Button -->
+<button class="flex items-center gap-2 px-lg py-md border border-secondary-fixed-dim/30 bg-surface-container text-secondary-fixed-dim rounded font-label-md text-label-md uppercase hover:bg-secondary-container/20 transition-all">
+<span class="material-symbols-outlined text-[20px]">file_save</span>
+                Save Report
+            </button>
+<!-- Ivory Style Button -->
+<button class="flex items-center gap-2 px-lg py-md bg-on-surface text-surface rounded font-label-md text-label-md uppercase hover:brightness-110 transition-all shadow-lg">
+<span class="material-symbols-outlined text-[20px]">download</span>
+                Export to Excel
+            </button>
+</div>
+</div>
+<div class="grid grid-cols-12 gap-gutter">
+<!-- Filter Sidebar (Dark Glass Style) -->
+<div class="col-span-12 lg:col-span-3">
+<div class="dark-glass p-lg rounded-xl sticky top-24 shadow-2xl">
+<div class="flex items-center gap-2 mb-lg border-b border-outline-variant pb-md">
+<span class="material-symbols-outlined text-secondary">filter_list</span>
+<h2 class="font-headline-md text-[20px] text-on-surface">Report Filters</h2>
+</div>
+<div class="space-y-lg">
+<div>
+<label class="font-label-md text-label-md text-outline block mb-sm uppercase tracking-widest">Date Range</label>
+<select class="w-full bg-surface-container-low border border-outline-variant/30 text-on-surface rounded px-md py-sm focus:ring-secondary focus:border-secondary font-body-md appearance-none">
+<option>Last 90 Days</option>
+<option>Last Quarter</option>
+<option>Fiscal Year 2024</option>
+<option>Custom Range</option>
+</select>
+</div>
+<div>
+<label class="font-label-md text-label-md text-outline block mb-sm uppercase tracking-widest">Material Category</label>
+<div class="space-y-2">
+<label class="flex items-center gap-2 text-body-md text-on-surface-variant cursor-pointer hover:text-secondary transition-colors">
+<input checked="" class="rounded border-outline-variant bg-surface-container-highest text-secondary focus:ring-secondary" type="checkbox"/>
+                                Organic Wheat
+                            </label>
+<label class="flex items-center gap-2 text-body-md text-on-surface-variant cursor-pointer hover:text-secondary transition-colors">
+<input checked="" class="rounded border-outline-variant bg-surface-container-highest text-secondary focus:ring-secondary" type="checkbox"/>
+                                Raw Cocoa Beans
+                            </label>
+<label class="flex items-center gap-2 text-body-md text-on-surface-variant cursor-pointer hover:text-secondary transition-colors">
+<input class="rounded border-outline-variant bg-surface-container-highest text-secondary focus:ring-secondary" type="checkbox"/>
+                                Organic Sugarcane
+                            </label>
+</div>
+</div>
+<div>
+<label class="font-label-md text-label-md text-outline block mb-sm uppercase tracking-widest">Supply Region</label>
+<select class="w-full bg-surface-container-low border border-outline-variant/30 text-on-surface rounded px-md py-sm focus:ring-secondary focus:border-secondary font-body-md appearance-none">
+<option>All Global Regions</option>
+<option>North America</option>
+<option>Southeast Asia</option>
+<option>Latin America</option>
+</select>
+</div>
+<div class="pt-lg">
+<button class="w-full py-md bg-secondary text-on-secondary rounded font-label-md text-label-md uppercase hover:brightness-110 transition-colors shadow-md">
+                            Apply All Filters
+                        </button>
+<button class="w-full py-md mt-sm text-outline text-label-md uppercase tracking-widest hover:text-on-surface transition-colors">
+                            Reset to Default
+                        </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Dashboard Visuals -->
+<div class="col-span-12 lg:col-span-9 space-y-gutter">
+<!-- KPI Bento Grid (Serif/Engraved Style) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<div class="bg-surface-container border border-outline-variant/30 p-lg rounded-xl flex flex-col justify-between h-36">
+<span class="text-outline font-label-md text-label-md uppercase tracking-[0.2em]">Total Throughput</span>
+<div class="flex items-baseline justify-between">
+<h3 class="font-headline-md text-[36px] text-secondary border-b border-secondary/20 pb-1">1,248.5 <span class="text-label-md font-body-md opacity-50">MT</span></h3>
+<div class="text-tertiary text-[12px] font-bold">+12.4%</div>
+</div>
+</div>
+<div class="bg-surface-container border border-outline-variant/30 p-lg rounded-xl flex flex-col justify-between h-36">
+<span class="text-outline font-label-md text-label-md uppercase tracking-[0.2em]">Yield Efficiency</span>
+<div class="flex items-baseline justify-between">
+<h3 class="font-headline-md text-[36px] text-secondary border-b border-secondary/20 pb-1">94.2%</h3>
+<div class="text-tertiary text-[12px] font-bold">+2.1%</div>
+</div>
+</div>
+<div class="bg-surface-container border border-outline-variant/30 p-lg rounded-xl flex flex-col justify-between h-36">
+<span class="text-outline font-label-md text-label-md uppercase tracking-[0.2em]">Rejected Batch %</span>
+<div class="flex items-baseline justify-between">
+<h3 class="font-headline-md text-[36px] text-secondary border-b border-secondary/20 pb-1">0.84%</h3>
+<div class="text-error text-[12px] font-bold">-0.12%</div>
+</div>
+</div>
+</div>
+<!-- Main Charts (Gold and Sage) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+<!-- Bar Chart Card -->
+<div class="bg-surface-container-high gold-hairline p-lg rounded-xl">
+<div class="flex justify-between items-center mb-xl">
+<h4 class="font-headline-md text-headline-md text-on-surface">Yield by Facility</h4>
+<span class="material-symbols-outlined text-outline cursor-pointer hover:text-secondary">more_horiz</span>
+</div>
+<div class="h-64 flex items-end gap-md px-md">
+<!-- Bars using Gold (secondary) and Sage (tertiary) -->
+<div class="group flex flex-col items-center flex-1">
+<div class="w-full bg-tertiary/20 rounded-t-sm chart-bar relative" style="height: 60%;">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-surface-container-highest text-secondary text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity border border-secondary/30">420T</div>
+</div>
+<span class="text-[10px] font-label-md mt-sm text-outline tracking-wider uppercase">FAC-A</span>
+</div>
+<div class="group flex flex-col items-center flex-1">
+<div class="w-full bg-secondary/80 rounded-t-sm chart-bar relative" style="height: 85%;">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-surface-container-highest text-secondary text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity border border-secondary/30">580T</div>
+</div>
+<span class="text-[10px] font-label-md mt-sm text-outline tracking-wider uppercase">FAC-B</span>
+</div>
+<div class="group flex flex-col items-center flex-1">
+<div class="w-full bg-tertiary/20 rounded-t-sm chart-bar relative" style="height: 45%;">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-surface-container-highest text-secondary text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity border border-secondary/30">310T</div>
+</div>
+<span class="text-[10px] font-label-md mt-sm text-outline tracking-wider uppercase">FAC-C</span>
+</div>
+<div class="group flex flex-col items-center flex-1">
+<div class="w-full bg-secondary/80 rounded-t-sm chart-bar relative" style="height: 70%;">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-surface-container-highest text-secondary text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity border border-secondary/30">490T</div>
+</div>
+<span class="text-[10px] font-label-md mt-sm text-outline tracking-wider uppercase">FAC-D</span>
+</div>
+<div class="group flex flex-col items-center flex-1">
+<div class="w-full bg-tertiary/20 rounded-t-sm chart-bar relative" style="height: 95%;">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-surface-container-highest text-secondary text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity border border-secondary/30">640T</div>
+</div>
+<span class="text-[10px] font-label-md mt-sm text-outline tracking-wider uppercase">FAC-E</span>
+</div>
+</div>
+</div>
+<!-- Line Chart Card -->
+<div class="bg-surface-container-high gold-hairline p-lg rounded-xl">
+<div class="flex justify-between items-center mb-xl">
+<h4 class="font-headline-md text-headline-md text-on-surface">Trend Performance</h4>
+<div class="flex gap-2">
+<div class="flex items-center gap-1">
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+<span class="text-[10px] font-label-md uppercase tracking-wider text-outline">Actual</span>
+</div>
+<div class="flex items-center gap-1">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+<span class="text-[10px] font-label-md uppercase tracking-wider text-outline">Target</span>
+</div>
+</div>
+</div>
+<div class="h-64 relative flex items-end">
+<svg class="w-full h-full" viewbox="0 0 400 200">
+<path d="M0 180 L80 150 L160 165 L240 100 L320 80 L400 30" fill="none" stroke="#eac078" stroke-linecap="round" stroke-width="3"></path>
+<path d="M0 170 L80 160 L160 140 L240 120 L320 100 L400 80" fill="none" opacity="0.6" stroke="#b8cdab" stroke-dasharray="5,5" stroke-linecap="round" stroke-width="2"></path>
+<!-- Dots -->
+<circle cx="80" cy="150" fill="#eac078" r="4"></circle>
+<circle cx="240" cy="100" fill="#eac078" r="4"></circle>
+<circle cx="400" cy="30" fill="#eac078" r="4"></circle>
+</svg>
+<div class="absolute bottom-0 left-0 right-0 flex justify-between px-2 pt-4 border-t border-outline-variant/30">
+<span class="text-[10px] text-outline uppercase tracking-widest">Jul</span>
+<span class="text-[10px] text-outline uppercase tracking-widest">Aug</span>
+<span class="text-[10px] text-outline uppercase tracking-widest">Sep</span>
+<span class="text-[10px] text-outline uppercase tracking-widest">Oct</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Data Table Section -->
+<div class="bg-surface-container-high border border-outline-variant/30 rounded-xl overflow-hidden shadow-xl">
+<div class="px-lg py-md border-b border-outline-variant/30 flex justify-between items-center bg-surface-container">
+<h4 class="font-headline-md text-[18px] text-on-surface">Detailed Throughput Log</h4>
+<div class="flex gap-md">
+<span class="material-symbols-outlined text-outline cursor-pointer hover:text-secondary">settings_suggest</span>
+<span class="material-symbols-outlined text-outline cursor-pointer hover:text-secondary">fullscreen</span>
+</div>
+</div>
+<div class="overflow-x-auto custom-scrollbar">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low">
+<th class="px-lg py-md text-label-md font-bold text-outline border-b border-outline-variant/30 uppercase tracking-widest">Batch ID</th>
+<th class="px-lg py-md text-label-md font-bold text-outline border-b border-outline-variant/30 uppercase tracking-widest">Material</th>
+<th class="px-lg py-md text-label-md font-bold text-outline border-b border-outline-variant/30 uppercase tracking-widest">Facility</th>
+<th class="px-lg py-md text-label-md font-bold text-outline border-b border-outline-variant/30 uppercase tracking-widest">Net Weight</th>
+<th class="px-lg py-md text-label-md font-bold text-outline border-b border-outline-variant/30 uppercase tracking-widest text-right">Efficiency</th>
+<th class="px-lg py-md text-label-md font-bold text-outline border-b border-outline-variant/30 uppercase tracking-widest">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10">
+<tr class="hover:bg-surface-container-lowest/50 transition-colors group">
+<td class="px-lg py-md font-data-mono text-secondary">#WH-2024-0012</td>
+<td class="px-lg py-md text-body-md text-on-surface-variant">Organic Hard Red Wheat</td>
+<td class="px-lg py-md text-body-md text-on-surface-variant">Southeast Hub A1</td>
+<td class="px-lg py-md text-body-md font-data-mono text-on-surface-variant">42.50 MT</td>
+<td class="px-lg py-md text-body-md text-right font-bold text-tertiary">98.2%</td>
+<td class="px-lg py-md">
+<span class="px-3 py-1 rounded bg-tertiary/10 text-tertiary text-[10px] font-bold uppercase tracking-widest">Optimal</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest/50 transition-colors group">
+<td class="px-lg py-md font-data-mono text-secondary">#CC-2024-0892</td>
+<td class="px-lg py-md text-body-md text-on-surface-variant">Criollo Cocoa Beans</td>
+<td class="px-lg py-md text-body-md text-on-surface-variant">Central Valley P2</td>
+<td class="px-lg py-md text-body-md font-data-mono text-on-surface-variant">18.15 MT</td>
+<td class="px-lg py-md text-body-md text-right font-bold text-tertiary">92.4%</td>
+<td class="px-lg py-md">
+<span class="px-3 py-1 rounded bg-tertiary/10 text-tertiary text-[10px] font-bold uppercase tracking-widest">Optimal</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest/50 transition-colors group">
+<td class="px-lg py-md font-data-mono text-secondary">#SG-2024-0045</td>
+<td class="px-lg py-md text-body-md text-on-surface-variant">Raw Cane Sugar</td>
+<td class="px-lg py-md text-body-md text-on-surface-variant">Coastal Refinery</td>
+<td class="px-lg py-md text-body-md font-data-mono text-on-surface-variant">112.0 MT</td>
+<td class="px-lg py-md text-body-md text-right font-bold text-secondary">88.7%</td>
+<td class="px-lg py-md">
+<span class="px-3 py-1 rounded bg-secondary-container/20 text-secondary text-[10px] font-bold uppercase tracking-widest">Warning</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest/50 transition-colors group">
+<td class="px-lg py-md font-data-mono text-secondary">#WH-2024-0013</td>
+<td class="px-lg py-md text-body-md text-on-surface-variant">Organic Soft White Wheat</td>
+<td class="px-lg py-md text-body-md text-on-surface-variant">Southeast Hub A1</td>
+<td class="px-lg py-md text-body-md font-data-mono text-on-surface-variant">38.20 MT</td>
+<td class="px-lg py-md text-body-md text-right font-bold text-tertiary">97.9%</td>
+<td class="px-lg py-md">
+<span class="px-3 py-1 rounded bg-tertiary/10 text-tertiary text-[10px] font-bold uppercase tracking-widest">Optimal</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-lg py-md bg-surface-container border-t border-outline-variant/30 flex justify-between items-center">
+<span class="text-label-md text-outline italic">Showing 1-4 of 128 results</span>
+<div class="flex gap-2">
+<button class="p-2 rounded bg-surface-container-low hover:bg-surface-container-highest text-outline transition-colors border border-outline-variant/20">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<button class="p-2 rounded bg-surface-container-low hover:bg-surface-container-highest text-outline transition-colors border border-outline-variant/20">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+    // Simple animation for bars on load
+    window.addEventListener('DOMContentLoaded', () => {
+        const bars = document.querySelectorAll('.chart-bar');
+        bars.forEach(bar => {
+            const targetHeight = bar.style.height;
+            bar.style.height = '0%';
+            setTimeout(() => {
+                bar.style.height = targetHeight;
+            }, 100);
+        });
+    });
+
+    // Mock interaction for Export
+    const exportBtn = document.querySelector('button:has(.material-symbols-outlined:contains("download"))');
+    if(exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            const originalContent = exportBtn.innerHTML;
+            exportBtn.innerHTML = `<span class="material-symbols-outlined animate-spin text-[20px]">sync</span><span class="font-label-md text-label-md uppercase ml-2">Exporting...</span>`;
+            exportBtn.disabled = true;
+            setTimeout(() => {
+                exportBtn.innerHTML = `<span class="material-symbols-outlined text-[20px]">check</span><span class="font-label-md text-label-md uppercase ml-2">Done</span>`;
+                setTimeout(() => {
+                    exportBtn.innerHTML = originalContent;
+                    exportBtn.disabled = false;
+                }, 2000);
+            }, 1500);
+        });
+    }
+</script>
+</body></html>

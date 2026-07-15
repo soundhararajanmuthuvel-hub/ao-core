@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AO Core ERP | Manufacturing</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Playfair+Display:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .plaque-card {
+            background: #231f1b;
+            border: 1px solid #5e4203; /* Gold/Brass hairline */
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+        .plaque-card::after {
+            content: '';
+            position: absolute;
+            inset: 2px;
+            border: 1px solid rgba(234, 192, 120, 0.1);
+            pointer-events: none;
+        }
+        .glass-card {
+            background: rgba(31, 27, 23, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(234, 192, 120, 0.15);
+        }
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 24px;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #5e4203;
+            border-radius: 10px;
+        }
+        .serif-numeral {
+            font-family: 'Playfair Display', serif;
+            letter-spacing: -0.02em;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed": "#f8ddcf",
+                        "tertiary-container": "#14240e",
+                        "surface": "#16130f",
+                        "on-primary-fixed": "#261910",
+                        "on-secondary-fixed-variant": "#5e4203",
+                        "inverse-on-surface": "#34302c",
+                        "error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#3a4c31",
+                        "inverse-primary": "#6e5a4f",
+                        "error": "#ffb4ab",
+                        "tertiary-fixed": "#d4e9c5",
+                        "surface-bright": "#3d3834",
+                        "tertiary": "#b8cdab",
+                        "surface-tint": "#dbc2b3",
+                        "inverse-surface": "#eae1db",
+                        "secondary-fixed-dim": "#eac078",
+                        "primary": "#dbc2b3",
+                        "surface-variant": "#393430",
+                        "surface-dim": "#16130f",
+                        "on-primary-fixed-variant": "#554339",
+                        "surface-container-low": "#1f1b17",
+                        "on-error": "#690005",
+                        "surface-container-highest": "#393430",
+                        "outline": "#9b8e88",
+                        "on-tertiary-container": "#7a8d6f",
+                        "secondary": "#eac078",
+                        "on-primary": "#3d2d23",
+                        "on-secondary-container": "#d7af69",
+                        "secondary-fixed": "#ffdea9",
+                        "on-primary-container": "#998377",
+                        "outline-variant": "#4e453f",
+                        "tertiary-fixed-dim": "#b8cdab",
+                        "on-tertiary-fixed": "#101f09",
+                        "on-surface-variant": "#d2c4bd",
+                        "on-error-container": "#ffdad6",
+                        "on-secondary-fixed": "#271900",
+                        "secondary-container": "#5e4203",
+                        "primary-container": "#2b1d14",
+                        "background": "#16130f",
+                        "on-surface": "#eae1db",
+                        "surface-container-high": "#2e2925",
+                        "surface-container-lowest": "#110e0a",
+                        "on-tertiary": "#24351d",
+                        "primary-fixed-dim": "#dbc2b3",
+                        "on-secondary": "#422d00",
+                        "surface-container": "#231f1b",
+                        "on-background": "#eae1db"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-margin": "32px",
+                        "stack-md": "24px",
+                        "gutter": "24px",
+                        "section-gap": "80px",
+                        "stack-sm": "12px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Playfair Display"],
+                        "display-lg": ["Playfair Display"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-md": ["Playfair Display"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            min-height: 100dvh;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md overflow-hidden">
+<!-- Navigation Drawer (Dark Espresso with Brass/Gold) -->
+<aside class="fixed left-0 top-0 h-full w-[260px] bg-surface-container-lowest border-r border-secondary-container flex flex-col py-lg z-50">
+<div class="px-lg mb-xl">
+<h1 class="text-secondary font-display-lg text-2xl tracking-tight">AO CORE</h1>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="text-on-surface-variant hover:text-secondary p-2 mx-2 cursor-pointer transition-all duration-200 hover:bg-secondary-container/10 rounded flex items-center gap-3">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md text-sm">Dashboard</span>
+</div>
+<div class="text-secondary font-bold bg-secondary-container/20 border-r-2 border-secondary mx-2 p-2 flex items-center gap-3">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-body-md text-sm">Inventory</span>
+</div>
+<div class="text-on-surface-variant hover:text-secondary p-2 mx-2 cursor-pointer transition-all duration-200 hover:bg-secondary-container/10 rounded flex items-center gap-3">
+<span class="material-symbols-outlined">local_shipping</span>
+<span class="font-body-md text-sm">Supply Chain</span>
+</div>
+<div class="text-on-surface-variant hover:text-secondary p-2 mx-2 cursor-pointer transition-all duration-200 hover:bg-secondary-container/10 rounded flex items-center gap-3">
+<span class="material-symbols-outlined">shopping_cart</span>
+<span class="font-body-md text-sm">Orders</span>
+</div>
+<div class="text-on-surface-variant hover:text-secondary p-2 mx-2 cursor-pointer transition-all duration-200 hover:bg-secondary-container/10 rounded flex items-center gap-3">
+<span class="material-symbols-outlined">bar_chart</span>
+<span class="font-body-md text-sm">Analytics</span>
+</div>
+</nav>
+<div class="px-lg mt-auto">
+<div class="flex items-center gap-md p-md rounded bg-surface-container-high border border-secondary-container/50">
+<div class="w-10 h-10 rounded-full bg-secondary-fixed-dim flex items-center justify-center text-on-secondary font-bold">JD</div>
+<div class="overflow-hidden">
+<p class="text-on-surface font-bold truncate text-sm">Julian Dubois</p>
+<p class="text-on-surface-variant text-[10px] uppercase tracking-widest">Production Lead</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Top App Bar -->
+<header class="fixed top-0 right-0 left-[260px] h-16 bg-surface-container border-b border-secondary-container flex items-center justify-between px-xl w-auto z-40">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-secondary">menu</span>
+<nav class="flex items-center gap-sm text-sm text-on-surface-variant ml-4">
+<span class="hover:text-secondary cursor-pointer">Manufacturing</span>
+<span class="material-symbols-outlined text-xs">chevron_right</span>
+<span class="text-secondary font-medium">Production Runs</span>
+</nav>
+</div>
+<div class="flex items-center gap-lg">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-sm">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container-lowest border border-secondary-container rounded-full text-xs w-64 focus:outline-none focus:border-secondary transition-all" placeholder="Search batches..." type="text"/>
+</div>
+<button class="bg-secondary text-on-secondary px-lg py-2 rounded-lg font-label-md transition-all hover:brightness-110 shadow-lg text-xs uppercase tracking-widest">
+            NEW RUN
+        </button>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-[260px] pt-16 h-screen overflow-y-auto bg-surface">
+<div class="p-xl max-w-[1400px] mx-auto">
+<!-- Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-xl">
+<div>
+<h1 class="font-display-lg text-display-lg text-secondary mb-xs">Manufacturing Control</h1>
+<p class="text-on-surface-variant font-body-md max-w-2xl">Refined oversight of batch conversions, recipe efficiency, and cost margins for organic production.</p>
+</div>
+<div class="flex bg-surface-container-high p-1 rounded-xl border border-secondary-container mt-4 md:mt-0">
+<button class="px-md py-2 rounded-lg bg-secondary text-on-secondary shadow-sm font-label-md text-xs">Live Runs</button>
+<button class="px-md py-2 rounded-lg font-label-md text-on-surface-variant hover:text-on-surface text-xs">History</button>
+<button class="px-md py-2 rounded-lg font-label-md text-on-surface-variant hover:text-on-surface text-xs">Forecast</button>
+</div>
+</div>
+<!-- Tabbed Interface (Brass Accents) -->
+<div class="border-b border-secondary-container mb-xl flex gap-xl">
+<button class="pb-md border-b-2 border-secondary text-secondary font-bold font-label-md flex items-center gap-2 text-xs uppercase tracking-widest">
+<span class="material-symbols-outlined text-[18px]">precision_manufacturing</span>
+                Production Runs
+            </button>
+<button class="pb-md border-b-2 border-transparent text-on-surface-variant font-label-md hover:text-secondary transition-all flex items-center gap-2 text-xs uppercase tracking-widest">
+<span class="material-symbols-outlined text-[18px]">science</span>
+                Recipes
+            </button>
+<button class="pb-md border-b-2 border-transparent text-on-surface-variant font-label-md hover:text-secondary transition-all flex items-center gap-2 text-xs uppercase tracking-widest">
+<span class="material-symbols-outlined text-[18px]">box</span>
+                Packing
+            </button>
+</div>
+<!-- Batch-Costing Bento Grid -->
+<div class="bento-grid">
+<!-- Main Plaque Card -->
+<div class="col-span-12 lg:col-span-8 plaque-card rounded-xl p-lg overflow-hidden group">
+<div class="flex justify-between items-start mb-xl relative z-10">
+<div>
+<span class="bg-secondary/10 border border-secondary/30 text-secondary px-sm py-1 rounded text-[10px] font-bold uppercase tracking-widest mb-xs inline-block">RUN #BATCH-0942</span>
+<h2 class="font-headline-md text-3xl text-secondary">Organic Cold-Pressed Almond Oil</h2>
+</div>
+<div class="text-right">
+<p class="text-on-surface-variant uppercase tracking-widest text-[10px]">Estimated Yield</p>
+<p class="serif-numeral text-headline-sm text-secondary">1,240 <span class="text-sm">Liters</span></p>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-lg mb-xl relative z-10">
+<div class="bg-surface-container-high p-md rounded border border-secondary-container/50">
+<p class="text-on-surface-variant text-[10px] uppercase tracking-widest mb-2">Direct Materials</p>
+<p class="serif-numeral text-2xl text-secondary">$4,820.00</p>
+<div class="w-full bg-secondary-container/30 h-[2px] mt-3 rounded-full overflow-hidden">
+<div class="bg-secondary h-full w-[65%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-high p-md rounded border border-secondary-container/50">
+<p class="text-on-surface-variant text-[10px] uppercase tracking-widest mb-2">Labor &amp; Overheads</p>
+<p class="serif-numeral text-2xl text-secondary">$1,150.00</p>
+<div class="w-full bg-secondary-container/30 h-[2px] mt-3 rounded-full overflow-hidden">
+<div class="bg-secondary h-full w-[25%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-high p-md rounded border border-secondary-container/50">
+<p class="text-on-surface-variant text-[10px] uppercase tracking-widest mb-2">Target Margin</p>
+<p class="serif-numeral text-2xl text-secondary">42.8%</p>
+<div class="w-full bg-secondary-container/30 h-[2px] mt-3 rounded-full overflow-hidden">
+<div class="bg-secondary h-full w-[88%]"></div>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between pt-lg border-t border-secondary-container/50 relative z-10">
+<div class="flex -space-x-2">
+<div class="w-8 h-8 rounded-full border border-secondary bg-surface-container-highest flex items-center justify-center text-[10px] text-secondary font-bold">AS</div>
+<div class="w-8 h-8 rounded-full border border-secondary bg-surface-container-highest flex items-center justify-center text-[10px] text-secondary font-bold">RK</div>
+<div class="w-8 h-8 rounded-full border border-secondary bg-surface-container-highest flex items-center justify-center text-[10px] text-secondary font-bold">ML</div>
+</div>
+<div class="flex items-center gap-md">
+<span class="text-on-surface-variant text-xs flex items-center gap-1 font-medium italic">
+<span class="material-symbols-outlined text-[16px]">timer</span> 4h 12m remaining
+                        </span>
+<button class="bg-secondary/10 border border-secondary text-secondary px-lg py-2 rounded font-label-md text-xs uppercase tracking-widest hover:bg-secondary hover:text-on-secondary transition-all">
+                            VIEW LOGS
+                        </button>
+</div>
+</div>
+</div>
+<!-- Conversion Metrics (Plaque Style) -->
+<div class="col-span-12 md:col-span-6 lg:col-span-4 plaque-card rounded-xl overflow-hidden flex flex-col h-full">
+<div class="p-lg flex-1">
+<div class="flex justify-between items-start mb-md">
+<h3 class="font-headline-sm text-secondary uppercase tracking-widest text-sm">Conversion Metrics</h3>
+<span class="material-symbols-outlined text-secondary text-sm">analytics</span>
+</div>
+<div class="space-y-4">
+<div class="flex justify-between items-center border-b border-secondary-container/30 pb-2">
+<span class="text-on-surface-variant text-xs">Input (Organic Almonds)</span>
+<span class="serif-numeral text-lg text-secondary">2,500<span class="text-xs ml-1">kg</span></span>
+</div>
+<div class="flex justify-between items-center border-b border-secondary-container/30 pb-2">
+<span class="text-on-surface-variant text-xs">Output (Pure Oil)</span>
+<span class="serif-numeral text-lg text-secondary">1,240<span class="text-xs ml-1">L</span></span>
+</div>
+<div class="flex justify-between items-center border-b border-secondary-container/30 pb-2">
+<span class="text-on-surface-variant text-xs">By-product (Meal)</span>
+<span class="serif-numeral text-lg text-secondary">1,180<span class="text-xs ml-1">kg</span></span>
+</div>
+</div>
+<!-- Refined bar chart -->
+<div class="mt-xl h-20 flex items-end justify-between gap-2">
+<div class="w-full bg-secondary-container/20 h-[60%] rounded-t-sm border-t border-secondary/30"></div>
+<div class="w-full bg-secondary/80 h-[85%] rounded-t-sm border-t border-secondary"></div>
+<div class="w-full bg-secondary-container/40 h-[45%] rounded-t-sm border-t border-secondary/30"></div>
+<div class="w-full bg-secondary-container/10 h-[30%] rounded-t-sm"></div>
+<div class="w-full bg-secondary/60 h-[75%] rounded-t-sm border-t border-secondary/50"></div>
+<div class="w-full bg-secondary h-full rounded-t-sm border-t border-secondary"></div>
+</div>
+</div>
+<div class="bg-secondary-container/20 border-t border-secondary/30 text-secondary p-md text-center font-label-md text-xs uppercase tracking-widest cursor-pointer hover:bg-secondary hover:text-on-secondary transition-all">
+                    OPTIMIZE RECIPE
+                </div>
+</div>
+<!-- Schedule Table (Dark Espresso/Gold) -->
+<div class="col-span-12 glass-card rounded-xl overflow-hidden border border-secondary-container/30">
+<div class="px-lg py-md bg-surface-container-high border-b border-secondary-container flex justify-between items-center">
+<h3 class="font-headline-sm text-secondary text-sm uppercase tracking-widest">Upcoming Schedule</h3>
+<div class="flex gap-sm">
+<button class="p-2 hover:bg-secondary/10 rounded-lg transition-all">
+<span class="material-symbols-outlined text-secondary text-sm">filter_list</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="bg-surface-container-lowest text-secondary font-label-md text-[10px] uppercase tracking-[0.2em] border-b border-secondary-container">
+<th class="px-lg py-md">Batch ID</th>
+<th class="px-lg py-md">Product Formula</th>
+<th class="px-lg py-md">Status</th>
+<th class="px-lg py-md">Est. Unit Cost</th>
+<th class="px-lg py-md">Scheduling</th>
+<th class="px-lg py-md text-right">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-secondary-container/20">
+<tr class="hover:bg-secondary-container/10 transition-colors">
+<td class="px-lg py-md font-medium text-secondary text-xs">#BT-0945</td>
+<td class="px-lg py-md">
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded border border-secondary/30 overflow-hidden">
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAQxPzVSMREDllqnWqIymDNTbO0p3q9ynwCWGtyLMHraaCnQ7XoWCHpj2V3mnq8ms1-xYONXgG0dUQgBDozbGO4xlx_1Mju6pH0pwXmaUhOloDfPZKandu3mDrmxDB1iPsz1asYR313EK-qHADqnhKQg1r9GMflfffjBCc5PFtOy2HZvj7u9aA0an7EA2VomLDQVtCbdEfsPP3FLn0DZZGkAeVaMFBdaoC0ZKwmb8ybKkDcifEEd13VsT-rbrQ1FPoNID1O9A5rtq8"/>
+</div>
+<span class="font-headline-md text-sm text-on-surface">Lavender Essential Oil</span>
+</div>
+</td>
+<td class="px-lg py-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded border border-tertiary/50 text-tertiary text-[9px] font-bold uppercase">STOCKED</span>
+</td>
+<td class="px-lg py-md serif-numeral text-secondary text-lg">$1.12 <span class="text-[10px] text-on-surface-variant font-sans">/ ml</span></td>
+<td class="px-lg py-md text-on-surface-variant text-xs">Tomorrow, 08:00 AM</td>
+<td class="px-lg py-md text-right">
+<button class="text-secondary hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-secondary-container/10 transition-colors">
+<td class="px-lg py-md font-medium text-secondary text-xs">#BT-0948</td>
+<td class="px-lg py-md">
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded border border-secondary/30 overflow-hidden">
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBHuMMZFgMEhnLQ49Sz7ctiKZlx9c9atUqg-vUo9cA19D28XxpoG42ZNkLgeLVp4NaisT4LqY5ykSP-Fw5aX4sLpo0rwwnWuTO8YXIaKSuPR1Cc6plfAny7vKuDSI9wQ9SLP5830ZGGmDbf82a_FTMIuXGr1BNR8u6xAJnv4mfGZnL7NZBFHn3D0pxv30OhI2ZX-svEhyKMcF4sH2OZpuJ4HYizHEozqoTIHaJJkGFbmXSOwYmHDHzZ67eC0LEYRhBn8uVnrYQde3I"/>
+</div>
+<span class="font-headline-md text-sm text-on-surface">Manuka Blend Syrup</span>
+</div>
+</td>
+<td class="px-lg py-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded border border-secondary/50 text-secondary text-[9px] font-bold uppercase">AWAITING</span>
+</td>
+<td class="px-lg py-md serif-numeral text-secondary text-lg">$4.85 <span class="text-[10px] text-on-surface-variant font-sans">/ jar</span></td>
+<td class="px-lg py-md text-on-surface-variant text-xs">Thu, 14th Oct</td>
+<td class="px-lg py-md text-right">
+<button class="text-secondary hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Efficiency & Alert Row -->
+<div class="col-span-12 md:col-span-6 glass-card rounded-xl p-lg flex items-center justify-between border-l-4 border-secondary">
+<div>
+<h4 class="font-headline-md text-secondary text-lg mb-1">Packing Efficiency</h4>
+<p class="text-on-surface-variant text-xs mb-3">Refined conversion metrics for 250ml artisanal units.</p>
+<div class="flex items-center gap-md">
+<span class="serif-numeral text-3xl text-secondary">98.2%</span>
+<span class="text-tertiary font-bold flex items-center text-[10px] uppercase tracking-widest">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> +1.2%
+                        </span>
+</div>
+</div>
+<div class="w-20 h-20 relative">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 36 36">
+<circle class="stroke-secondary-container/20" cx="18" cy="18" fill="none" r="16" stroke-width="2"></circle>
+<circle class="stroke-secondary" cx="18" cy="18" fill="none" r="16" stroke-dasharray="98, 100" stroke-linecap="round" stroke-width="2"></circle>
+</svg>
+<span class="absolute inset-0 flex items-center justify-center font-bold text-secondary serif-numeral text-sm">98%</span>
+</div>
+</div>
+<div class="col-span-12 md:col-span-6 bg-surface-container-lowest rounded-xl p-lg border border-error/30 flex items-center justify-between">
+<div>
+<h4 class="font-headline-md text-error text-lg mb-1">Market Volatility Alert</h4>
+<p class="text-on-surface-variant text-xs mb-3">Sunflower Seed futures up 15%. Batch-0982 requires recalculation.</p>
+<button class="bg-error/10 border border-error text-error px-md py-2 rounded font-label-md text-[10px] uppercase tracking-widest hover:bg-error hover:text-on-error transition-all">
+                        RE-CALCULATE BATCH
+                    </button>
+</div>
+<span class="material-symbols-outlined text-error/30 text-[48px]">priority_high</span>
+</div>
+</div>
+</div>
+</main>
+<script>
+    // Tab interaction
+    const tabs = document.querySelectorAll('button[class*="pb-md"]');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => {
+                t.classList.remove('border-secondary', 'text-secondary', 'font-bold');
+                t.classList.add('border-transparent', 'text-on-surface-variant');
+            });
+            tab.classList.remove('border-transparent', 'text-on-surface-variant');
+            tab.classList.add('border-secondary', 'text-secondary', 'font-bold');
+        });
+    });
+</script>
+</body></html>

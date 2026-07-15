@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import UserTour from '../components/UserTour';
 import { usePWA } from '../context/PWAContext';
 import SalesmanApp from '../pages/SalesmanApp';
+import { useToast } from '../context/ToastContext';
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -690,6 +691,150 @@ export default function AppLayout() {
       </div>
 
       {user && !user.tourCompleted && !showLaunch && <UserTour />}
+      {user && user.mustChangePassword && <ForceChangePasswordModal />}
+    </div>
+  );
+}
+
+function ForceChangePasswordModal() {
+  const { changePassword, logout } = useAuth();
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await changePassword(password);
+      toast('✓ Password updated successfully!', 'success');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to change password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
+      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 999999,
+      padding: '2rem',
+      boxSizing: 'border-box'
+    }}>
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.03)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: '24px',
+        padding: '2.5rem 2rem',
+        maxWidth: '440px',
+        width: '100%',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        color: '#fff',
+        fontFamily: 'Inter, sans-serif'
+      }}>
+        <div style={{ fontSize: '3.5rem', marginBottom: '1rem', filter: 'drop-shadow(0 0 10px rgba(245, 158, 11, 0.5))' }}>🔒</div>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 0.5rem 0', color: '#f59e0b', textAlign: 'center' }}>Secure Your Account</h2>
+        <p style={{ fontSize: '0.85rem', color: '#94a3b8', textAlign: 'center', lineHeight: '1.5', margin: '0 0 1.5rem 0' }}>
+          Your account was initialized with a temporary password. As a security measure, you are required to set a new password to continue.
+        </p>
+
+        <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {error && (
+            <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '10px', padding: '0.75rem', color: '#f87171', fontSize: '0.8rem', textAlign: 'center' }}>
+              {error}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#e2e8f0' }}>New Password</label>
+            <input
+              type="password"
+              className="form-control"
+              placeholder="Enter at least 6 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              style={{ backgroundColor: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#e2e8f0' }}>Confirm Password</label>
+            <input
+              type="password"
+              className="form-control"
+              placeholder="Re-enter new password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              style={{ backgroundColor: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '0.85rem',
+              fontWeight: 700,
+              fontSize: '0.95rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(245, 158, 11, 0.25)',
+              transition: 'all 0.2s',
+              marginTop: '0.5rem'
+            }}
+          >
+            {loading ? 'Updating Password...' : '💾 Update Password'}
+          </button>
+
+          <button
+            type="button"
+            onClick={logout}
+            style={{
+              backgroundColor: 'transparent',
+              color: '#94a3b8',
+              border: 'none',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              marginTop: '0.25rem'
+            }}
+          >
+            Cancel & Logout
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

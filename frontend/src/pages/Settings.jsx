@@ -38,8 +38,10 @@ export default function SettingsPage() {
 
   // Database Management states
   const [dbModalOpen, setDbModalOpen] = useState(false);
-  const [dbActionType, setDbActionType] = useState('');
+  const [dbActionType, setDbActionType] = useState(''); // 'reset-demo', 'clear-transactions', 'factory-reset'
   const [confirmationStep, setConfirmationStep] = useState(1);
+  const [alsoDeleteUsers, setAlsoDeleteUsers] = useState(false);
+  const [seededCredentials, setSeededCredentials] = useState(null);
   const [typedConfirmation, setTypedConfirmation] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [dbCounts, setDbCounts] = useState(null);
@@ -460,6 +462,8 @@ export default function SettingsPage() {
     setAdminPassword('');
     setDbCounts(null);
     setBackupFileName('');
+    setSeededCredentials(null);
+    setAlsoDeleteUsers(false);
     setActionSuccess(false);
     setDbModalOpen(true);
   };
@@ -502,15 +506,16 @@ export default function SettingsPage() {
     try {
       let res;
       if (dbActionType === 'reset-demo') {
-        res = await databaseApi.resetDemoData(adminPassword);
+        res = await databaseApi.resetDemoData(adminPassword, alsoDeleteUsers);
       } else if (dbActionType === 'clear-transactions') {
-        res = await databaseApi.clearTransactions(adminPassword);
+        res = await databaseApi.clearTransactions(adminPassword, alsoDeleteUsers);
       } else if (dbActionType === 'factory-reset') {
         res = await databaseApi.factoryReset(adminPassword);
       }
 
       if (res?.data?.success) {
         setBackupFileName(res.data.backupFileName || '');
+        setSeededCredentials(res.data.credentials || null);
         setActionSuccess(true);
         setConfirmationStep(4);
       } else {
@@ -2206,6 +2211,17 @@ export default function SettingsPage() {
                       Although an automatic system backup ZIP will be saved on the server, all active transactions/master-records specified will be wiped out.
                     </p>
                   </div>
+                  {(dbActionType === 'reset-demo' || dbActionType === 'clear-transactions') && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', margin: '0.5rem 0', color: '#374151' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={alsoDeleteUsers} 
+                        onChange={(e) => setAlsoDeleteUsers(e.target.checked)} 
+                        style={{ width: '16px', height: '16px' }}
+                      />
+                      <span>Also delete all user accounts except mine</span>
+                    </label>
+                  )}
                   <div className="form-group">
                     <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>
                       To proceed, please type <code style={{ backgroundColor: '#f3f4f6', padding: '0.15rem 0.4rem', borderRadius: '4px', color: '#dc2626', fontWeight: 700 }}>DELETE MY ERP</code> below:
@@ -2303,6 +2319,23 @@ export default function SettingsPage() {
                     <div style={{ backgroundColor: '#f1f5f9', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontFamily: 'monospace', color: '#334155', wordBreak: 'break-all' }}>
                       <strong>Server Auto-Backup Archive:</strong><br />
                       {backupFileName}
+                    </div>
+                  )}
+                  {seededCredentials && seededCredentials.length > 0 && (
+                    <div style={{ width: '100%', textAlign: 'left', marginTop: '1rem', backgroundColor: '#fff7ed', border: '1px solid #ffedd5', padding: '1rem', borderRadius: '8px' }}>
+                      <h5 style={{ margin: '0 0 0.5rem 0', color: '#ea580c', fontWeight: 700, fontSize: '0.9rem' }}>🔑 Generated Admin & Staff Credentials:</h5>
+                      <p style={{ margin: '0 0 1rem 0', fontSize: '0.75rem', color: '#7c2d12', lineHeight: '1.4' }}>
+                        Please copy these temporary credentials. You will be forced to set a new password on your first login.
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto' }}>
+                        {seededCredentials.map((c, i) => (
+                          <div key={i} style={{ fontSize: '0.75rem', fontFamily: 'monospace', borderBottom: '1px solid #fed7aa', paddingBottom: '0.25rem' }}>
+                            <strong>{c.name} ({c.role}):</strong><br />
+                            Email: <span style={{ color: '#0f172a' }}>{c.email}</span><br />
+                            Password: <span style={{ color: '#dc2626', fontWeight: 'bold' }}>{c.password}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                   <button
@@ -2682,7 +2715,7 @@ function MigrationCenter() {
       return;
     }
 
-    if (!confirm('🚨 CRITICAL WARNING: You are about to perform a full system database restore. This will completely overwrite all existing customer records, products, invoices, payments, repack entries, and raw materials with the data inside the backup archive. We recommend backing up your current database first. Do you want to proceed?')) {
+    if (!confirm('🚨 CRITICAL WARNING: You are about to perform a full system database restore. This will completely overwrite all database tables including user accounts, permissions, and company settings. Your session may be re-authenticated or reloaded. We recommend backing up your current database first. Do you want to proceed?')) {
       return;
     }
 

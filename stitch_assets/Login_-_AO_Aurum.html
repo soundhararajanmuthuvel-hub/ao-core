@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Login | AO Core ERP</title>
+<!-- Tailwind CSS with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Inter and Playfair Display -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Playfair+Display:wght@600;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-fixed": "#f8ddcf",
+                    "tertiary-container": "#14240e",
+                    "surface": "#16130f",
+                    "on-primary-fixed": "#261910",
+                    "on-secondary-fixed-variant": "#5e4203",
+                    "inverse-on-surface": "#34302c",
+                    "error-container": "#93000a",
+                    "on-tertiary-fixed-variant": "#3a4c31",
+                    "inverse-primary": "#6e5a4f",
+                    "error": "#ffb4ab",
+                    "tertiary-fixed": "#d4e9c5",
+                    "surface-bright": "#3d3834",
+                    "tertiary": "#b8cdab",
+                    "surface-tint": "#dbc2b3",
+                    "inverse-surface": "#eae1db",
+                    "secondary-fixed-dim": "#eac078",
+                    "primary": "#dbc2b3",
+                    "surface-variant": "#393430",
+                    "surface-dim": "#16130f",
+                    "on-primary-fixed-variant": "#554339",
+                    "surface-container-low": "#1f1b17",
+                    "on-error": "#690005",
+                    "surface-container-highest": "#393430",
+                    "outline": "#9b8e88",
+                    "on-tertiary-container": "#7a8d6f",
+                    "secondary": "#eac078",
+                    "on-primary": "#3d2d23",
+                    "on-secondary-container": "#d7af69",
+                    "secondary-fixed": "#ffdea9",
+                    "on-primary-container": "#998377",
+                    "outline-variant": "#4e453f",
+                    "tertiary-fixed-dim": "#b8cdab",
+                    "on-tertiary-fixed": "#101f09",
+                    "on-surface-variant": "#d2c4bd",
+                    "on-error-container": "#ffdad6",
+                    "on-secondary-fixed": "#271900",
+                    "secondary-container": "#5e4203",
+                    "primary-container": "#2b1d14",
+                    "background": "#16130f",
+                    "on-surface": "#eae1db",
+                    "surface-container-high": "#2e2925",
+                    "surface-container-lowest": "#110e0a",
+                    "on-tertiary": "#24351d",
+                    "primary-fixed-dim": "#dbc2b3",
+                    "on-secondary": "#422d00",
+                    "surface-container": "#231f1b",
+                    "on-background": "#eae1db"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "container-margin": "32px",
+                    "stack-md": "24px",
+                    "gutter": "24px",
+                    "section-gap": "80px",
+                    "stack-sm": "12px",
+                    "base": "8px"
+            },
+            "fontFamily": {
+                    "body-md": ["Inter"],
+                    "headline-lg": ["Playfair Display"],
+                    "display-lg": ["Playfair Display"],
+                    "body-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-md": ["Playfair Display"]
+            },
+            "fontSize": {
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #16130f; /* Deep Espresso Background */
+            background-image: radial-gradient(circle at center, rgba(61, 56, 52, 0.15) 0%, rgba(22, 19, 15, 1) 100%);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .login-card {
+            background: linear-gradient(145deg, #1f1b17, #16130f);
+            box-shadow: 
+                0 20px 40px -15px rgba(0,0,0,0.5),
+                inset 0 1px 0 rgba(255,255,255,0.05);
+            border: 1px solid rgba(234, 192, 120, 0.15); /* Aged brass hairline border */
+            position: relative;
+        }
+        .login-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            box-shadow: inset 0 0 1px rgba(255, 255, 255, 0.05);
+        }
+        .glass-input {
+            background: rgba(17, 14, 10, 0.4);
+            border: 1px solid rgba(234, 192, 120, 0.1);
+            backdrop-filter: blur(4px);
+        }
+        .glass-input:focus {
+            border-color: #eac078;
+            background: rgba(17, 14, 10, 0.6);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center font-body-md text-on-surface p-6">
+<!-- Login Container -->
+<main class="w-full max-w-md">
+<!-- Logo Section -->
+<div class="mb-12 text-center">
+<div class="inline-flex items-center justify-center mb-6">
+<img alt="AO Core" class="w-16 h-16 object-contain opacity-90 brightness-110" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmaEd4NVcjzITaDOze4X0RWoI93hKwMjmoohtPYqw-k3JigmZfIOH9ZLdlW3qCqIHz5ICAit_UfFf5QHMK37466Qmz_CKjJfXzudye2XbnMCdLy-2w-4F5LH_roaFOk4HPLKLjLp45WNUdwVGKmqcUMhcyHCxY6hn3inxHJFZy9Y0-K4eRE2vx1Yw_1y2_S2yiNzFV07XWNVE2hDuk-S8hvgLQRvgWEaWKc19El_Ag6pEEvGcN6iMIY2at-mjdeWj8ucTpED5hJZ4"/>
+</div>
+<h1 class="font-headline-md text-3xl text-secondary tracking-tight mb-2">AO Core ERP</h1>
+<p class="font-label-md text-xs text-outline tracking-[0.2em] uppercase">Enterprise Management for Organic Excellence</p>
+</div>
+<!-- Login Card -->
+<div class="login-card rounded-xl p-8 mb-8">
+<div class="mb-8">
+<h2 class="font-headline-md text-2xl text-on-surface mb-1">Welcome Back</h2>
+<p class="font-body-md text-sm text-on-surface-variant">Sign in to access your dashboard</p>
+</div>
+<form class="space-y-6" id="loginForm" onsubmit="handleLogin(event)">
+<!-- Email Field -->
+<div class="space-y-2">
+<label class="font-label-md text-xs text-outline block uppercase tracking-wider" for="email">Business Email</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant text-lg">mail</span>
+<input class="w-full pl-10 pr-4 py-3 glass-input rounded-lg text-on-surface placeholder:text-outline-variant font-body-md outline-none transition-all focus:ring-0" id="email" name="email" placeholder="name@aocore.com" required="" type="email"/>
+</div>
+</div>
+<!-- Password Field -->
+<div class="space-y-2">
+<div class="flex justify-between items-center">
+<label class="font-label-md text-xs text-outline block uppercase tracking-wider" for="password">Password</label>
+<a class="font-label-md text-xs text-secondary hover:text-secondary-fixed transition-colors" href="#">Forgot password?</a>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant text-lg">lock</span>
+<input class="w-full pl-10 pr-10 py-3 glass-input rounded-lg text-on-surface placeholder:text-outline-variant font-body-md outline-none transition-all focus:ring-0" id="password" name="password" placeholder="••••••••" required="" type="password"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-outline-variant hover:text-on-surface transition-colors" onclick="togglePassword()" type="button">
+<span class="material-symbols-outlined text-lg" id="passwordIcon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Remember Me -->
+<div class="flex items-center space-x-3">
+<div class="relative flex items-center">
+<input class="w-4 h-4 rounded-sm border-outline-variant bg-surface-container-lowest text-secondary focus:ring-secondary focus:ring-offset-surface-dim" id="remember" type="checkbox"/>
+</div>
+<label class="font-body-md text-sm text-on-surface-variant" for="remember">Keep me logged in for 30 days</label>
+</div>
+<!-- Submit Button -->
+<button class="w-full bg-secondary-container text-secondary font-semibold py-4 rounded-lg hover:bg-secondary hover:text-secondary-container active:scale-[0.99] transition-all flex items-center justify-center gap-3 border border-secondary/20 shadow-lg" type="submit">
+<span class="material-symbols-outlined text-xl">login</span>
+<span class="uppercase tracking-widest text-sm font-bold">Secure Login</span>
+</button>
+</form>
+<!-- SSO / Alternative Options -->
+<div class="mt-10">
+<div class="relative flex items-center mb-6">
+<div class="flex-grow border-t border-outline-variant/30"></div>
+<span class="flex-shrink mx-4 font-label-md text-[10px] text-outline uppercase tracking-[0.2em]">Or continue with</span>
+<div class="flex-grow border-t border-outline-variant/30"></div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<button class="flex items-center justify-center gap-2 py-3 bg-surface-container-low border border-outline-variant/20 rounded-lg hover:bg-surface-container transition-colors group">
+<img class="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAklrkrdQrM6kjb0WHo9PxlpW3AKuqlFAvk-qnA6eX8CYOkt3GPkW8mqZvo2MPF9_VD4uAQJCytHCFJPM70zSGwqYCKGMCbSweRHDG8pmyBO35Cu8TSaRHNVOyCLzu8OKu0iHLaCap0q1jZvh4Ibz3ddXbbIvIWD8gsVaZYxpPiXIl6b0TXi7C-_r5Xjb5m7QQ5Cr5MQUezy7cErsoDPxuvNht1MM9RqIZ7v60ns7LjP58RsD03wZ-RZZYdNq0AeuFsFTJ_kQ4i0pE"/>
+<span class="font-label-md text-xs text-on-surface-variant">Google</span>
+</button>
+<button class="flex items-center justify-center gap-2 py-3 bg-surface-container-low border border-outline-variant/20 rounded-lg hover:bg-surface-container transition-colors group">
+<img class="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBohcl31EPKQe4xOUefh4HpTRxvu3TALWUELCEVX22dxddQ-SBaFkcV5NPS8dL1w52oovmvtRTh2H787U6Bwm5C0s3nwU2_jEBjkSZOUZJrs0j6lrVZvKL0GfbFkel-dLmUVU3jku3uWwMA_dmy3ewC_2pk_pXRbd99nWUx2ZtU_ftq5H_jHx8mMH0q-ZYTaS1Te7lXI0dxXsNkwHmZ7pik-Usi-ZG_TrZNBLi7l05q3_pg0OooyrFcX4v56sfuBC0JqOJ7izwHNWw"/>
+<span class="font-label-md text-xs text-on-surface-variant">Azure AD</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Footer -->
+<footer class="text-center space-y-4 px-4">
+<div class="flex items-center justify-center gap-6">
+<a class="font-label-md text-[11px] text-outline hover:text-secondary transition-colors uppercase tracking-widest" href="#">Privacy</a>
+<span class="text-outline-variant opacity-30">•</span>
+<a class="font-label-md text-[11px] text-outline hover:text-secondary transition-colors uppercase tracking-widest" href="#">Terms</a>
+<span class="text-outline-variant opacity-30">•</span>
+<a class="font-label-md text-[11px] text-outline hover:text-secondary transition-colors uppercase tracking-widest" href="#">Support</a>
+</div>
+<p class="font-body-md text-[11px] text-outline-variant opacity-60">© 2024 AO Core Enterprise Resources. All rights reserved.</p>
+</footer>
+</main>
+<!-- Success/Processing Overlay -->
+<div class="fixed inset-0 bg-surface-dim/80 backdrop-blur-md hidden items-center justify-center z-50" id="loadingOverlay">
+<div class="bg-surface-container p-12 rounded-xl shadow-2xl flex flex-col items-center border border-secondary/20">
+<div class="w-12 h-12 border-2 border-secondary/20 border-t-secondary rounded-full animate-spin"></div>
+<p class="mt-8 font-headline-md text-xl text-secondary uppercase tracking-[0.2em]">Authenticating</p>
+</div>
+</div>
+<script>
+        function togglePassword() {
+            const input = document.getElementById('password');
+            const icon = document.getElementById('passwordIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = 'visibility_off';
+            } else {
+                input.type = 'password';
+                icon.textContent = 'visibility';
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.style.display = 'flex';
+            
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            overlay.innerHTML = `
+                <div class="bg-surface-container p-12 rounded-xl shadow-2xl flex flex-col items-center border border-secondary/20">
+                    <span class="material-symbols-outlined text-5xl text-secondary mb-6" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                    <p class="font-headline-md text-xl text-secondary mb-2 uppercase tracking-widest">Access Granted</p>
+                    <p class="font-body-md text-sm text-on-surface-variant">Entering the AO Core Dashboard...</p>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                alert('Authentication successful. Redirecting...');
+                overlay.style.display = 'none';
+            }, 1000);
+        }
+    </script>
+</body></html>

@@ -24,7 +24,7 @@ exports.login = async (req, res, next) => {
 
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, tourCompleted: user.tourCompleted },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, tourCompleted: user.tourCompleted, mustChangePassword: user.mustChangePassword },
     });
   } catch (err) {
     next(err);
@@ -39,6 +39,7 @@ exports.me = async (req, res) => {
       email: req.user.email,
       role: req.user.role,
       tourCompleted: req.user.tourCompleted,
+      mustChangePassword: req.user.mustChangePassword,
     },
   });
 };
@@ -60,7 +61,41 @@ exports.updateTourStatus = async (req, res, next) => {
         email: user.email,
         role: user.role,
         tourCompleted: user.tourCompleted,
+        mustChangePassword: user.mustChangePassword,
       },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.changePassword = async (req, res, next) => {
+  try {
+    const { password } = req.body;
+    if (!password) {
+      return res.status(400).json({ message: 'Password is required' });
+    }
+    const user = await User.scope('withPassword').findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    user.password = password;
+    user.mustChangePassword = false;
+    await user.save();
+    
+    await logActivity(user.id, 'update', 'auth', 'User changed temporary password');
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        tourCompleted: user.tourCompleted,
+        mustChangePassword: false
+      }
     });
   } catch (err) {
     next(err);
