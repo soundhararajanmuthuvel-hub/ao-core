@@ -568,6 +568,93 @@ export default function Dashboard() {
                   />
                 </div>
 
+                {/* 🎯 Target Performance & Company Achievement Section */}
+                <div style={{ marginBottom: '2rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.75rem', marginTop: '1.5rem', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    🎯 Target Achievement & Sales Performance
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                    
+                    {/* Progress Card */}
+                    <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Target Progress Tracker</h4>
+                      
+                      {/* Today's Target */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '4px' }}>
+                          <span>Today's Target</span>
+                          <span>{adminData?.targets?.metrics?.todayTarget ? `₹${adminData.targets.metrics.todaySales?.toLocaleString()} / ₹${adminData.targets.metrics.todayTarget?.toLocaleString()}` : 'N/A'}</span>
+                        </div>
+                        <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{ 
+                            width: `${Math.min(100, adminData?.targets?.metrics?.todayTarget > 0 ? Math.round((adminData.targets.metrics.todaySales / adminData.targets.metrics.todayTarget) * 100) : 0)}%`, 
+                            height: '100%', 
+                            backgroundColor: adminData?.targets?.metrics?.todaySales >= adminData?.targets?.metrics?.todayTarget ? '#10b981' : '#f59e0b' 
+                          }} />
+                        </div>
+                      </div>
+
+                      {/* Monthly Target */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '4px' }}>
+                          <span>Monthly Target ({adminData?.targets?.metrics?.monthlyAchievementPercent || 0}%)</span>
+                          <span>{adminData?.targets?.metrics?.monthlyTarget ? `₹${adminData.targets.metrics.monthlyActual?.toLocaleString()} / ₹${adminData.targets.metrics.monthlyTarget?.toLocaleString()}` : 'N/A'}</span>
+                        </div>
+                        <div style={{ width: '100%', height: '10px', backgroundColor: 'var(--border)', borderRadius: '5px', overflow: 'hidden' }}>
+                          <div style={{ 
+                            width: `${Math.min(100, adminData?.targets?.metrics?.monthlyAchievementPercent || 0)}%`, 
+                            height: '100%', 
+                            backgroundColor: adminData?.targets?.metrics?.monthlyAchievementPercent >= 100 ? '#10b981' : '#ef4444' 
+                          }} />
+                        </div>
+                      </div>
+
+                      {/* Yearly Target */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '4px' }}>
+                          <span>Yearly Target</span>
+                          <span>{adminData?.targets?.metrics?.monthlyTarget ? `₹${adminData.targets.metrics.monthlyActual?.toLocaleString()} / ₹${(adminData.targets.metrics.monthlyTarget * 12)?.toLocaleString()}` : 'N/A'}</span>
+                        </div>
+                        <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{ 
+                            width: `${Math.min(100, adminData?.targets?.metrics?.monthlyTarget > 0 ? Math.round((adminData.targets.metrics.monthlyActual / (adminData.targets.metrics.monthlyTarget * 12)) * 100) : 0)}%`, 
+                            height: '100%', 
+                            backgroundColor: '#3b82f6' 
+                          }} />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '0.75rem', fontSize: '0.8rem' }}>
+                        <span>Risk Level: <strong style={{ color: adminData?.targets?.metrics?.upcomingTargetRisk?.includes('High') ? '#ef4444' : '#10b981' }}>{adminData?.targets?.metrics?.upcomingTargetRisk || 'Low'}</strong></span>
+                        <span>Badge: <strong>{adminData?.targets?.metrics?.rewardBadge || 'Bronze'}</strong></span>
+                      </div>
+                    </div>
+
+                    {/* Salesman Leaderboard Card */}
+                    <div className="card" style={{ padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Salesman Leaderboard</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto' }}>
+                        {adminData?.targets?.salesmanLeaderboard && adminData.targets.salesmanLeaderboard.length > 0 ? (
+                          adminData.targets.salesmanLeaderboard.map((salesman) => (
+                            <div key={salesman.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', backgroundColor: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontWeight: 800, color: '#64748b' }}>#{salesman.rank}</span>
+                                <span style={{ fontWeight: 600 }}>{salesman.name}</span>
+                              </div>
+                              <span style={{ fontWeight: 'bold', color: salesman.achievementPercent >= 100 ? '#10b981' : '#ff9800' }}>
+                                {salesman.achievementPercent}% achieved (₹{salesman.actual?.toLocaleString()})
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textAlign: 'center', padding: '1rem' }}>No salesmen registered.</div>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
                 <div style={{ marginBottom: '1.5rem' }}>
                   <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.75rem', marginTop: '1.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     📦 Manufacturing & Packing Overview

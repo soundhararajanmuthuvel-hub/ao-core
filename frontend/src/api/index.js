@@ -55,6 +55,7 @@ export const salesTargetsApi = {
   update: (id, data) => client.put(`/sales-targets/${id}`, data),
   remove: (id) => client.delete(`/sales-targets/${id}`),
   dashboard: () => client.get('/sales-targets/dashboard'),
+  getSalesmanDashboard: () => client.get('/salesman/dashboard'),
 };
 
 export const salesApi = {

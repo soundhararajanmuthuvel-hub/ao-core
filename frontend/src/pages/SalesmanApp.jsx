@@ -8,7 +8,8 @@ import {
   customersApi, 
   productsApi, 
   ordersApi, 
-  crmApi 
+  crmApi,
+  salesTargetsApi 
 } from '../api';
 import { 
   Home, 
@@ -56,6 +57,7 @@ export default function SalesmanApp() {
   const [routes, setRoutes] = useState([]);
   const [visits, setVisits] = useState([]);
   const [sfaAnalytics, setSfaAnalytics] = useState(null);
+  const [salesmanTargets, setSalesmanTargets] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Filter & Search States
@@ -153,14 +155,15 @@ export default function SalesmanApp() {
     setLoading(true);
     try {
       if (navigator.onLine) {
-        const [custRes, leadsRes, prodRes, routesRes, visitsRes, analyticsRes, ordersRes] = await Promise.all([
+        const [custRes, leadsRes, prodRes, routesRes, visitsRes, analyticsRes, ordersRes, targetsRes] = await Promise.all([
           customersApi.list({ limit: 200 }),
           crmApi.getLeads({ limit: 100 }),
           productsApi.list({ limit: 200 }),
           sfaApi.getRoutes({ salesmanId: user.id }),
           sfaApi.getVisits({ salesmanId: user.id }),
           sfaApi.getAnalytics({ salesmanId: user.id }),
-          ordersApi.list({ limit: 50 })
+          ordersApi.list({ limit: 50 }),
+          salesTargetsApi.getSalesmanDashboard()
         ]);
 
         const assignedCust = (custRes.data?.customers || []).filter(c => !c.assignedSalesmanId || c.assignedSalesmanId === user.id);
@@ -173,6 +176,7 @@ export default function SalesmanApp() {
         setRoutes(routesRes.data || []);
         setVisits(visitsRes.data || []);
         setSfaAnalytics(analyticsRes.data || null);
+        setSalesmanTargets(targetsRes.data || null);
         setPastOrders((ordersRes.data?.orders || []).filter(o => o.customerId && assignedCust.some(c => c.id === o.customerId)));
 
         // Cache in LocalStorage
@@ -180,12 +184,14 @@ export default function SalesmanApp() {
         localStorage.setItem('sfa_cache_leads', JSON.stringify(assignedLeads));
         localStorage.setItem('sfa_cache_products', JSON.stringify(prodList));
         localStorage.setItem('sfa_cache_analytics', JSON.stringify(analyticsRes.data));
+        localStorage.setItem('sfa_cache_targets', JSON.stringify(targetsRes.data));
       } else {
         // Load Offline Caches
         setCustomers(JSON.parse(localStorage.getItem('sfa_cache_customers') || '[]'));
         setLeads(JSON.parse(localStorage.getItem('sfa_cache_leads') || '[]'));
         setProducts(JSON.parse(localStorage.getItem('sfa_cache_products') || '[]'));
         setSfaAnalytics(JSON.parse(localStorage.getItem('sfa_cache_analytics') || 'null'));
+        setSalesmanTargets(JSON.parse(localStorage.getItem('sfa_cache_targets') || 'null'));
       }
     } catch (err) {
       console.error(err);
@@ -896,22 +902,57 @@ export default function SalesmanApp() {
               <div className="card" style={{ padding: '0.85rem', borderLeft: '4px solid var(--info)' }}>
                 <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-secondary)' }}>TODAY'S VISITS</span>
                 <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--info)', marginTop: '2px' }}>
-                  {sfaAnalytics?.visitedCustomers || 0} / 20 Shops
+                  {salesmanTargets?.visitCount || 0} Visits
                 </div>
               </div>
               <div className="card" style={{ padding: '0.85rem', borderLeft: '4px solid var(--success)' }}>
                 <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-secondary)' }}>TODAY'S ORDERS</span>
                 <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--success)', marginTop: '2px' }}>
-                  ₹{(sfaAnalytics?.ordersGenerated * 12500 || 0).toLocaleString()}
+                  {salesmanTargets?.todayOrders || 0} Orders
                 </div>
               </div>
+              <div className="card" style={{ padding: '0.85rem', borderLeft: '4px solid #3b82f6' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-secondary)' }}>TODAY'S SALES</span>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#3b82f6', marginTop: '2px' }}>
+                  ₹{(salesmanTargets?.todaySales || 0).toLocaleString()}
+                </div>
+              </div>
+              <div className="card" style={{ padding: '0.85rem', borderLeft: '4px solid #10b981' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-secondary)' }}>TODAY'S COLLECTION</span>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>
+                  ₹{(salesmanTargets?.todayCollection || 0).toLocaleString()}
+                </div>
+              </div>
+              <div className="card" style={{ padding: '0.85rem', borderLeft: '4px solid #8b5cf6' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-secondary)' }}>MY TARGET</span>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#8b5cf6', marginTop: '2px' }}>
+                  ₹{(salesmanTargets?.myTarget || 0).toLocaleString()}
+                </div>
+              </div>
+              <div className="card" style={{ padding: '0.85rem', borderLeft: '4px solid #f43f5e' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-secondary)' }}>REMAINING TARGET</span>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f43f5e', marginTop: '2px' }}>
+                  ₹{(salesmanTargets?.remainingTarget || 0).toLocaleString()}
+                </div>
+              </div>
+
+              {/* Achievement Progress Bar & Badge */}
               <div className="card" style={{ padding: '0.85rem', borderLeft: '4px solid var(--warning)', gridColumn: 'span 2' }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-secondary)' }}>TODAY'S TARGET ACHIEVEMENT PROGRESS</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-secondary)' }}>MONTHLY TARGET PROGRESS</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>Rank: #{salesmanTargets?.leaderboardPosition || 0}</span>
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '6px' }}>
                   <div style={{ flex: 1, backgroundColor: 'var(--border)', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min(100, (sfaAnalytics?.visitedCustomers || 0) * 5)}%`, backgroundColor: 'var(--warning)', height: '100%' }}></div>
+                    <div style={{ width: `${Math.min(100, salesmanTargets?.targetPercent || 0)}%`, backgroundColor: 'var(--warning)', height: '100%' }}></div>
                   </div>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{Math.min(100, (sfaAnalytics?.visitedCustomers || 0) * 5)}%</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{salesmanTargets?.targetPercent || 0}%</span>
+                </div>
+                <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Badge Earned:</span>
+                  <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: 'var(--bg-page)', border: '1px solid var(--border)' }}>
+                    {salesmanTargets?.achievementBadge || 'Bronze Badge'}
+                  </span>
                 </div>
               </div>
             </div>

@@ -342,6 +342,14 @@ const getDashboardDataInternal = async () => {
   }
   const packedTodayList = Object.values(packedTodayMap);
 
+  const { getTargetDashboardDataInternal } = require('./salesTargetController');
+  let targets = null;
+  try {
+    targets = await getTargetDashboardDataInternal();
+  } catch (e) {
+    console.error('Failed to load targets on main dashboard:', e);
+  }
+
   return {
     cards: {
       totalProducts: productCount,
@@ -376,7 +384,8 @@ const getDashboardDataInternal = async () => {
     outstanding: outstandingMetrics,
     outstandingTrend,
     bulkProductsList: bulkProductsForValuation,
-    packedTodayList
+    packedTodayList,
+    targets
   };
 };
 

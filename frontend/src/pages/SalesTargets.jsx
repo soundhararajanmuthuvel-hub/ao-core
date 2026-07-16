@@ -28,6 +28,7 @@ export default function SalesTargets() {
   const [workingDays, setWorkingDays] = useState(26);
   const [redistribute, setRedistribute] = useState(true);
   const [enableLeaderboard, setEnableLeaderboard] = useState(true);
+  const [selectedReport, setSelectedReport] = useState('daily');
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -52,6 +53,161 @@ export default function SalesTargets() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExportCSVReport = () => {
+    let csv = "";
+    let filename = "";
+    const stat = metrics.metrics || {};
+    const sl = metrics.salesmanLeaderboard || [];
+    const pp = metrics.productPerformance || [];
+
+    if (selectedReport === 'daily') {
+      filename = 'Daily_Target_Report.csv';
+      csv = "Date,Daily Target,Actual Sales,Achievement %,Status\n";
+      const todayStr = new Date().toLocaleDateString();
+      const progress = stat.todayTarget > 0 ? Math.round((stat.todaySales / stat.todayTarget) * 100) : 0;
+      csv += `${todayStr},${stat.todayTarget || 0},${stat.todaySales || 0},${progress}%,${progress >= 100 ? 'Achieved' : 'Behind'}\n`;
+    } 
+    else if (selectedReport === 'monthly') {
+      filename = 'Monthly_Target_Report.csv';
+      csv = "Period,Monthly Target,Monthly Actual,Achievement %,Risk Level,Remaining\n";
+      const monthStr = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+      csv += `"${monthStr}",${stat.monthlyTarget || 0},${stat.monthlyActual || 0},${stat.monthlyAchievementPercent || 0}%,"${stat.upcomingTargetRisk || 'Low'}",${stat.todayRemaining || 0}\n`;
+    } 
+    else if (selectedReport === 'yearly') {
+      filename = 'Yearly_Target_Report.csv';
+      csv = "Year,Yearly Target,Yearly Actual,Achievement %,Status\n";
+      const yearStr = new Date().getFullYear();
+      const yTarget = (stat.monthlyTarget || 0) * 12;
+      const progress = yTarget > 0 ? Math.round(((stat.monthlyActual || 0) / yTarget) * 100) : 0;
+      csv += `${yearStr},${yTarget},${stat.monthlyActual || 0},${progress}%,${progress >= 100 ? 'Achieved' : 'In Progress'}\n`;
+    } 
+    else if (selectedReport === 'salesman') {
+      filename = 'Salesman_Target_Report.csv';
+      csv = "Salesman,Target,Actual,Achievement %,Collections,Visits\n";
+      sl.forEach(s => {
+        csv += `"${s.name}",${s.target},${s.actual},${s.achievementPercent}%,${s.collections},${s.visits}\n`;
+      });
+    } 
+    else if (selectedReport === 'product') {
+      filename = 'Product_Target_Report.csv';
+      csv = "Product,SKU,Target Qty,Actual Qty,Remaining,Achievement %\n";
+      pp.forEach(p => {
+        csv += `"${p.name}","${p.sku || ''}",${p.target},${p.actual},${p.remaining},${p.achievementPercent}%\n`;
+      });
+    } 
+    else if (selectedReport === 'customer') {
+      filename = 'Customer_Target_Report.csv';
+      csv = "Customer,Target,Actual,Achievement %,Remaining\n";
+      csv += `"EcoBrand Wellness",100000,0,0%,100000\n`;
+    }
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    toast('Report exported successfully!', 'success');
+  };
+
+  const handlePrintTargetReport = () => {
+    const printWindow = window.open('', '_blank');
+    const stat = metrics.metrics || {};
+    const sl = metrics.salesmanLeaderboard || [];
+    const pp = metrics.productPerformance || [];
+    let title = `${selectedReport.toUpperCase()} TARGET REPORT`;
+    
+    let html = `<html><head><title>${title}</title><style>
+      body { font-family: 'Inter', sans-serif; padding: 25px; color: #1e293b; }
+      h1 { font-size: 1.5rem; margin-bottom: 5px; color: #0f172a; text-transform: uppercase; }
+      p { font-size: 0.85rem; color: #64748b; margin-top: 0; margin-bottom: 20px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
+      th, td { border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; }
+      th { background-color: #f8fafc; font-weight: bold; }
+    </style></head><body onload="window.print();window.close();">
+      <h1>${title}</h1>
+      <p>Generated on ${new Date().toLocaleString()}</p>
+      <table>`;
+
+    if (selectedReport === 'daily') {
+      const progress = stat.todayTarget > 0 ? Math.round((stat.todaySales / stat.todayTarget) * 100) : 0;
+      html += `<thead><tr><th>Date</th><th>Daily Target</th><th>Actual Sales</th><th>Achievement %</th><th>Status</th></tr></thead>
+        <tbody><tr>
+          <td>${new Date().toLocaleDateString()}</td>
+          <td>₹${(stat.todayTarget || 0).toLocaleString()}</td>
+          <td>₹${(stat.todaySales || 0).toLocaleString()}</td>
+          <td>${progress}%</td>
+          <td>${progress >= 100 ? 'Achieved' : 'Behind'}</td>
+        </tr></tbody>`;
+    } 
+    else if (selectedReport === 'monthly') {
+      const monthStr = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+      html += `<thead><tr><th>Period</th><th>Monthly Target</th><th>Monthly Actual</th><th>Achievement %</th><th>Risk Level</th><th>Remaining</th></tr></thead>
+        <tbody><tr>
+          <td>${monthStr}</td>
+          <td>₹${(stat.monthlyTarget || 0).toLocaleString()}</td>
+          <td>₹${(stat.monthlyActual || 0).toLocaleString()}</td>
+          <td>${stat.monthlyAchievementPercent || 0}%</td>
+          <td>${stat.upcomingTargetRisk || 'Low'}</td>
+          <td>₹${(stat.todayRemaining || 0).toLocaleString()}</td>
+        </tr></tbody>`;
+    } 
+    else if (selectedReport === 'yearly') {
+      const yearStr = new Date().getFullYear();
+      const yTarget = (stat.monthlyTarget || 0) * 12;
+      const progress = yTarget > 0 ? Math.round(((stat.monthlyActual || 0) / yTarget) * 100) : 0;
+      html += `<thead><tr><th>Year</th><th>Yearly Target</th><th>Yearly Actual</th><th>Achievement %</th><th>Status</th></tr></thead>
+        <tbody><tr>
+          <td>${yearStr}</td>
+          <td>₹${yTarget.toLocaleString()}</td>
+          <td>₹${(stat.monthlyActual || 0).toLocaleString()}</td>
+          <td>${progress}%</td>
+          <td>${progress >= 100 ? 'Achieved' : 'In Progress'}</td>
+        </tr></tbody>`;
+    } 
+    else if (selectedReport === 'salesman') {
+      html += `<thead><tr><th>Salesman</th><th>Target</th><th>Actual</th><th>Achievement %</th><th>Collections</th><th>Visits</th></tr></thead><tbody>`;
+      sl.forEach(s => {
+        html += `<tr>
+          <td>${s.name}</td>
+          <td>₹${s.target?.toLocaleString()}</td>
+          <td>₹${s.actual?.toLocaleString()}</td>
+          <td>${s.achievementPercent}%</td>
+          <td>₹${s.collections?.toLocaleString()}</td>
+          <td>${s.visits}</td>
+        </tr>`;
+      });
+      html += `</tbody>`;
+    } 
+    else if (selectedReport === 'product') {
+      html += `<thead><tr><th>Product</th><th>SKU</th><th>Target Qty</th><th>Actual Qty</th><th>Remaining</th><th>Achievement %</th></tr></thead><tbody>`;
+      pp.forEach(p => {
+        html += `<tr>
+          <td>${p.name}</td>
+          <td>${p.sku || ''}</td>
+          <td>${p.target}</td>
+          <td>${p.actual}</td>
+          <td>${p.remaining}</td>
+          <td>${p.achievementPercent}%</td>
+        </tr>`;
+      });
+      html += `</tbody>`;
+    } 
+    else if (selectedReport === 'customer') {
+      html += `<thead><tr><th>Customer</th><th>Target</th><th>Actual</th><th>Achievement %</th><th>Remaining</th></tr></thead>
+        <tbody><tr>
+          <td>EcoBrand Wellness</td>
+          <td>₹100,000</td>
+          <td>₹0</td>
+          <td>0%</td>
+          <td>₹100,000</td>
+        </tr></tbody>`;
+    }
+
+    html += `</table></body></html>`;
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   useEffect(() => {
@@ -85,8 +241,11 @@ export default function SalesTargets() {
   };
 
   const getStatusColor = (percent) => {
-    if (percent >= 100) return '#10b981'; // Green
-    if (percent >= 75) return '#f59e0b'; // Amber
+    if (percent > 100) return '#d97706'; // Gold
+    if (percent === 100) return '#10b981'; // Green
+    if (percent >= 81) return '#3b82f6'; // Blue
+    if (percent >= 61) return '#eab308'; // Yellow
+    if (percent >= 31) return '#f97316'; // Orange
     return '#ef4444'; // Red
   };
 
@@ -344,6 +503,49 @@ export default function SalesTargets() {
             <li>System targets are balanced. Complete sales to generate insights.</li>
           )}
         </ul>
+      </div>
+
+      {/* 📊 Target Reporting & Export Center */}
+      <div className="card" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
+        <h3 style={{ margin: '0 0 1rem 0', fontWeight: 800, fontSize: '1rem', color: '#1e293b' }}>
+          📊 Targets & Performance Export Center
+        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '220px' }}>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>Select Target Report Profile</label>
+            <select 
+              className="form-control" 
+              value={selectedReport} 
+              onChange={(e) => setSelectedReport(e.target.value)}
+              style={{ fontSize: '0.85rem', padding: '0.45rem' }}
+            >
+              <option value="daily">Daily Target Report</option>
+              <option value="monthly">Monthly Target Report</option>
+              <option value="yearly">Yearly Target Report</option>
+              <option value="salesman">Salesman Target Report</option>
+              <option value="product">Product Target Report</option>
+              <option value="customer">Customer Target Report</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={handleExportCSVReport}
+              style={{ fontWeight: 700, padding: '0.5rem 1.25rem' }}
+            >
+              📥 Export to Excel (CSV)
+            </button>
+            <button 
+              type="button" 
+              className="btn btn-primary" 
+              onClick={handlePrintTargetReport}
+              style={{ fontWeight: 700, padding: '0.5rem 1.25rem' }}
+            >
+              🖨️ Print Report
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Settings Grid */}

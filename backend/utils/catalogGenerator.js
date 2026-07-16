@@ -23,6 +23,26 @@ const fetchImageBuffer = async (imgUrlOrPath) => {
   return null;
 };
 
+// Helper to clean HTML tags and decode HTML entities from text strings
+const cleanHtmlText = (html) => {
+  if (!html) return '';
+  let text = html.replace(/<[^>]*>/g, ''); // Strip all tags
+  text = text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&rsquo;/g, "'")
+    .replace(/&lsquo;/g, "'")
+    .replace(/&ldquo;/g, '"')
+    .replace(/&rdquo;/g, '"')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&mdash;/g, '—')
+    .replace(/&ndash;/g, '–');
+  return text.trim();
+};
+
 // Generates Premium PDF Catalog
 exports.buildPdfCatalog = async (products, settings, pricingType = 'retail') => {
   return new Promise(async (resolve, reject) => {
@@ -87,14 +107,27 @@ exports.buildPdfCatalog = async (products, settings, pricingType = 'retail') => 
       doc.strokeColor(brandColor).lineWidth(2).rect(20, 20, 555, 802).stroke();
       doc.strokeColor(brandColor).lineWidth(0.5).rect(24, 24, 547, 794).stroke();
 
+      // Corner accents inside the decorative border
+      doc.save();
+      doc.strokeColor(brandColor).lineWidth(1.5);
+      // Top Left corner frame
+      doc.moveTo(24, 44).lineTo(24, 24).lineTo(44, 24).stroke();
+      // Top Right corner frame
+      doc.moveTo(568, 44).lineTo(568, 24).lineTo(548, 24).stroke();
+      // Bottom Left corner frame
+      doc.moveTo(24, 798).lineTo(24, 818).lineTo(44, 818).stroke();
+      // Bottom Right corner frame
+      doc.moveTo(568, 798).lineTo(568, 818).lineTo(548, 818).stroke();
+      doc.restore();
+
       if (logoBuffer) {
         try {
           doc.image(logoBuffer, 197, 180, { width: 200 });
         } catch (e) {}
       }
 
-      doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(36).text(companyName, 40, 400, { align: 'center' });
-      doc.fillColor('#334155').font('Helvetica-Bold').fontSize(18).text('OFFICIAL PRODUCT CATALOG & PRICE LIST', 40, 450, { align: 'center' });
+      doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(32).text(companyName, 40, 400, { align: 'center' });
+      doc.fillColor('#334155').font('Helvetica-Bold').fontSize(16).text('OFFICIAL PRODUCT CATALOG & PRICE LIST', 40, 450, { align: 'center' });
 
       // Pricing context badge
       let tierLabel = 'RETAIL EDITION';
@@ -111,65 +144,172 @@ exports.buildPdfCatalog = async (products, settings, pricingType = 'retail') => 
       pageNumber++;
       doc.addPage();
 
-      // 2. Product Pages
+      // 2. Product Pages Grouped by Category
+      const sortedProducts = [...products].sort((a, b) => {
+        const catA = (a.category || 'General').toLowerCase();
+        const catB = (b.category || 'General').toLowerCase();
+        if (catA < catB) return -1;
+        if (catA > catB) return 1;
+
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        if (nameA < nameB) return -1;
+        if (nameA > nameB) return 1;
+        return 0;
+      });
+
       let itemY = 80;
+      let lastCategory = null;
       drawHeaderFooter(pageNumber);
 
-      for (let i = 0; i < products.length; i++) {
-        const p = products[i];
+      for (let i = 0; i < sortedProducts.length; i++) {
+        const p = sortedProducts[i];
+        const category = p.category || 'General';
+
+        // Strip and clean the text elements
+        const descText = cleanHtmlText(p.description || p.shortDescription || 'No description provided.');
+        const ingText = p.ingredients ? cleanHtmlText(p.ingredients) : '';
+
+        // Calculate card height dynamically
+        let rightContentHeight = 15; // top margin
         
-        // Check if we need a new page (each product takes ~220 points of height)
-        if (itemY > 580) {
+        // Product name height
+        doc.font('Helvetica-Bold').fontSize(13);
+        rightContentHeight += doc.heightOfString(p.name, { width: 345 }) + 3;
+
+        // SKU / Category height
+        doc.font('Helvetica-Bold').fontSize(7.5);
+        const skuCatText = `SKU: ${p.sku || 'N/A'}    |    CATEGORY: ${category.toUpperCase()}`;
+        rightContentHeight += doc.heightOfString(skuCatText, { width: 345 }) + 6;
+
+        // Description height
+        doc.font('Helvetica').fontSize(9);
+        rightContentHeight += doc.heightOfString(descText, { width: 345, lineGap: 1 }) + 8;
+
+        // Ingredients height
+        if (ingText) {
+          doc.font('Helvetica-Bold').fontSize(8);
+          const fullIngText = `INGREDIENTS: ${ingText}`;
+          rightContentHeight += doc.heightOfString(fullIngText, { width: 345 }) + 6;
+        }
+
+        // Barcode height
+        if (p.barcode) {
+          doc.font('Helvetica').fontSize(7.5);
+          rightContentHeight += doc.heightOfString(`Barcode: ${p.barcode}`, { width: 345 }) + 6;
+        }
+
+        // Badge and Prices space
+        rightContentHeight += 30; 
+        rightContentHeight += 15; // bottom margin
+
+        // Card height clamp
+        const boxHeight = Math.max(150, rightContentHeight);
+
+        // Check if category changed
+        const categoryChanged = lastCategory !== category;
+        let dividerHeight = categoryChanged ? 45 : 0;
+
+        // Page break logic
+        if (itemY + dividerHeight + boxHeight > 780) {
           pageNumber++;
           doc.addPage();
           drawHeaderFooter(pageNumber);
           itemY = 80;
         }
 
-        // Product Box Container
-        doc.save();
-        doc.rect(40, itemY, 515, 210).fill('#ffffff');
-        doc.strokeColor('#f1f5f9').lineWidth(1).rect(40, itemY, 515, 210).stroke();
+        // Draw Category Section Divider
+        if (categoryChanged) {
+          doc.save();
+          doc.fillColor(brandColor).rect(40, itemY, 515, 26, { rx: 3 }).fill();
+          doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(10).text(category.toUpperCase(), 50, itemY + 8, { characterSpacing: 1.5 });
+          doc.restore();
+          itemY += 36;
+          lastCategory = category;
+        }
 
-        // Image loading
+        // Draw Product Card Box
+        doc.save();
+        doc.rect(40, itemY, 515, boxHeight).fill('#ffffff');
+        doc.strokeColor('#e2e8f0').lineWidth(0.75).rect(40, itemY, 515, boxHeight).stroke();
+
+        // Image / Branded Placeholder Left Column
+        const imgW = 110;
+        const imgH = 110;
+        const imgX = 55;
+        const imgY = itemY + (boxHeight - imgH) / 2;
+
+        const drawPlaceholder = (x, y, w, h) => {
+          doc.save();
+          doc.fillColor(brandColor).fillOpacity(0.04).rect(x, y, w, h, { rx: 5 }).fill();
+          doc.strokeColor(brandColor).lineWidth(0.75).fillOpacity(1.0).rect(x + 4, y + 4, w - 8, h - 8, { rx: 4 }).stroke();
+          
+          const initials = companyName.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase() || 'AO';
+          doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(20).text(initials, x, y + (h / 2) - 15, { align: 'center', width: w });
+          doc.font('Helvetica-Oblique').fontSize(7.5).text('Organic Premium', x, y + (h / 2) + 12, { align: 'center', width: w });
+          doc.restore();
+        };
+
         const imgBuffer = await fetchImageBuffer(p.image);
         if (imgBuffer) {
           try {
-            doc.image(imgBuffer, 50, itemY + 15, { width: 140, height: 140, fit: [140, 140] });
+            doc.image(imgBuffer, imgX, imgY, { width: imgW, height: imgH, fit: [imgW, imgH] });
           } catch (e) {
-            doc.rect(50, itemY + 15, 140, 140).fill('#f8fafc');
-            doc.fillColor('#94a3b8').font('Helvetica').fontSize(10).text('No Image Available', 70, itemY + 80);
+            drawPlaceholder(imgX, imgY, imgW, imgH);
           }
         } else {
-          doc.rect(50, itemY + 15, 140, 140).fill('#f8fafc');
-          doc.fillColor('#94a3b8').font('Helvetica').fontSize(10).text('No Image Available', 70, itemY + 80);
+          drawPlaceholder(imgX, imgY, imgW, imgH);
         }
 
-        // Product Name and SKU
-        doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(14).text(p.name, 210, itemY + 15, { width: 330 });
-        doc.fillColor('#64748b').font('Helvetica-Oblique').fontSize(8.5).text(`SKU: ${p.sku}  |  Category: ${p.category || 'General'}`, 210, itemY + 33);
+        // Content Layout (Right Column)
+        let textY = itemY + 15;
+        const textX = 185;
+        const textWidth = 355;
+
+        // Product Name
+        doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(13);
+        doc.text(p.name, textX, textY, { width: textWidth });
+        textY += doc.heightOfString(p.name, { width: textWidth }) + 3;
+
+        // SKU / Category Info
+        doc.fillColor('#64748b').font('Helvetica-Bold').fontSize(7.5);
+        const skuCatString = `SKU: ${p.sku || 'N/A'}    |    CATEGORY: ${category.toUpperCase()}`;
+        doc.text(skuCatString, textX, textY, { characterSpacing: 1.0 });
+        textY += doc.heightOfString(skuCatString, { width: textWidth }) + 6;
 
         // Description
-        const desc = p.description || p.shortDescription || 'No description provided for this product.';
-        doc.fillColor('#334155').font('Helvetica').fontSize(9.5).text(desc, 210, itemY + 48, { width: 330, height: 45, ellipsis: true });
+        doc.fillColor('#334155').font('Helvetica').fontSize(9);
+        doc.text(descText, textX, textY, { width: textWidth, lineGap: 1 });
+        textY += doc.heightOfString(descText, { width: textWidth, lineGap: 1 }) + 8;
 
         // Ingredients
-        if (p.ingredients) {
-          doc.fillColor('#475569').font('Helvetica-Bold').fontSize(8.5).text('Ingredients: ', 210, itemY + 98, { continued: true });
-          doc.font('Helvetica').fillColor('#64748b').text(p.ingredients, { width: 330, height: 25, ellipsis: true });
+        if (ingText) {
+          doc.fillColor('#475569').font('Helvetica-Bold').fontSize(8);
+          doc.text('INGREDIENTS: ', textX, textY, { continued: true });
+          doc.font('Helvetica').fillColor('#64748b').text(ingText, { width: textWidth - 80 });
+          textY += doc.heightOfString(`INGREDIENTS: ${ingText}`, { width: textWidth }) + 6;
         }
 
-        // Barcode placeholder
+        // Barcode
         if (p.barcode) {
-          doc.fillColor('#64748b').font('Helvetica').fontSize(8).text(`Barcode: ${p.barcode}`, 210, itemY + 128);
+          doc.fillColor('#94a3b8').font('Helvetica').fontSize(7.5).text(`Barcode: ${p.barcode}`, textX, textY);
+          textY += doc.heightOfString(`Barcode: ${p.barcode}`, { width: textWidth }) + 6;
         }
 
-        // Pack size badge
-        const packText = p.packSize ? `Pack: ${p.packSize}` : `Unit: 1 ${p.unit || 'pcs'}`;
-        doc.fillColor('#eff6ff').rect(210, itemY + 148, 120, 18, { rx: 3 }).fill();
-        doc.fillColor('#1e40af').font('Helvetica-Bold').fontSize(8.5).text(packText, 215, itemY + 153, { width: 110, align: 'center' });
+        // Bottom Badge & Pricing Row
+        const bottomContentY = itemY + boxHeight - 30;
 
-        // Price Display logic
+        // Pack Size Badge
+        const packText = p.packSize ? `Pack: ${p.packSize}` : `Unit: 1 ${p.unit || 'pcs'}`;
+        
+        doc.save();
+        doc.fillColor(brandColor).fillOpacity(0.06);
+        doc.rect(textX, bottomContentY, 110, 16, { rx: 3 }).fill();
+        doc.restore();
+        
+        doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(7.5).text(packText, textX + 5, bottomContentY + 4, { width: 100, align: 'center' });
+
+        // Prices Block
         if (pricingType !== 'hide') {
           let priceToShow = p.sellingPrice;
           let tierName = 'Retail Price';
@@ -182,13 +322,12 @@ exports.buildPdfCatalog = async (products, settings, pricingType = 'retail') => 
             tierName = 'Stockist Price';
           }
 
-          // MRP block
-          doc.fillColor('#64748b').font('Helvetica').fontSize(9.5).text(`MRP: Rs. ${Number(p.mrp || p.sellingPrice).toFixed(2)}`, 345, itemY + 151);
-          doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(11).text(`${tierName}: Rs. ${Number(priceToShow).toFixed(2)}`, 210, itemY + 180);
+          doc.fillColor('#64748b').font('Helvetica').fontSize(8.5).text(`MRP: Rs. ${Number(p.mrp || p.sellingPrice).toFixed(2)}`, textX + 130, bottomContentY + 3);
+          doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(10).text(`${tierName}: Rs. ${Number(priceToShow).toFixed(2)}`, textX + 220, bottomContentY + 2, { align: 'right', width: textWidth - 220 });
         }
 
         doc.restore();
-        itemY += 230;
+        itemY += boxHeight + 15;
       }
 
       // Finish document

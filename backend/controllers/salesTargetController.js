@@ -111,142 +111,310 @@ exports.deleteTarget = async (req, res) => {
 };
 
 // Target Dashboard Calculations with Auto-Redistribution Logic
+const getTargetDashboardDataInternal = async () => {
+  const today = new Date();
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
+  
+  const settings = await Settings.findOne();
+  const configWorkingDays = settings?.workingDaysPerMonth || getTotalWorkingDays(today);
+  
+  // Fetch all targets for this year/month
+  const targets = await SalesTarget.findAll({
+    where: { year: today.getFullYear() }
+  });
+
+  // 1. Fetch Actual Sales figures for this month
+  const currentMonthInvoices = await Invoice.findAll({
+    where: {
+      date: { [Op.between]: [startOfMonth, endOfMonth] },
+      status: { [Op.ne]: 'Cancelled' }
+    },
+    include: [{ model: InvoiceItem, as: 'items' }]
+  });
+
+  const monthlyActualRevenue = currentMonthInvoices.reduce((sum, inv) => sum + Number(inv.grandTotal || 0), 0);
+  
+  // Today's Sales
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
+  const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+  const todayInvoices = currentMonthInvoices.filter(inv => new Date(inv.date) >= startOfToday && new Date(inv.date) <= endOfToday);
+  const todayActualRevenue = todayInvoices.reduce((sum, inv) => sum + Number(inv.grandTotal || 0), 0);
+
+  // 2. Resolve Monthly Company Target (Dynamic Split fallback if only Yearly exists)
+  let companyMonthlyTargetVal = 300000; // Default fallback 3 Lakhs INR
+  const companyMonthly = targets.find(t => t.targetType === 'Company' && t.targetPeriod === 'Monthly' && t.month === (today.getMonth() + 1));
+  const companyYearly = targets.find(t => t.targetType === 'Company' && t.targetPeriod === 'Yearly');
+  
+  if (companyMonthly) {
+    companyMonthlyTargetVal = Number(companyMonthly.targetValue);
+  } else if (companyYearly) {
+    companyMonthlyTargetVal = Number(companyYearly.targetValue) / 12;
+  }
+
+  // Dynamic Target Redistribution Calculations
+  const remainingDays = getRemainingWorkingDays(today);
+  const remainingTarget = Math.max(0, companyMonthlyTargetVal - (monthlyActualRevenue - todayActualRevenue));
+  const recalculatedDailyTarget = remainingDays > 0 ? (remainingTarget / remainingDays) : 10000;
+
+  // Company Progress Metrics
+  const companyAchievementPercent = companyMonthlyTargetVal > 0 ? Math.round((monthlyActualRevenue / companyMonthlyTargetVal) * 100) : 0;
+  
+  // 3. Product performance stats (Targets vs Actuals)
+  const productTargets = targets.filter(t => t.targetType === 'Product');
+  const productPerformance = [];
+  
+  // Get unique product sales quantities
+  const prodSales = {};
+  currentMonthInvoices.forEach(inv => {
+    inv.items?.forEach(it => {
+      const pId = it.productId;
+      if (pId) {
+        prodSales[pId] = (prodSales[pId] || 0) + Number(it.qty || 0);
+      }
+    });
+  });
+
+  const allProducts = await Product.findAll({ limit: 150 });
+  allProducts.forEach(prod => {
+    const tRecord = productTargets.find(t => t.productId === prod.id);
+    let targetVal = 0;
+    if (tRecord) {
+      targetVal = tRecord.targetPeriod === 'Yearly' ? Math.round(Number(tRecord.targetValue) / 12) : Number(tRecord.targetValue);
+    }
+    const actualQty = prodSales[prod.id] || 0;
+    const progress = targetVal > 0 ? Math.min(100, Math.round((actualQty / targetVal) * 100)) : 0;
+    
+    if (targetVal > 0 || actualQty > 0) {
+      productPerformance.push({
+        id: prod.id,
+        name: prod.name,
+        sku: prod.sku,
+        target: targetVal,
+        actual: actualQty,
+        remaining: Math.max(0, targetVal - actualQty),
+        achievementPercent: progress,
+        status: progress >= 100 ? 'GREEN' : progress >= 75 ? 'AMBER' : 'RED'
+      });
+    }
+  });
+
+  const sortedProducts = [...productPerformance].sort((a, b) => b.achievementPercent - a.achievementPercent);
+  const bestSelling = sortedProducts[0] || { name: 'N/A', achievementPercent: 0 };
+  const worstPerforming = [...productPerformance].filter(p => p.target > 0).sort((a, b) => a.achievementPercent - b.achievementPercent)[0] || { name: 'N/A', achievementPercent: 0 };
+
+  // 4. Salesman Leaderboard
+  const salesmanTargets = targets.filter(t => t.targetType === 'Salesman');
+  const salesmen = await User.findAll({ where: { role: { [Op.in]: ['Salesman', 'Sales Executive'] } } });
+  const salesmanPerformance = [];
+
+  // Salesman actual stats (Revenue, Payments, Visits, Customers Onboarded)
+  const salesmenSales = {};
+  const salesmenPayments = {};
+  const salesmenVisits = {};
+  const salesmenCustomers = {};
+
+  currentMonthInvoices.forEach(inv => {
+    const sId = inv.assignedSalesmanId || inv.createdBy?.id;
+    if (sId) salesmenSales[sId] = (salesmenSales[sId] || 0) + Number(inv.grandTotal || 0);
+  });
+
+  const monthlyPayments = await Payment.findAll({
+    where: { date: { [Op.between]: [startOfMonth, endOfMonth] } }
+  });
+  monthlyPayments.forEach(p => {
+    const sId = p.createdBy?.id || p.salesmanId;
+    if (sId) salesmenPayments[sId] = (salesmenPayments[sId] || 0) + Number(p.amount || 0);
+  });
+
+  const monthlyVisits = await Visit.findAll({
+    where: { checkInTime: { [Op.between]: [startOfMonth, endOfMonth] } }
+  });
+  monthlyVisits.forEach(v => {
+    const sId = v.salesmanId;
+    if (sId) salesmenVisits[sId] = (salesmenVisits[sId] || 0) + 1;
+  });
+
+  const monthlyNewCusts = await Customer.findAll({
+    where: { createdAt: { [Op.between]: [startOfMonth, endOfMonth] } }
+  });
+  monthlyNewCusts.forEach(c => {
+    const sId = c.assignedSalesmanId;
+    if (sId) salesmenCustomers[sId] = (salesmenCustomers[sId] || 0) + 1;
+  });
+
+  salesmen.forEach((salesman, idx) => {
+    const tRecord = salesmanTargets.find(t => t.salesmanId === salesman.id);
+    let targetVal = 150000; // default 1.5 Lakhs target
+    if (tRecord) {
+      targetVal = tRecord.targetPeriod === 'Yearly' ? Math.round(Number(tRecord.targetValue) / 12) : Number(tRecord.targetValue);
+    }
+    const actualRev = salesmenSales[salesman.id] || 0;
+    const progress = targetVal > 0 ? Math.round((actualRev / targetVal) * 100) : 0;
+
+    salesmanPerformance.push({
+      id: salesman.id,
+      name: salesman.name,
+      target: targetVal,
+      actual: actualRev,
+      achievementPercent: progress,
+      collections: salesmenPayments[salesman.id] || 0,
+      visits: salesmenVisits[salesman.id] || 0,
+      orders: todayInvoices.filter(i => i.assignedSalesmanId === salesman.id).length,
+      newCustomers: salesmenCustomers[salesman.id] || 0,
+      status: progress >= 100 ? 'GREEN' : progress >= 75 ? 'AMBER' : 'RED'
+    });
+  });
+
+  // Sort by achievement percentage to build Leaderboard Rank
+  salesmanPerformance.sort((a, b) => b.achievementPercent - a.achievementPercent);
+  const rankedSalesmen = salesmanPerformance.map((s, idx) => ({ ...s, rank: idx + 1 }));
+
+  // 5. Intelligent AI Suggestions & Expected achievement
+  const expectedAchievementPercent = companyAchievementPercent > 0 
+    ? Math.round(companyAchievementPercent * (configWorkingDays / Math.max(1, configWorkingDays - remainingDays))) 
+    : 0;
+
+  const aiSuggestionsList = [];
+  if (bestSelling.name && bestSelling.achievementPercent > 100) {
+    aiSuggestionsList.push(`🔥 Focus on ${bestSelling.name} this week. It is selling faster than planned (${bestSelling.achievementPercent}% achieved).`);
+  }
+  if (worstPerforming.name && worstPerforming.target > 0) {
+    aiSuggestionsList.push(`⚠️ ${worstPerforming.name} is behind target (${worstPerforming.achievementPercent}% achieved). Consider promo offers.`);
+  }
+  aiSuggestionsList.push(`📈 Expected monthly company target achievement: ${expectedAchievementPercent}%.`);
+  
+  // Risk indicator
+  let upcomingRisk = 'Low Risk';
+  if (expectedAchievementPercent < 75) upcomingRisk = 'High Risk - Targets likely missed';
+  else if (expectedAchievementPercent < 95) upcomingRisk = 'Moderate Risk';
+
+  // 6. Rewards & Badges calculations
+  let rewardBadge = '🥉 Bronze';
+  if (companyAchievementPercent >= 100) rewardBadge = '🏆 Platinum';
+  else if (companyAchievementPercent >= 90) rewardBadge = '🥇 Gold';
+  else if (companyAchievementPercent >= 75) rewardBadge = '🥈 Silver';
+
+  return {
+    metrics: {
+      todayTarget: Math.round(companyMonthlyTargetVal / configWorkingDays),
+      todaySales: todayActualRevenue,
+      todayRemaining: Math.max(0, Math.round(recalculatedDailyTarget) - todayActualRevenue),
+      monthlyTarget: companyMonthlyTargetVal,
+      monthlyActual: monthlyActualRevenue,
+      monthlyAchievementPercent: companyAchievementPercent,
+      recalculatedDailyTarget: Math.round(recalculatedDailyTarget),
+      remainingWorkingDays: remainingDays,
+      bestSellingProduct: bestSelling.name,
+      worstPerformingProduct: worstPerforming.name,
+      upcomingTargetRisk: upcomingRisk,
+      rewardBadge,
+    },
+    productPerformance,
+    salesmanLeaderboard: rankedSalesmen,
+    aiSuggestions: aiSuggestionsList
+  };
+};
+
+exports.getTargetDashboardDataInternal = getTargetDashboardDataInternal;
+
 exports.getTargetDashboard = async (req, res) => {
   try {
+    const data = await getTargetDashboardDataInternal();
+    res.json({ success: true, ...data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getSalesmanTargetDashboard = async (req, res) => {
+  try {
+    const salesmanId = req.user.id;
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
-    
-    const settings = await Settings.findOne();
-    const configWorkingDays = settings?.workingDaysPerMonth || getTotalWorkingDays(today);
-    
-    // Fetch all targets for this year/month
+
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
+    const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+
+    // Fetch all targets for this year
     const targets = await SalesTarget.findAll({
       where: { year: today.getFullYear() }
     });
 
-    // 1. Fetch Actual Sales figures for this month
+    // 1. Fetch current month's invoices
     const currentMonthInvoices = await Invoice.findAll({
       where: {
         date: { [Op.between]: [startOfMonth, endOfMonth] },
         status: { [Op.ne]: 'Cancelled' }
-      },
-      include: [{ model: InvoiceItem, as: 'items' }]
-    });
-
-    const monthlyActualRevenue = currentMonthInvoices.reduce((sum, inv) => sum + Number(inv.grandTotal || 0), 0);
-    
-    // Today's Sales
-    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
-    const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
-    const todayInvoices = currentMonthInvoices.filter(inv => new Date(inv.date) >= startOfToday && new Date(inv.date) <= endOfToday);
-    const todayActualRevenue = todayInvoices.reduce((sum, inv) => sum + Number(inv.grandTotal || 0), 0);
-
-    // 2. Resolve Monthly Company Target (Dynamic Split fallback if only Yearly exists)
-    let companyMonthlyTargetVal = 300000; // Default fallback 3 Lakhs INR
-    const companyMonthly = targets.find(t => t.targetType === 'Company' && t.targetPeriod === 'Monthly' && t.month === (today.getMonth() + 1));
-    const companyYearly = targets.find(t => t.targetType === 'Company' && t.targetPeriod === 'Yearly');
-    
-    if (companyMonthly) {
-      companyMonthlyTargetVal = Number(companyMonthly.targetValue);
-    } else if (companyYearly) {
-      companyMonthlyTargetVal = Number(companyYearly.targetValue) / 12;
-    }
-
-    // Dynamic Target Redistribution Calculations
-    const remainingDays = getRemainingWorkingDays(today);
-    const remainingTarget = Math.max(0, companyMonthlyTargetVal - (monthlyActualRevenue - todayActualRevenue));
-    const recalculatedDailyTarget = remainingDays > 0 ? (remainingTarget / remainingDays) : 10000;
-
-    // Company Progress Metrics
-    const companyAchievementPercent = companyMonthlyTargetVal > 0 ? Math.round((monthlyActualRevenue / companyMonthlyTargetVal) * 100) : 0;
-    
-    // 3. Product performance stats (Targets vs Actuals)
-    const productTargets = targets.filter(t => t.targetType === 'Product');
-    const productPerformance = [];
-    
-    // Get unique product sales quantities
-    const prodSales = {};
-    currentMonthInvoices.forEach(inv => {
-      inv.items?.forEach(it => {
-        const pId = it.productId;
-        if (pId) {
-          prodSales[pId] = (prodSales[pId] || 0) + Number(it.qty || 0);
-        }
-      });
-    });
-
-    const allProducts = await Product.findAll({ limit: 150 });
-    allProducts.forEach(prod => {
-      const tRecord = productTargets.find(t => t.productId === prod.id);
-      let targetVal = 0;
-      if (tRecord) {
-        targetVal = tRecord.targetPeriod === 'Yearly' ? Math.round(Number(tRecord.targetValue) / 12) : Number(tRecord.targetValue);
-      }
-      const actualQty = prodSales[prod.id] || 0;
-      const progress = targetVal > 0 ? Math.min(100, Math.round((actualQty / targetVal) * 100)) : 0;
-      
-      if (targetVal > 0 || actualQty > 0) {
-        productPerformance.push({
-          id: prod.id,
-          name: prod.name,
-          sku: prod.sku,
-          target: targetVal,
-          actual: actualQty,
-          remaining: Math.max(0, targetVal - actualQty),
-          achievementPercent: progress,
-          status: progress >= 100 ? 'GREEN' : progress >= 75 ? 'AMBER' : 'RED'
-        });
       }
     });
 
-    const sortedProducts = [...productPerformance].sort((a, b) => b.achievementPercent - a.achievementPercent);
-    const bestSelling = sortedProducts[0] || { name: 'N/A', achievementPercent: 0 };
-    const worstPerforming = [...productPerformance].filter(p => p.target > 0).sort((a, b) => a.achievementPercent - b.achievementPercent)[0] || { name: 'N/A', achievementPercent: 0 };
+    // Today's Invoices for this salesman
+    const todayInvoices = currentMonthInvoices.filter(inv => {
+      const invDate = new Date(inv.date);
+      const isToday = invDate >= startOfToday && invDate <= endOfToday;
+      const isSalesman = inv.assignedSalesmanId === salesmanId || inv.createdById === salesmanId;
+      return isToday && isSalesman;
+    });
 
-    // 4. Salesman Leaderboard
+    const todaySales = todayInvoices.reduce((sum, inv) => sum + Number(inv.grandTotal || 0), 0);
+
+    // Monthly Invoices for this salesman
+    const monthlyInvoices = currentMonthInvoices.filter(inv => {
+      return inv.assignedSalesmanId === salesmanId || inv.createdById === salesmanId;
+    });
+    const monthlySales = monthlyInvoices.reduce((sum, inv) => sum + Number(inv.grandTotal || 0), 0);
+
+    // 2. Today's Collections (Payments)
+    const todayPayments = await Payment.findAll({
+      where: {
+        date: { [Op.between]: [startOfToday, endOfToday] },
+        [Op.or]: [
+          { salesmanId },
+          { createdById: salesmanId }
+        ]
+      }
+    });
+    const todayCollection = todayPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+    // 3. Today's Visits
+    const todayVisitsCount = await Visit.count({
+      where: {
+        salesmanId,
+        checkInTime: { [Op.between]: [startOfToday, endOfToday] }
+      }
+    });
+
+    // 4. Today's Orders for customers assigned to this salesman
+    const assignedCustomers = await Customer.findAll({
+      where: { assignedSalesmanId: salesmanId },
+      attributes: ['id']
+    });
+    const customerIds = assignedCustomers.map(c => c.id);
+
+    const todayOrders = await Order.count({
+      where: {
+        customerId: { [Op.in]: customerIds },
+        orderDate: { [Op.between]: [startOfToday, endOfToday] }
+      }
+    });
+
+    // 5. Leaderboard position calculation
     const salesmanTargets = targets.filter(t => t.targetType === 'Salesman');
     const salesmen = await User.findAll({ where: { role: { [Op.in]: ['Salesman', 'Sales Executive'] } } });
     const salesmanPerformance = [];
 
-    // Salesman actual stats (Revenue, Payments, Visits, Customers Onboarded)
+    // Calculate monthly sales for all salesmen for ranking
     const salesmenSales = {};
-    const salesmenPayments = {};
-    const salesmenVisits = {};
-    const salesmenCustomers = {};
-
     currentMonthInvoices.forEach(inv => {
-      const sId = inv.assignedSalesmanId || inv.createdBy?.id;
+      const sId = inv.assignedSalesmanId || inv.createdById;
       if (sId) salesmenSales[sId] = (salesmenSales[sId] || 0) + Number(inv.grandTotal || 0);
     });
 
-    const monthlyPayments = await Payment.findAll({
-      where: { date: { [Op.between]: [startOfMonth, endOfMonth] } }
-    });
-    monthlyPayments.forEach(p => {
-      const sId = p.createdBy?.id || p.salesmanId;
-      if (sId) salesmenPayments[sId] = (salesmenPayments[sId] || 0) + Number(p.amount || 0);
-    });
-
-    const monthlyVisits = await Visit.findAll({
-      where: { checkInTime: { [Op.between]: [startOfMonth, endOfMonth] } }
-    });
-    monthlyVisits.forEach(v => {
-      const sId = v.salesmanId;
-      if (sId) salesmenVisits[sId] = (salesmenVisits[sId] || 0) + 1;
-    });
-
-    const monthlyNewCusts = await Customer.findAll({
-      where: { createdAt: { [Op.between]: [startOfMonth, endOfMonth] } }
-    });
-    monthlyNewCusts.forEach(c => {
-      const sId = c.assignedSalesmanId;
-      if (sId) salesmenCustomers[sId] = (salesmenCustomers[sId] || 0) + 1;
-    });
-
-    salesmen.forEach((salesman, idx) => {
+    salesmen.forEach((salesman) => {
       const tRecord = salesmanTargets.find(t => t.salesmanId === salesman.id);
-      let targetVal = 150000; // default 1.5 Lakhs target
+      let targetVal = 150000;
       if (tRecord) {
         targetVal = tRecord.targetPeriod === 'Yearly' ? Math.round(Number(tRecord.targetValue) / 12) : Number(tRecord.targetValue);
       }
@@ -255,68 +423,44 @@ exports.getTargetDashboard = async (req, res) => {
 
       salesmanPerformance.push({
         id: salesman.id,
-        name: salesman.name,
-        target: targetVal,
-        actual: actualRev,
-        achievementPercent: progress,
-        collections: salesmenPayments[salesman.id] || 0,
-        visits: salesmenVisits[salesman.id] || 0,
-        orders: todayInvoices.filter(i => i.assignedSalesmanId === salesman.id).length,
-        newCustomers: salesmenCustomers[salesman.id] || 0,
-        status: progress >= 100 ? 'GREEN' : progress >= 75 ? 'AMBER' : 'RED'
+        achievementPercent: progress
       });
     });
 
-    // Sort by achievement percentage to build Leaderboard Rank
     salesmanPerformance.sort((a, b) => b.achievementPercent - a.achievementPercent);
-    const rankedSalesmen = salesmanPerformance.map((s, idx) => ({ ...s, rank: idx + 1 }));
+    const myRankIndex = salesmanPerformance.findIndex(s => s.id === salesmanId);
+    const leaderboardPosition = myRankIndex !== -1 ? myRankIndex + 1 : salesmen.length + 1;
 
-    // 5. Intelligent AI Suggestions & Expected achievement
-    const expectedAchievementPercent = companyAchievementPercent > 0 
-      ? Math.round(companyAchievementPercent * (configWorkingDays / Math.max(1, configWorkingDays - remainingDays))) 
-      : 0;
-
-    const aiSuggestionsList = [];
-    if (bestSelling.name && bestSelling.achievementPercent > 100) {
-      aiSuggestionsList.push(`🔥 Focus on ${bestSelling.name} this week. It is selling faster than planned (${bestSelling.achievementPercent}% achieved).`);
+    // 6. Configured target for this salesman
+    const myTargetRecord = salesmanTargets.find(t => t.salesmanId === salesmanId);
+    let myTarget = 150000;
+    if (myTargetRecord) {
+      myTarget = myTargetRecord.targetPeriod === 'Yearly' ? Math.round(Number(myTargetRecord.targetValue) / 12) : Number(myTargetRecord.targetValue);
     }
-    if (worstPerforming.name && worstPerforming.target > 0) {
-      aiSuggestionsList.push(`⚠️ ${worstPerforming.name} is behind target (${worstPerforming.achievementPercent}% achieved). Consider promo offers.`);
-    }
-    aiSuggestionsList.push(`📈 Expected monthly company target achievement: ${expectedAchievementPercent}%.`);
-    
-    // Risk indicator
-    let upcomingRisk = 'Low Risk';
-    if (expectedAchievementPercent < 75) upcomingRisk = 'High Risk - Targets likely missed';
-    else if (expectedAchievementPercent < 95) upcomingRisk = 'Moderate Risk';
 
-    // 6. Rewards & Badges calculations
-    let rewardBadge = '🥉 Bronze';
-    if (companyAchievementPercent >= 100) rewardBadge = '🏆 Platinum';
-    else if (companyAchievementPercent >= 90) rewardBadge = '🥇 Gold';
-    else if (companyAchievementPercent >= 75) rewardBadge = '🥈 Silver';
+    const targetPercent = myTarget > 0 ? Math.round((monthlySales / myTarget) * 100) : 0;
+    const remainingTarget = Math.max(0, myTarget - monthlySales);
+
+    // Badge logic
+    let achievementBadge = '🥉 Bronze Badge';
+    if (targetPercent >= 110) achievementBadge = '🏆 Outstanding Performer Badge';
+    else if (targetPercent >= 100) achievementBadge = '💎 Diamond Badge';
+    else if (targetPercent >= 81) achievementBadge = '🏅 Platinum Badge';
+    else if (targetPercent >= 61) achievementBadge = '🥇 Gold Badge';
+    else if (targetPercent >= 31) achievementBadge = '🥈 Silver Badge';
 
     res.json({
       success: true,
-      metrics: {
-        todayTarget: Math.round(companyMonthlyTargetVal / configWorkingDays),
-        todaySales: todayActualRevenue,
-        todayRemaining: Math.max(0, Math.round(recalculatedDailyTarget) - todayActualRevenue),
-        monthlyTarget: companyMonthlyTargetVal,
-        monthlyActual: monthlyActualRevenue,
-        monthlyAchievementPercent: companyAchievementPercent,
-        recalculatedDailyTarget: Math.round(recalculatedDailyTarget),
-        remainingWorkingDays: remainingDays,
-        bestSellingProduct: bestSelling.name,
-        worstPerformingProduct: worstPerforming.name,
-        upcomingTargetRisk: upcomingRisk,
-        rewardBadge,
-      },
-      productPerformance,
-      salesmanLeaderboard: rankedSalesmen,
-      aiSuggestions: aiSuggestionsList
+      myTarget,
+      todaySales,
+      todayOrders,
+      remainingTarget,
+      todayCollection,
+      visitCount: todayVisitsCount,
+      targetPercent,
+      leaderboardPosition,
+      achievementBadge
     });
-
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

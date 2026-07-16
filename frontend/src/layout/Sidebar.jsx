@@ -6,123 +6,7 @@ import { useCompanyBrand } from '../context/CompanyBrandContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { sfaApi, ordersApi, shippingApi, productsApi, customersApi } from '../api';
-import { 
-  LayoutDashboard, 
-  Package, 
-  ShoppingCart, 
-  MapPinned, 
-  Factory, 
-  Wallet, 
-  BarChart3, 
-  Settings as SettingsIcon, 
-  Users as UsersIcon,
-  Sparkles
-} from 'lucide-react';
-
-const menuStructure = [
-  {
-    type: 'link',
-    to: '/',
-    icon: LayoutDashboard,
-    label: 'Dashboard',
-    end: true,
-    roles: ['Super Admin', 'admin', 'Manufacturing Manager', 'Billing Executive', 'Store Keeper', 'Dispatch Executive', 'Sales Executive', 'Sales Manager', 'Salesman', 'Delivery Staff']
-  },
-  {
-    type: 'link',
-    to: '/ai-assistant',
-    icon: Sparkles,
-    label: 'AI Assistant',
-    roles: ['Super Admin', 'admin', 'Manufacturing Manager', 'Billing Executive', 'Store Keeper', 'Sales Executive', 'Sales Manager', 'Salesman']
-  },
-  {
-    type: 'group',
-    id: 'crm',
-    icon: UsersIcon,
-    label: 'CRM',
-    roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'],
-    children: [
-      { to: '/crm/leads', label: 'Leads', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/crm/ai-lead-importer', label: 'AI Lead Importer', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/customers', label: 'Customers', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/crm/customer-map', label: 'Customer Map', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/crm/followups', label: 'Follow Ups', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/crm/re-engagement', label: 'Re-Engagement', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/crm/whatsapp-logs', label: 'Communication Center', roles: ['Super Admin', 'admin', 'Sales Manager'] }
-    ]
-  },
-  {
-    type: 'group',
-    id: 'inventory',
-    icon: Package,
-    label: 'Inventory',
-    roles: ['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager', 'Sales Manager', 'Salesman', 'Sales Executive'],
-    children: [
-      { to: '/products', label: 'Products', roles: ['Super Admin', 'admin', 'Store Keeper'] },
-      { to: '/products/catalog-center', label: 'Catalog Center', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
-      { to: '/products?tab=raw-materials', label: 'Raw Materials', roles: ['Super Admin', 'admin', 'Manufacturing Manager', 'Store Keeper'] },
-      { to: '/inventory', label: 'Stock', roles: ['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager'] },
-      { to: '/suppliers', label: 'Suppliers', roles: ['Super Admin', 'admin', 'Manufacturing Manager', 'Store Keeper'] }
-    ]
-  },
-  {
-    type: 'group',
-    id: 'sales',
-    icon: ShoppingCart,
-    label: 'Sales',
-    roles: ['Super Admin', 'admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive', 'Sales Manager', 'Salesman'],
-    children: [
-      { to: '/order-noting', label: 'Orders', roles: ['Super Admin', 'admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive', 'Store Keeper'] },
-      { to: '/sales', label: 'Invoices', roles: ['Super Admin', 'admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive', 'Sales Manager', 'Salesman'] },
-      { to: '/customers', label: 'Customers', roles: ['Super Admin', 'admin', 'Sales Executive', 'Billing Executive', 'Sales Manager', 'Salesman'] }
-    ]
-  },
-  {
-    type: 'group',
-    id: 'manufacturing',
-    icon: Factory,
-    label: 'Manufacturing',
-    roles: ['Super Admin', 'admin', 'Manufacturing Manager'],
-    children: [
-      { to: '/manufacturing?tab=production', label: 'Production', roles: ['Super Admin', 'admin', 'Manufacturing Manager'] },
-      { to: '/manufacturing?tab=recipes', label: 'Recipes', roles: ['Super Admin', 'admin', 'Manufacturing Manager'] },
-      { to: '/manufacturing?tab=packing-conversion', label: 'Packing Conversion', roles: ['Super Admin', 'admin', 'Manufacturing Manager'] }
-    ]
-  },
-  {
-    type: 'link',
-    to: '/sales?tab=payments',
-    icon: Wallet,
-    label: 'Accounts',
-    roles: ['Super Admin', 'admin', 'Billing Executive']
-  },
-  {
-    type: 'link',
-    to: '/reports',
-    icon: BarChart3,
-    label: 'Reports',
-    roles: ['Super Admin', 'admin', 'Sales Manager']
-  },
-  {
-    type: 'group',
-    id: 'settings',
-    icon: SettingsIcon,
-    label: 'Settings',
-    roles: ['Super Admin', 'admin'],
-    children: [
-      { to: '/settings', label: 'General Settings', roles: ['Super Admin', 'admin'] },
-      { to: '/settings/integrations-marketplace', label: 'Integrations Marketplace', roles: ['Super Admin', 'admin'] },
-      { to: '/settings/developer-center', label: 'Developer Center', roles: ['Super Admin', 'admin'] }
-    ]
-  },
-  {
-    type: 'link',
-    to: '/users',
-    icon: UsersIcon,
-    label: 'Users',
-    roles: ['Super Admin', 'admin']
-  }
-];
+import { menuStructure } from './menuConfig';
 
 const badgeStyle = {
   fontSize: '0.7rem',
@@ -144,6 +28,21 @@ export default function Sidebar({ collapsed, open, onClose }) {
 
   const userRole = user?.role || '';
   const isUserAdmin = userRole === 'admin' || userRole === 'Super Admin';
+
+  useEffect(() => {
+    console.log('=== AO CORE ERP MENU CONFIGURATION AUDIT ===');
+    console.log('User Role:', userRole);
+    const desktopItems = menuStructure.map(item => {
+      const allowed = hasAccess(item);
+      return {
+        Label: item.label,
+        Path: item.to,
+        Status: allowed ? 'Visible' : 'Hidden',
+        Reason: allowed ? 'Access Granted' : `Excluded for role ${userRole}`
+      };
+    });
+    console.table(desktopItems);
+  }, [userRole]);
 
   const [expandedMenus, setExpandedMenus] = useState(() => {
     const saved = localStorage.getItem('sidebar_expanded_menus');

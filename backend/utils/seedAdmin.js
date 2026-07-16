@@ -605,6 +605,78 @@ const seed = async () => {
       }
 
       console.log('✓ Invoices, shipments, and sales history seeded.');
+
+      // 10. Seed Sales Targets
+      console.log('Seeding sales targets...');
+      const SalesTarget = require('../models/SalesTarget');
+      const salesExec = await User.findOne({ where: { role: 'Sales Executive' } });
+      const firstProd = await Product.findOne();
+      const firstCust = await Customer.findOne();
+      const currentYear = new Date().getFullYear();
+      const currentMonth = new Date().getMonth() + 1;
+
+      await SalesTarget.destroy({ where: {} }); // Wipe existing targets to start fresh
+
+      // Company Monthly Target
+      await SalesTarget.create({
+        targetType: 'Company',
+        targetPeriod: 'Monthly',
+        year: currentYear,
+        month: currentMonth,
+        valueType: 'Revenue',
+        targetValue: 500000.00
+      });
+
+      // Company Yearly Target
+      await SalesTarget.create({
+        targetType: 'Company',
+        targetPeriod: 'Yearly',
+        year: currentYear,
+        month: null,
+        valueType: 'Revenue',
+        targetValue: 6000000.00
+      });
+
+      if (salesExec) {
+        // Salesman Monthly Target
+        await SalesTarget.create({
+          targetType: 'Salesman',
+          targetPeriod: 'Monthly',
+          year: currentYear,
+          month: currentMonth,
+          valueType: 'Revenue',
+          targetValue: 150000.00,
+          salesmanId: salesExec.id
+        });
+      }
+
+      if (firstProd) {
+        // Product Monthly Target
+        await SalesTarget.create({
+          targetType: 'Product',
+          targetPeriod: 'Monthly',
+          year: currentYear,
+          month: currentMonth,
+          valueType: 'Quantity',
+          targetValue: 200.00,
+          productId: firstProd.id
+        });
+      }
+
+      if (firstCust) {
+        // Customer Monthly Target
+        await SalesTarget.create({
+          targetType: 'Customer',
+          targetPeriod: 'Monthly',
+          year: currentYear,
+          month: currentMonth,
+          valueType: 'Revenue',
+          targetValue: 100000.00,
+          customerId: firstCust.id
+        });
+      }
+
+      console.log('✓ Sales targets seeded.');
     }
 
     console.log('Database seeding completed successfully.');

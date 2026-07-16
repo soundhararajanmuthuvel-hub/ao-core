@@ -11,6 +11,7 @@ import UserTour from '../components/UserTour';
 import { usePWA } from '../context/PWAContext';
 import SalesmanApp from '../pages/SalesmanApp';
 import { useToast } from '../context/ToastContext';
+import { menuStructure } from './menuConfig';
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -255,6 +256,11 @@ export default function AppLayout() {
 
   const userRole = user?.role || '';
   const isSuperAdmin = userRole === 'admin' || userRole === 'Super Admin';
+
+  const hasAccess = (item) => {
+    if (isSuperAdmin) return true;
+    return item.roles.includes(userRole);
+  };
 
   return (
     <div className="app-shell">
@@ -637,52 +643,19 @@ export default function AppLayout() {
           <button type="button" style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setDrawerOpen(false)}>✕</button>
         </div>
         <div className="drawer-grid">
-          <div className="drawer-item" onClick={() => handleDrawerNavigate('/crm')}>
-            <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>📊</span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>CRM</span>
-          </div>
-          <div className="drawer-item" onClick={() => handleDrawerNavigate('/customer-visits')}>
-            <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>📍</span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Visits</span>
-          </div>
-          <div className="drawer-item" onClick={() => handleDrawerNavigate('/sales-targets')}>
-            <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🎯</span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Targets</span>
-          </div>
-          <div className="drawer-item" onClick={() => handleDrawerNavigate('/field-ordering')}>
-            <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🛒</span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Orders</span>
-          </div>
-          <div className="drawer-item" onClick={() => handleDrawerNavigate('/delivery-tracking')}>
-            <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🚚</span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Delivery</span>
-          </div>
-          {(isSuperAdmin || userRole === 'Manufacturing Manager') && (
-            <div className="drawer-item" onClick={() => handleDrawerNavigate('/manufacturing')}>
-              <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🏭</span>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Production</span>
-            </div>
-          )}
-          {isSuperAdmin && (
-            <>
-              <div className="drawer-item" onClick={() => handleDrawerNavigate('/reports')}>
-                <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>📑</span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Reports</span>
+          {menuStructure
+            .filter(item => item.showOnMobileDrawer && hasAccess(item))
+            .map((item) => (
+              <div 
+                key={item.id} 
+                className="drawer-item" 
+                onClick={() => handleDrawerNavigate(item.to)}
+              >
+                <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>{item.emoji}</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{item.label}</span>
               </div>
-              <div className="drawer-item" onClick={() => handleDrawerNavigate('/settings')}>
-                <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>⚙️</span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Settings</span>
-              </div>
-              <div className="drawer-item" onClick={() => handleDrawerNavigate('/users')}>
-                <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🔐</span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Users</span>
-              </div>
-              <div className="drawer-item" onClick={() => handleDrawerNavigate('/suppliers')}>
-                <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🤝</span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Suppliers</span>
-              </div>
-            </>
-          )}
+            ))
+          }
           <div className="drawer-item" onClick={handleLogout} style={{ border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444' }}>
             <span style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🚪</span>
             <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Logout</span>
