@@ -237,7 +237,7 @@ exports.inventoryIntelligence = async (req, res, next) => {
 exports.accountsAssistant = async (req, res, next) => {
   try {
     const unpaidInvoices = await Invoice.findAll({
-      where: { paymentStatus: ['Unpaid', 'Partial'] },
+      where: { paymentStatus: ['unpaid', 'partial'] },
       include: [{ model: Customer, as: 'customer', attributes: ['name', 'phone', 'email'] }]
     });
 
@@ -254,8 +254,8 @@ exports.accountsAssistant = async (req, res, next) => {
       email: i.customer ? i.customer.email : 'N/A',
       date: i.date,
       grandTotal: i.grandTotal,
-      paidAmount: i.paidAmount || 0,
-      outstandingBalance: i.grandTotal - (i.paidAmount || 0),
+      paidAmount: i.amountPaid || 0,
+      outstandingBalance: i.grandTotal - (i.amountPaid || 0),
       paymentStatus: i.paymentStatus,
       dueDate: i.dueDate
     }));
@@ -607,12 +607,12 @@ exports.chatAI = async (req, res, next) => {
           where: { date: { [Op.gte]: new Date(new Date().setHours(0,0,0,0)) } },
           include: [{ model: Customer, as: 'customer', attributes: ['name'] }]
         }),
-        Invoice.findAll({ where: { paymentStatus: ['Unpaid', 'Partial'] } }),
+        Invoice.findAll({ where: { paymentStatus: ['unpaid', 'partial'] } }),
         Shipment.findAll({ where: { status: { [Op.notIn]: ['Delivered', 'Returned'] } } })
       ]);
 
       const totalTodayRevenue = todaySales.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
-      const totalOutstanding = unpaidInvoices.reduce((sum, inv) => sum + Number(inv.grandTotal - (inv.paidAmount || 0)), 0);
+      const totalOutstanding = unpaidInvoices.reduce((sum, inv) => sum + Number(inv.grandTotal - (inv.amountPaid || 0)), 0);
 
       const erpContext = `
         Current ERP Database Snapshot:
@@ -915,7 +915,7 @@ exports.getDashboardSuggestions = async (req, res, next) => {
       Product.findAll({ attributes: ['name', 'stock', 'lowStockThreshold', 'unit'] }),
       RawMaterial.findAll({ attributes: ['name', 'stock', 'minStock', 'unit'] }),
       Customer.findAll({ attributes: ['name', 'businessName', 'balance', 'lastOrderDate', 'territory'] }),
-      Invoice.findAll({ where: { paymentStatus: ['Unpaid', 'Partial'] } })
+      Invoice.findAll({ where: { paymentStatus: ['unpaid', 'partial'] } })
     ]);
 
     // Heuristics calculations for fallback OR context
@@ -931,7 +931,7 @@ exports.getDashboardSuggestions = async (req, res, next) => {
       }
     });
 
-    const outstandingBalance = unpaidInvoices.reduce((sum, inv) => sum + Number(inv.grandTotal - (inv.paidAmount || 0)), 0);
+    const outstandingBalance = unpaidInvoices.reduce((sum, inv) => sum + Number(inv.grandTotal - (inv.amountPaid || 0)), 0);
     
     // Inactive customers (no order in last 30 days)
     const inactiveCustomers = [];
