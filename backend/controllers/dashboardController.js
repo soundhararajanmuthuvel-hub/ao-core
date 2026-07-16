@@ -28,32 +28,20 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+const { getDashboardDataInternal } = require('./analyticsController');
+
 exports.getHomeDashboard = async (req, res, next) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const isMySQL = sequelize.options.dialect === 'mysql';
-    const now = new Date();
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    const delayThreshold = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
 
     const tenantId = req.user?.tenantId || 1;
 
-    // Concurrent aggregation of Dashboard KPI, Low Stock, WooStats, and SFA analytics
+    // Core Dashboard KPIs and Trends using shared helper
+    const analytics = await getDashboardDataInternal();
+
+    // Concurrent aggregation of Low Stock Lists, WooStats, and SFA analytics
     const [
-      productCount,
-      salesStatsResult,
-      todayStatsResult,
-      lowStockCount,
-      delayedOrdersCount,
-      currentMonthlyRevenueResult,
-      pendingDispatchCount,
-      bulkProductsForValuation,
-      retailPackStockSum,
       productsAlertList,
       rawMaterialsAlertList,
       wooStatsConnections,
@@ -65,65 +53,7 @@ exports.getHomeDashboard = async (req, res, next) => {
       todayVisitsCount,
       sfaAnalyticsSummary
     ] = await Promise.all([
-      // 1. Core Analytics KPIs
-      Product.count({ where: { isArchived: false } }),
-      sequelize.query(
-        `SELECT 
-           COUNT(DISTINCT i.id) AS totalSales,
-           COALESCE(SUM(i.grandTotal), 0) AS revenue,
-           COALESCE(SUM((ii.qty * ii.unitPrice) - ((ii.qty + COALESCE(ii.freeQty, 0)) * COALESCE(ii.purchasePrice, 0))), 0) AS profit
-         FROM invoices i
-         LEFT JOIN invoice_items ii ON i.id = ii.invoiceId`,
-        { type: sequelize.QueryTypes.SELECT }
-      ),
-      sequelize.query(
-        `SELECT 
-           COALESCE(SUM(grandTotal), 0) AS todaySales,
-           COUNT(id) AS todayOrders
-         FROM invoices
-         WHERE date >= :today AND date < :tomorrow AND type = 'invoice' AND status NOT IN ('Draft', 'Cancelled')`,
-        {
-          replacements: { today, tomorrow },
-          type: sequelize.QueryTypes.SELECT,
-        }
-      ),
-      Product.count({
-        where: {
-          isArchived: false,
-          stock: { [Op.lte]: col('lowStockThreshold') }
-        }
-      }),
-      Order.count({
-        where: {
-          status: 'Prepared',
-          orderDate: { [Op.lte]: delayThreshold }
-        }
-      }),
-      Invoice.sum('grandTotal', {
-        where: {
-          type: 'invoice',
-          status: { [Op.notIn]: ['Draft', 'Cancelled'] },
-          date: { [Op.between]: [currentMonthStart, currentMonthEnd] }
-        }
-      }),
-      Order.count({
-        where: {
-          status: { [Op.in]: ['Prepared', 'Packed'] }
-        }
-      }),
-      Product.findAll({
-        where: { productType: 'BULK_PRODUCT', isArchived: false },
-        attributes: ['id', 'name', 'stock', 'unit', 'purchasePrice'],
-        raw: true
-      }),
-      Product.sum('stock', {
-        where: {
-          productType: { [Op.in]: ['RETAIL_PACK', 'LABEL_PACK'] },
-          isArchived: false
-        }
-      }),
-
-      // 2. Low Stock Alerts list
+      // 1. Low Stock Alerts list
       Product.findAll({
         where: { isArchived: false },
         attributes: ['id', 'name', 'sku', 'stock', 'lowStockThreshold', 'unit', 'productType'],
@@ -134,7 +64,7 @@ exports.getHomeDashboard = async (req, res, next) => {
         raw: true
       }),
 
-      // 3. Integration connection stats
+      // 2. Integration connection stats
       IntegrationConnection.findAll({
         where: { tenantId },
         attributes: ['id', 'connectionStatus', 'lastSyncTime'],
@@ -150,7 +80,7 @@ exports.getHomeDashboard = async (req, res, next) => {
       IntegrationCustomer.count({ where: { tenantId } }),
       IntegrationOrder.count({ where: { tenantId } }),
 
-      // 4. SFA Salesmen (for tracking pings)
+      // 3. SFA Salesmen (for tracking pings)
       User.findAll({
         where: { role: ['Salesman', 'Sales Executive'] },
         attributes: ['id', 'name', 'role', 'isActive'],
@@ -164,18 +94,6 @@ exports.getHomeDashboard = async (req, res, next) => {
       // SFA general analytics metrics
       Customer.count()
     ]);
-
-    // Calculate bulk stock value
-    let bulkStockValue = 0;
-    if (bulkProductsForValuation && bulkProductsForValuation.length) {
-      bulkProductsForValuation.forEach(p => {
-        bulkStockValue += Number(p.stock || 0) * Number(p.purchasePrice || 0);
-      });
-    }
-
-    const retailPackStock = Number(retailPackStockSum || 0);
-    const stats = salesStatsResult[0] || { totalSales: 0, revenue: 0, profit: 0 };
-    const todayData = todayStatsResult[0] || { todaySales: 0, todayOrders: 0 };
 
     // Format alerts lists
     const critical = [];
@@ -259,20 +177,7 @@ exports.getHomeDashboard = async (req, res, next) => {
 
     res.json({
       success: true,
-      analytics: {
-        productCount,
-        totalSales: stats.totalSales || 0,
-        revenue: stats.revenue || 0,
-        profit: stats.profit || 0,
-        todaySales: todayData.todaySales || 0,
-        todayOrders: todayData.todayOrders || 0,
-        lowStockCount,
-        delayedOrdersCount,
-        monthlyRevenue: currentMonthlyRevenueResult || 0,
-        pendingDispatchCount,
-        bulkStockValue,
-        retailPackStock
-      },
+      analytics, // contains cards, charts, outstanding metrics
       stockAlerts: {
         critical: critical.slice(0, 5),
         warning: warning.slice(0, 5),
