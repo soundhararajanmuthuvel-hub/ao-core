@@ -218,17 +218,17 @@ const getDashboardDataInternal = async () => {
   const todayStart = new Date(today);
   const outstandingMetrics = {
     today: calculateFilterMetrics(unpaidInvoices, (d) => d >= todayStart),
-    thisMonth: calculateFilterMetrics(unpaidInvoices, (d) => d >= currentMonthStart),
-    thisQuarter: calculateFilterMetrics(unpaidInvoices, (d) => {
+    this_month: calculateFilterMetrics(unpaidInvoices, (d) => d >= currentMonthStart),
+    this_quarter: calculateFilterMetrics(unpaidInvoices, (d) => {
       const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
       return d >= qStart;
     }),
-    financialYear: calculateFilterMetrics(unpaidInvoices, (d) => {
+    financial_year: calculateFilterMetrics(unpaidInvoices, (d) => {
       const currentYear = now.getFullYear();
       const fyStart = now.getMonth() >= 3 ? new Date(currentYear, 3, 1) : new Date(currentYear - 1, 3, 1);
       return d >= fyStart;
     }),
-    allTime: calculateFilterMetrics(unpaidInvoices, () => true)
+    all_time: calculateFilterMetrics(unpaidInvoices, () => true)
   };
 
   // Outstanding Trend over 6 months
