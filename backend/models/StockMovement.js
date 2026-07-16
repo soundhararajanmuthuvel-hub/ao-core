@@ -39,6 +39,11 @@ const StockMovement = sequelize.define('StockMovement', {
     type: DataTypes.DATE,
     allowNull: true,
   },
+}, {
+  indexes: [
+    { fields: ['productId'] },
+    { fields: ['createdAt'] }
+  ]
 });
 
 // Associations

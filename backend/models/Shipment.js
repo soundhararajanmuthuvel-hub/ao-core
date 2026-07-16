@@ -111,6 +111,11 @@ const Shipment = sequelize.define('Shipment', {
     type: DataTypes.INTEGER,
     defaultValue: 0,
   },
+}, {
+  indexes: [
+    { fields: ['invoiceId'] },
+    { fields: ['status'] }
+  ]
 });
 
 // Associations

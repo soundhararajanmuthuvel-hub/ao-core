@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const compression = require('compression');
 const path = require('path');
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
@@ -44,6 +45,7 @@ const { profileMiddleware } = require('./middleware/profileMiddleware');
    MIDDLEWARE
  ========================= */
 app.use(cors(corsOptions));
+app.use(compression());
 app.use(profileMiddleware);
 app.options('*', cors(corsOptions));
 
@@ -55,9 +57,9 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(morgan('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'tiny' : 'dev'));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/api/assets/company-logo', require('./controllers/settingsController').getCompanyLogoImage);
 app.get('/api/company/logo', require('./controllers/settingsController').getCompanyLogoImage);

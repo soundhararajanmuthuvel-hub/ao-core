@@ -205,6 +205,13 @@ const Invoice = sequelize.define('Invoice', {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0,
   },
+}, {
+  indexes: [
+    { fields: ['date'] },
+    { fields: ['customerId'] },
+    { fields: ['status'] },
+    { fields: ['type'] }
+  ]
 });
 
 // Associations

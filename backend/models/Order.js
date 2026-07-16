@@ -106,6 +106,12 @@ const Order = sequelize.define('Order', {
     defaultValue: false,
     allowNull: false,
   },
+}, {
+  indexes: [
+    { fields: ['customerId'] },
+    { fields: ['status'] },
+    { fields: ['orderDate'] }
+  ]
 });
 
 Order.belongsTo(require('./Customer'), { as: 'customer', foreignKey: 'customerId' });

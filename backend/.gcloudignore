@@ -1,8 +1,0 @@
-# Exclusion list for gcloud run deploy
-node_modules
-uploads
-backups
-.env
-database.sqlite
-verify_*.js
-*.log

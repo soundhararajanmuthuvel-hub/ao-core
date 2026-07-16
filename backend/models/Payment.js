@@ -41,6 +41,11 @@ const Payment = sequelize.define('Payment', {
     type: DataTypes.STRING,
     defaultValue: 'Success',
   }
+}, {
+  indexes: [
+    { fields: ['customerId'] },
+    { fields: ['date'] }
+  ]
 });
 
 const Customer = require('./Customer');

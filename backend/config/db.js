@@ -41,6 +41,12 @@ if (dialect === 'postgres') {
         rejectUnauthorized: false
       }
     },
+    pool: {
+      max: 5,
+      min: 0,
+      acquire: 30000,
+      idle: 10000,
+    },
     ...getSequelizeLoggingOptions(),
     define: {
       timestamps: true,
@@ -50,6 +56,12 @@ if (dialect === 'postgres') {
   console.log('Using MySQL database connection URL...');
   sequelize = new Sequelize(process.env.DATABASE_URL || process.env.MYSQL_URL, {
     dialect: 'mysql',
+    pool: {
+      max: 5,
+      min: 0,
+      acquire: 30000,
+      idle: 10000,
+    },
     ...getSequelizeLoggingOptions(),
     define: {
       timestamps: true,
@@ -65,6 +77,12 @@ if (dialect === 'postgres') {
       host: process.env.MYSQLHOST || process.env.DB_HOST || 'localhost',
       port: process.env.MYSQLPORT || process.env.DB_PORT || 3306,
       dialect: 'mysql',
+      pool: {
+        max: 5,
+        min: 0,
+        acquire: 30000,
+        idle: 10000,
+      },
       ...getSequelizeLoggingOptions(),
       define: {
         timestamps: true,
@@ -76,6 +94,12 @@ if (dialect === 'postgres') {
   sequelize = new Sequelize({
     dialect: 'sqlite',
     storage: path.join(__dirname, '..', 'database.sqlite'),
+    pool: {
+      max: 5,
+      min: 0,
+      acquire: 30000,
+      idle: 10000,
+    },
     ...getSequelizeLoggingOptions(),
     define: {
       timestamps: true,

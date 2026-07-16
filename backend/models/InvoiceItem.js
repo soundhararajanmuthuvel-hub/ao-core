@@ -60,6 +60,11 @@ const InvoiceItem = sequelize.define('InvoiceItem', {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0.00,
   },
+}, {
+  indexes: [
+    { fields: ['invoiceId'] },
+    { fields: ['productId'] }
+  ]
 });
 
 InvoiceItem.belongsTo(Product, { as: 'product', foreignKey: 'productId' });

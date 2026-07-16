@@ -7,8 +7,19 @@ const Customer = require('../models/Customer');
 const PackingConversion = require('../models/PackingConversion');
 const PackingConversionItem = require('../models/PackingConversionItem');
 
+const dashboardCache = {
+  data: null,
+  timestamp: 0,
+  ttl: 45000 // 45 seconds TTL
+};
+
 exports.getDashboard = async (req, res, next) => {
   try {
+    const nowTime = Date.now();
+    if (dashboardCache.data && (nowTime - dashboardCache.timestamp < dashboardCache.ttl)) {
+      return res.json(dashboardCache.data);
+    }
+
     const { reconcileInvoicesHelper } = require('./salesController');
     await reconcileInvoicesHelper();
 
@@ -360,7 +371,7 @@ exports.getDashboard = async (req, res, next) => {
     }
     const packedTodayList = Object.values(packedTodayMap);
 
-    res.json({
+    const dashboardPayload = {
       cards: {
         totalProducts: productCount,
         totalSales: Number(stats.totalSales),
@@ -395,7 +406,12 @@ exports.getDashboard = async (req, res, next) => {
       outstandingTrend,
       bulkProductsList: bulkProductsForValuation,
       packedTodayList
-    });
+    };
+
+    dashboardCache.data = dashboardPayload;
+    dashboardCache.timestamp = Date.now();
+
+    res.json(dashboardPayload);
   } catch (err) {
     next(err);
   }

@@ -205,6 +205,10 @@ const Product = sequelize.define('Product', {
       return Number(this.stock) <= Number(this.lowStockThreshold);
     },
   },
+}, {
+  indexes: [
+    { fields: ['category'] }
+  ]
 });
 
 Product.beforeCreate((product) => {

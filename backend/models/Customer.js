@@ -181,6 +181,11 @@ const Customer = sequelize.define('Customer', {
     type: DataTypes.DATE,
     allowNull: true,
   },
+}, {
+  indexes: [
+    { fields: ['phone'] },
+    { fields: ['email'] }
+  ]
 });
 
 Customer.belongsTo(require('./User'), { as: 'salesman', foreignKey: 'assignedSalesmanId' });
