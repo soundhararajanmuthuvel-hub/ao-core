@@ -973,7 +973,17 @@ exports.getPayments = async (req, res, next) => {
   }
 };
 
+let lastFullReconcileTime = 0;
+
 exports.reconcileInvoicesHelper = async (customerId = null) => {
+  if (!customerId) {
+    const now = Date.now();
+    if (now - lastFullReconcileTime < 60000) {
+      return { throttled: true };
+    }
+    lastFullReconcileTime = now;
+  }
+
   const Payment = require('../models/Payment');
   const Customer = require('../models/Customer');
 

@@ -18,6 +18,7 @@ const allowedOrigins = [
   "http://127.0.0.1:5173",
   "http://localhost:5050",
   "http://127.0.0.1:5050"
+  // TODO: add Cloud Run URL here after first deploy (e.g. https://ao-core-backend-xxxxx-uc.a.run.app)
 ];
 
 const corsOptions = {
@@ -37,10 +38,13 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
 };
 
+const { profileMiddleware } = require('./middleware/profileMiddleware');
+
 /* =========================
    MIDDLEWARE
  ========================= */
 app.use(cors(corsOptions));
+app.use(profileMiddleware);
 app.options('*', cors(corsOptions));
 
 // Explicit preflight handler to guarantee OPTIONS requests never fall through or 404
@@ -106,6 +110,7 @@ app.use('/api/purchases', require('./routes/purchaseRoutes'));
 app.use('/api/inventory', require('./routes/inventoryRoutes'));
 app.use('/api/suppliers', require('./routes/supplierRoutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
+app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
 app.use('/api/reports', require('./routes/reportsRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));

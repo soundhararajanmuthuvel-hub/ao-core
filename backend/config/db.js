@@ -2,17 +2,55 @@ const { Sequelize } = require('sequelize');
 const path = require('path');
 
 let dialect = process.env.DB_DIALECT || 'sqlite';
-if (process.env.MYSQLHOST || process.env.DATABASE_URL || process.env.MYSQL_URL) {
+const dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
+
+if (dbUrl && (dbUrl.startsWith('postgres://') || dbUrl.startsWith('postgresql://'))) {
+  dialect = 'postgres';
+} else if (process.env.MYSQLHOST || process.env.DATABASE_URL || process.env.MYSQL_URL) {
   dialect = 'mysql';
 }
 
+const getSequelizeLoggingOptions = () => {
+  return {
+    benchmark: true,
+    logging: (msg, timingMs) => {
+      if (process.env.NODE_ENV === 'development' && msg.includes('EXECUTE')) {
+        console.log(`[Sequelize] ${msg} (${timingMs}ms)`);
+      }
+      try {
+        const { profileStorage } = require('../middleware/profileMiddleware');
+        const context = profileStorage.getStore();
+        if (context) {
+          context.queryTimeMs += timingMs || 0;
+          context.queriesCount += 1;
+        }
+      } catch (_) {}
+    }
+  };
+};
+
 let sequelize;
 
-if (process.env.DATABASE_URL || process.env.MYSQL_URL) {
+if (dialect === 'postgres') {
+  console.log('Using Postgres/Supabase database connection URL...');
+  sequelize = new Sequelize(dbUrl, {
+    dialect: 'postgres',
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    },
+    ...getSequelizeLoggingOptions(),
+    define: {
+      timestamps: true,
+    },
+  });
+} else if (process.env.DATABASE_URL || process.env.MYSQL_URL) {
   console.log('Using MySQL database connection URL...');
   sequelize = new Sequelize(process.env.DATABASE_URL || process.env.MYSQL_URL, {
     dialect: 'mysql',
-    logging: process.env.NODE_ENV === 'development' ? (msg) => console.log(`[Sequelize] ${msg}`) : false,
+    ...getSequelizeLoggingOptions(),
     define: {
       timestamps: true,
     },
@@ -27,7 +65,7 @@ if (process.env.DATABASE_URL || process.env.MYSQL_URL) {
       host: process.env.MYSQLHOST || process.env.DB_HOST || 'localhost',
       port: process.env.MYSQLPORT || process.env.DB_PORT || 3306,
       dialect: 'mysql',
-      logging: process.env.NODE_ENV === 'development' ? (msg) => console.log(`[Sequelize] ${msg}`) : false,
+      ...getSequelizeLoggingOptions(),
       define: {
         timestamps: true,
       },
@@ -38,7 +76,7 @@ if (process.env.DATABASE_URL || process.env.MYSQL_URL) {
   sequelize = new Sequelize({
     dialect: 'sqlite',
     storage: path.join(__dirname, '..', 'database.sqlite'),
-    logging: process.env.NODE_ENV === 'development' ? (msg) => console.log(`[Sequelize] ${msg}`) : false,
+    ...getSequelizeLoggingOptions(),
     define: {
       timestamps: true,
     },
@@ -278,7 +316,7 @@ const connectDB = async () => {
   require('../models/WebhookLog');
   require('../models/ApiAuditLog');
 
-  const shouldAlter = true;
+  const shouldAlter = false;
   await dropStaleSqliteBackupTables();
   await runSqliteSyncSafely({ alter: shouldAlter });
   console.log('Database models synchronized successfully.');
@@ -291,25 +329,51 @@ const connectDB = async () => {
     console.error('Failed to register webhook hooks:', webhookHooksErr.message);
   }
 
-  // Safe table alterations helper
-  const addColumnIfNotExist = async (tableName, columnName, columnDefSql) => {
-    const resolvedTableName = tableNameMap[tableName] || tableNameMap[tableName.replace(/s$/, '')] || tableName.toLowerCase();
-    try {
-      let columnNames = [];
-      if (dialect === 'mysql') {
-        const columns = await sequelize.query(`SHOW COLUMNS FROM ${resolvedTableName};`, { type: Sequelize.QueryTypes.SELECT });
-        columnNames = columns.map(col => (col.Field || col.field || '').toLowerCase());
-      } else {
-        const tableInfo = await sequelize.query(`PRAGMA table_info(${resolvedTableName});`, { type: Sequelize.QueryTypes.SELECT });
-        columnNames = tableInfo.map(col => (col.name || '').toLowerCase());
+  // Pre-fetch table columns cache to avoid redundant, slow database queries per column
+  const tableColumnsCache = {};
+  try {
+    if (dialect === 'mysql') {
+      const dbName = sequelize.config.database;
+      const columns = await sequelize.query(
+        `SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = :dbName`,
+        {
+          replacements: { dbName },
+          type: Sequelize.QueryTypes.SELECT
+        }
+      );
+      for (const col of columns) {
+        const tName = (col.TABLE_NAME || '').toLowerCase();
+        if (!tableColumnsCache[tName]) tableColumnsCache[tName] = [];
+        tableColumnsCache[tName].push((col.COLUMN_NAME || '').toLowerCase());
       }
+    } else {
+      const tables = await sequelize.query(
+        "SELECT name FROM sqlite_master WHERE type='table';",
+        { type: Sequelize.QueryTypes.SELECT }
+      );
+      await Promise.all(tables.map(async ({ name }) => {
+        const tName = name.toLowerCase();
+        const tableInfo = await sequelize.query(`PRAGMA table_info(${name});`, { type: Sequelize.QueryTypes.SELECT });
+        tableColumnsCache[tName] = tableInfo.map(col => (col.name || '').toLowerCase());
+      }));
+    }
+  } catch (cacheErr) {
+    console.error('Failed to pre-fetch table columns cache:', cacheErr.message);
+  }
 
-      if (!columnNames.includes(columnName.toLowerCase())) {
+  // Safe table alterations helper using memory-cached layout
+  const addColumnIfNotExist = async (tableName, columnName, columnDefSql) => {
+    const resolvedTableName = (tableNameMap[tableName] || tableNameMap[tableName.replace(/s$/, '')] || tableName).toLowerCase();
+    const existingColumns = tableColumnsCache[resolvedTableName] || [];
+
+    if (!existingColumns.includes(columnName.toLowerCase())) {
+      try {
         console.log(`Adding missing column ${columnName} to table ${resolvedTableName}...`);
         await sequelize.query(`ALTER TABLE ${resolvedTableName} ADD COLUMN ${columnName} ${columnDefSql};`);
+        existingColumns.push(columnName.toLowerCase());
+      } catch (err) {
+        console.error(`Error adding column ${columnName} to ${resolvedTableName}:`, err.message);
       }
-    } catch (err) {
-      console.error(`Error adding column ${columnName} to ${resolvedTableName}:`, err.message);
     }
   };
 
@@ -531,6 +595,51 @@ const connectDB = async () => {
     }
   } catch (err) {
     console.error('Error correcting product types on startup:', err);
+  }
+
+  // Create missing SQL indexes to optimize search and aggregate query execution speeds
+  try {
+    const createIndexIfNotExist = async (indexName, tableName, columnsArray) => {
+      const resolvedTableName = (tableNameMap[tableName] || tableNameMap[tableName.replace(/s$/, '')] || tableName).toLowerCase();
+      if (dialect === 'mysql') {
+        const existingIndex = await sequelize.query(
+          `SHOW INDEX FROM ${resolvedTableName} WHERE Key_name = :indexName`,
+          {
+            replacements: { indexName },
+            type: Sequelize.QueryTypes.SELECT
+          }
+        );
+        if (existingIndex.length === 0) {
+          console.log(`Creating index ${indexName} on ${resolvedTableName}...`);
+          await sequelize.query(`CREATE INDEX ${indexName} ON ${resolvedTableName} (${columnsArray.join(', ')});`);
+        }
+      } else {
+        const existingIndexes = await sequelize.query(`PRAGMA index_list(${resolvedTableName});`, {
+          type: Sequelize.QueryTypes.SELECT
+        });
+        const hasIndex = existingIndexes.some(idx => idx.name === indexName);
+        if (!hasIndex) {
+          console.log(`Creating index ${indexName} on ${resolvedTableName}...`);
+          await sequelize.query(`CREATE INDEX ${indexName} ON ${resolvedTableName} (${columnsArray.join(', ')});`);
+        }
+      }
+    };
+
+    await createIndexIfNotExist('idx_products_name', 'Product', ['name']);
+    await createIndexIfNotExist('idx_products_sku', 'Product', ['sku']);
+    await createIndexIfNotExist('idx_customers_name', 'Customer', ['name']);
+    await createIndexIfNotExist('idx_customers_phone', 'Customer', ['phone']);
+    await createIndexIfNotExist('idx_customers_gstNumber', 'Customer', ['gstNumber']);
+    await createIndexIfNotExist('idx_invoices_date', 'Invoice', ['date']);
+    await createIndexIfNotExist('idx_invoices_customerId', 'Invoice', ['customerId']);
+    await createIndexIfNotExist('idx_invoice_items_invoiceId', 'InvoiceItem', ['invoiceId']);
+    await createIndexIfNotExist('idx_invoice_items_productId', 'InvoiceItem', ['productId']);
+    await createIndexIfNotExist('idx_stock_movements_productId', 'StockMovement', ['productId']);
+    await createIndexIfNotExist('idx_raw_materials_name', 'RawMaterial', ['name']);
+    await createIndexIfNotExist('idx_raw_materials_materialCode', 'RawMaterial', ['materialCode']);
+    await createIndexIfNotExist('idx_purchase_items_productId', 'PurchaseItem', ['productId']);
+  } catch (indexErr) {
+    console.error('Failed to ensure database indexes:', indexErr.message);
   }
 
   // Auto-seed basic admin and developer roles if they don't exist

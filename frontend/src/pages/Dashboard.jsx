@@ -238,28 +238,21 @@ export default function Dashboard() {
       setDataLoading(true);
       try {
         if (isSuperAdmin) {
-          const [dashRes, alertsRes, boRes, wooRes, trackRes, visitsRes, sfaAnalRes] = await Promise.allSettled([
-            analyticsApi.dashboard(),
-            inventoryApi.lowStockAlerts(),
-            salesApi.list({ erpStatus: 'Waiting For Stock', limit: 1 }),
-            integrationsApi.getStats(),
-            sfaApi.getLiveTracking(),
-            sfaApi.getVisits(),
-            sfaApi.getAnalytics()
-          ]);
-          if (dashRes.status === 'fulfilled') setAdminData(dashRes.value.data);
-          if (trackRes.status === 'fulfilled') setSfaTracking(trackRes.value.data || []);
-          if (visitsRes.status === 'fulfilled') setSfaVisits(visitsRes.value.data || []);
-          if (sfaAnalRes.status === 'fulfilled') setSfaAnalytics(sfaAnalRes.value.data || null);
-          if (alertsRes.status === 'fulfilled') {
-            setAlerts(alertsRes.value.data);
-            setStoreData(prev => ({ ...prev, lowStock: alertsRes.value.data.critical.concat(alertsRes.value.data.warning).slice(0, 5) }));
-          }
-          if (boRes.status === 'fulfilled') {
-            setBackordersCount(boRes.value.data.total || 0);
-          }
-          if (wooRes.status === 'fulfilled' && wooRes.value.data.success) {
-            setWooStats(wooRes.value.data);
+          const { data } = await analyticsApi.getHomeDashboard();
+          if (data.success) {
+            setAdminData(data.analytics);
+            setSfaTracking(data.sfaLive?.liveTracking || []);
+            setSfaVisits([]);
+            setSfaAnalytics({
+              assignedCustomers: data.totalCustomerCount || 0,
+              visitedCustomers: data.sfaLive?.todayVisitsCount || 0,
+              ordersGenerated: data.analytics?.todayOrders || 0,
+              orderConversionRate: data.sfaLive?.todayVisitsCount > 0 ? parseFloat(((data.analytics?.todayOrders / data.sfaLive?.todayVisitsCount) * 100).toFixed(1)) : 0
+            });
+            setAlerts(data.stockAlerts);
+            setStoreData(prev => ({ ...prev, lowStock: (data.stockAlerts?.critical || []).concat(data.stockAlerts?.warning || []).slice(0, 5) }));
+            setBackordersCount(data.analytics?.delayedOrdersCount || 0);
+            setWooStats(data.wooStats);
           }
         }
 

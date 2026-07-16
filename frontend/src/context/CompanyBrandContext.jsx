@@ -63,6 +63,7 @@ export function CompanyBrandProvider({ children }) {
   // Sync state with settings updates and localStorage
   useEffect(() => {
     const cached = localStorage.getItem('cached_brand_data');
+    let hasCache = false;
     if (cached) {
       try {
         const data = JSON.parse(cached);
@@ -76,13 +77,16 @@ export function CompanyBrandProvider({ children }) {
           phone: data.phone || '',
           address: data.address || '',
         });
+        hasCache = true;
       } catch (e) {
         console.error('[CompanyBrand] Failed to load cached brand:', e);
       }
     }
 
-    refreshBrand();
-  }, [settings, refreshBrand]);
+    if (!hasCache) {
+      refreshBrand();
+    }
+  }, [refreshBrand]);
 
   return (
     <CompanyBrandContext.Provider value={{ ...brand, refreshBrand }}>

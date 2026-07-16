@@ -111,6 +111,7 @@ export const settingsApi = {
 
 export const analyticsApi = {
   dashboard: () => client.get('/analytics/dashboard'),
+  getHomeDashboard: () => client.get('/dashboard/home'),
 };
 
 export const reportsApi = {

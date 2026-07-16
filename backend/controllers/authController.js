@@ -46,11 +46,14 @@ exports.me = async (req, res) => {
 
 exports.updateTourStatus = async (req, res, next) => {
   try {
+    const cacheService = require('../services/cacheService');
     const { tourCompleted } = req.body;
     const user = await User.findByPk(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
     user.tourCompleted = tourCompleted === undefined ? true : !!tourCompleted;
     await user.save();
+    
+    cacheService.delete(`user_profile_${user.id}`);
 
     res.json({
       success: true,
@@ -71,6 +74,7 @@ exports.updateTourStatus = async (req, res, next) => {
 
 exports.changePassword = async (req, res, next) => {
   try {
+    const cacheService = require('../services/cacheService');
     const { password } = req.body;
     if (!password) {
       return res.status(400).json({ message: 'Password is required' });
@@ -83,6 +87,7 @@ exports.changePassword = async (req, res, next) => {
     user.mustChangePassword = false;
     await user.save();
     
+    cacheService.delete(`user_profile_${user.id}`);
     await logActivity(user.id, 'update', 'auth', 'User changed temporary password');
 
     res.json({

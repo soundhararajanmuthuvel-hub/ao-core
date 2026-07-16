@@ -1,31 +1,35 @@
 :root {
   --brand-primary: #5a2d0c;
   --brand-primary-hover: #401e07;
-  --bg-page: #f1f5f9;
+  --bg-page: #fcfaf7;
   --bg-card: #ffffff;
-  --bg-sidebar: #0f172a;
-  --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --border: #e2e8f0;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
-  --radius: 10px;
+  --bg-sidebar: #2b1d14;
+  --text-primary: #2b1d14;
+  --text-secondary: #5c4d44;
+  --text-muted: #8c7b72;
+  --border: #e6dfd8;
+  --shadow: 0 2px 8px rgba(43, 29, 20, 0.08);
+  --shadow-lg: 0 12px 30px rgba(43, 29, 20, 0.12);
+  --radius: 8px;
   --sidebar-width: 260px;
   --header-height: 64px;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --info: #3b82f6;
+  --success: #526c48;
+  --warning: #b38224;
+  --danger: #b0382e;
+  --info: #7a8d6f;
+  --font-headline: 'Playfair Display', Georgia, serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 [data-theme='dark'] {
-  --bg-page: #0f172a;
-  --bg-card: #1e293b;
-  --bg-sidebar: #020617;
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --border: #334155;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --brand-primary: #dbc2b3;
+  --brand-primary-hover: #eac078;
+  --bg-page: #16130f;
+  --bg-card: #231f1b;
+  --bg-sidebar: #110e0a;
+  --text-primary: #eae1db;
+  --text-secondary: #d2c4bd;
+  --text-muted: #9b8e88;
+  --border: rgba(201, 162, 93, 0.18);
+  --shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
 }
