@@ -10,11 +10,61 @@ const Lead = require('../models/Lead');
 const User = require('../models/User');
 const axios = require('axios');
 
-// Secure Gemini API caller helper
-async function callGemini(prompt) {
-  const apiKey = process.env.GEMINI_API_KEY;
+// Secure Cerebras Fallback API caller
+async function callCerebrasFallback(prompt) {
+  const apiKey = process.env.CEREBRAS_API_KEY;
   if (!apiKey) {
-    console.error("GEMINI_API_KEY is not defined in environment variables!");
+    console.warn("[Cerebras Fallback] CEREBRAS_API_KEY is not defined in environment variables!");
+    return null;
+  }
+
+  try {
+    const response = await axios.post(
+      'https://api.cerebras.ai/v1/chat/completions',
+      {
+        model: 'gemma-4-31b',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.2
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        timeout: 10000 // 10 seconds timeout
+      }
+    );
+
+    if (response.data?.choices?.[0]?.message?.content) {
+      return response.data.choices[0].message.content;
+    } else {
+      console.warn("[Cerebras Fallback] Unexpected response format:", response.data);
+      return null;
+    }
+  } catch (error) {
+    console.error("[Cerebras Fallback] API call failed:", error.response?.data || error.message);
+    return null;
+  }
+}
+
+// Secure Gemini API caller helper with centralized Cerebras fallback and lightweight usage logging
+async function callGemini(prompt, endpointName = 'generic') {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const startTime = Date.now();
+
+  if (!apiKey) {
+    console.warn(`[AI Quota - ${endpointName}] GEMINI_API_KEY missing at ${new Date().toISOString()}`);
+    // Try fallback immediately
+    const fallbackResult = await callCerebrasFallback(prompt);
+    if (fallbackResult) {
+      console.log(`[AI Quota - ${endpointName}] SUCCESS (Cerebras Fallback) at ${new Date().toISOString()}`);
+      return fallbackResult;
+    }
     return "AI Assistant Error: Gemini API key is missing. Please configure GEMINI_API_KEY in the .env file.";
   }
 
@@ -40,14 +90,29 @@ async function callGemini(prompt) {
       }
     );
 
+    const duration = Date.now() - startTime;
     if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      console.log(`[AI Quota - ${endpointName}] SUCCESS (Gemini) duration=${duration}ms at ${new Date().toISOString()}`);
       return response.data.candidates[0].content.parts[0].text;
     } else {
-      console.warn("Unexpected Gemini API response format:", response.data);
+      console.warn(`[AI Quota - ${endpointName}] UNEXPECTED_FORMAT duration=${duration}ms at ${new Date().toISOString()}`);
+      const fallbackResult = await callCerebrasFallback(prompt);
+      if (fallbackResult) {
+        console.log(`[AI Quota - ${endpointName}] SUCCESS (Cerebras Fallback on format mismatch) at ${new Date().toISOString()}`);
+        return fallbackResult;
+      }
       return "AI Assistant Error: Unexpected response format from intelligence service.";
     }
   } catch (error) {
-    console.error("Gemini API call failed:", error.response?.data || error.message);
+    const duration = Date.now() - startTime;
+    console.error(`[AI Quota - ${endpointName}] FAILURE (Gemini) duration=${duration}ms error="${error.response?.data ? JSON.stringify(error.response.data) : error.message}"`);
+    
+    // Attempt fallback to Cerebras
+    const fallbackResult = await callCerebrasFallback(prompt);
+    if (fallbackResult) {
+      console.log(`[AI Quota - ${endpointName}] SUCCESS (Cerebras Fallback after Gemini failure) at ${new Date().toISOString()}`);
+      return fallbackResult;
+    }
     return `AI Assistant Error: Failed to contact the intelligence service (${error.message}).`;
   }
 }
@@ -58,6 +123,7 @@ async function callGemini(prompt) {
 exports.analyzeLeads = async (req, res, next) => {
   try {
     const leads = await Lead.findAll({
+      attributes: ['id', 'shopName', 'category', 'ownerName', 'mobileNumber', 'address', 'area', 'status', 'source'],
       include: [{ model: User, as: 'salesman', attributes: ['id', 'name'] }]
     });
 
@@ -93,7 +159,7 @@ exports.analyzeLeads = async (req, res, next) => {
       Provide your analysis in clean Markdown with professional headers, bullet points, and small warning callouts when appropriate.
     `;
 
-    const reply = await callGemini(prompt);
+    const reply = await callGemini(prompt, 'analyzeLeads');
     res.json({ success: true, reply });
   } catch (err) {
     next(err);
@@ -105,7 +171,9 @@ exports.analyzeLeads = async (req, res, next) => {
    ================================================== */
 exports.customerIntelligence = async (req, res, next) => {
   try {
-    const customers = await Customer.findAll();
+    const customers = await Customer.findAll({
+      attributes: ['id', 'name', 'businessName', 'salesChannel', 'tier']
+    });
     const invoices = await Invoice.findAll({
       attributes: ['customerId', 'grandTotal', 'date', 'status']
     });
@@ -149,7 +217,7 @@ exports.customerIntelligence = async (req, res, next) => {
       Provide a highly readable, professional executive summary in Markdown.
     `;
 
-    const reply = await callGemini(prompt);
+    const reply = await callGemini(prompt, 'customerIntelligence');
     res.json({ success: true, reply });
   } catch (err) {
     next(err);
@@ -164,10 +232,16 @@ exports.salesAssistant = async (req, res, next) => {
     const { customerId } = req.body;
     let customerInfo = null;
     if (customerId) {
-      customerInfo = await Customer.findByPk(customerId);
+      customerInfo = await Customer.findByPk(customerId, {
+        attributes: ['id', 'name', 'businessName', 'salesChannel', 'tier']
+      });
     }
     const products = await Product.findAll({ attributes: ['id', 'name', 'sku', 'sellingPrice', 'category'] });
-    const recentInvoices = await Invoice.findAll({ limit: 10, order: [['date', 'DESC']] });
+    const recentInvoices = await Invoice.findAll({
+      attributes: ['customerType', 'grandTotal', 'status'],
+      limit: 10,
+      order: [['date', 'DESC']]
+    });
 
     const prompt = `
       You are the AI Sales Assistant for Amudhasurabiy Organics (AO ERP).
@@ -187,7 +261,7 @@ exports.salesAssistant = async (req, res, next) => {
       Provide a structured, persuasive recommendation in Markdown.
     `;
 
-    const reply = await callGemini(prompt);
+    const reply = await callGemini(prompt, 'salesAssistant');
     res.json({ success: true, reply });
   } catch (err) {
     next(err);
@@ -224,7 +298,7 @@ exports.inventoryIntelligence = async (req, res, next) => {
       Provide a detailed inventory audit in Markdown, complete with structured advice.
     `;
 
-    const reply = await callGemini(prompt);
+    const reply = await callGemini(prompt, 'inventoryIntelligence');
     res.json({ success: true, reply });
   } catch (err) {
     next(err);
@@ -238,6 +312,7 @@ exports.accountsAssistant = async (req, res, next) => {
   try {
     const unpaidInvoices = await Invoice.findAll({
       where: { paymentStatus: ['unpaid', 'partial'] },
+      attributes: ['id', 'invoiceNumber', 'date', 'grandTotal', 'amountPaid', 'paymentStatus', 'dueDate', 'customerId'],
       include: [{ model: Customer, as: 'customer', attributes: ['name', 'phone', 'email'] }]
     });
 
@@ -273,7 +348,7 @@ exports.accountsAssistant = async (req, res, next) => {
       Provide your findings and drafts in clean Markdown.
     `;
 
-    const reply = await callGemini(prompt);
+    const reply = await callGemini(prompt, 'accountsAssistant');
     res.json({ success: true, reply });
   } catch (err) {
     next(err);
@@ -317,7 +392,7 @@ exports.manufacturingAssistant = async (req, res, next) => {
       Provide your planner report in clean Markdown.
     `;
 
-    const reply = await callGemini(prompt);
+    const reply = await callGemini(prompt, 'manufacturingAssistant');
     res.json({ success: true, reply });
   } catch (err) {
     next(err);
@@ -592,8 +667,8 @@ exports.chatAI = async (req, res, next) => {
       return res.status(400).json({ message: 'Message is required' });
     }
 
-    // If Gemini key is set, run secure Gemini AI response
-    if (process.env.GEMINI_API_KEY) {
+    // If Gemini or Cerebras key is set, run AI response
+    if (process.env.GEMINI_API_KEY || process.env.CEREBRAS_API_KEY) {
       const [productsCount, customersCount, lowProducts, lowRaw, todaySales, unpaidInvoices, pendingShipments] = await Promise.all([
         Product.count(),
         Customer.count(),
@@ -602,13 +677,24 @@ exports.chatAI = async (req, res, next) => {
           attributes: ['id', 'name', 'stock', [sequelize.col('lowStockThreshold'), 'minStock'], 'unit'],
           limit: 10
         }),
-        RawMaterial.findAll({ where: { stock: { [Op.lte]: sequelize.col('minStock') } }, limit: 10 }),
+        RawMaterial.findAll({
+          where: { stock: { [Op.lte]: sequelize.col('minStock') } },
+          attributes: ['id', 'name', 'stock', 'minStock', 'unit'],
+          limit: 10
+        }),
         Invoice.findAll({
           where: { date: { [Op.gte]: new Date(new Date().setHours(0,0,0,0)) } },
+          attributes: ['id', 'grandTotal'],
           include: [{ model: Customer, as: 'customer', attributes: ['name'] }]
         }),
-        Invoice.findAll({ where: { paymentStatus: ['unpaid', 'partial'] } }),
-        Shipment.findAll({ where: { status: { [Op.notIn]: ['Delivered', 'Returned'] } } })
+        Invoice.findAll({
+          where: { paymentStatus: ['unpaid', 'partial'] },
+          attributes: ['id', 'grandTotal', 'amountPaid']
+        }),
+        Shipment.findAll({
+          where: { status: { [Op.notIn]: ['Delivered', 'Returned'] } },
+          attributes: ['id', 'status']
+        })
       ]);
 
       const totalTodayRevenue = todaySales.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
@@ -638,7 +724,7 @@ exports.chatAI = async (req, res, next) => {
         - If the user asks about something not present in the context, use your general knowledge but mention you are answering as an ERP assistant.
       `;
 
-      const reply = await callGemini(prompt);
+      const reply = await callGemini(prompt, 'chatAI');
       return res.json({
         success: true,
         reply,
@@ -949,8 +1035,8 @@ exports.getDashboardSuggestions = async (req, res, next) => {
       return `Outstanding balance of ₹${remaining.toLocaleString('en-IN')} pending for Invoice #${inv.invoiceNumber}`;
     }).slice(0, 3);
 
-    // Call Gemini if API Key exists
-    if (process.env.GEMINI_API_KEY) {
+    // Call Gemini or Cerebras fallback if either API Key exists
+    if (process.env.GEMINI_API_KEY || process.env.CEREBRAS_API_KEY) {
       const erpContext = {
         lowStockCount: lowStockItems.length,
         lowStockSample: lowStockItems.slice(0, 5),
@@ -981,7 +1067,7 @@ exports.getDashboardSuggestions = async (req, res, next) => {
       `;
 
       try {
-        const rawReply = await callGemini(prompt);
+        const rawReply = await callGemini(prompt, 'getDashboardSuggestions');
         // Clean reply from backticks in case Gemini returned markdown
         let cleanedReply = rawReply.replace(/```json/g, '').replace(/```/g, '').trim();
         const suggestions = JSON.parse(cleanedReply);
@@ -1052,12 +1138,26 @@ const parseJSONFromLLM = (text) => {
   }
 };
 
-// 1. Customer Insights
 exports.getCustomerInsights = async (req, res, next) => {
   try {
     const Payment = require('../models/Payment');
+    const AiSuggestion = require('../models/AiSuggestion');
     
-    const customers = await Customer.findAll({ limit: 100 });
+    const todayStr = new Date().toISOString().split('T')[0];
+    const cacheKey = `c_${todayStr.replace(/-/g, '')}`;
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    if (!forceRefresh) {
+      const cached = await AiSuggestion.findOne({ where: { generatedDate: cacheKey } });
+      if (cached) {
+        return res.json({ success: true, ...cached.suggestions, data: cached.suggestions, cached: true });
+      }
+    }
+
+    const customers = await Customer.findAll({
+      attributes: ['id', 'name', 'businessName', 'customerType', 'tier'],
+      limit: 100
+    });
     const invoices = await Invoice.findAll({ attributes: ['customerId', 'grandTotal', 'status'] });
     const payments = await Payment.findAll({ attributes: ['customerId', 'amount'] });
 
@@ -1103,7 +1203,7 @@ exports.getCustomerInsights = async (req, res, next) => {
       Do not wrap in markdown tags or include any text other than the JSON object.
     `;
 
-    const rawReply = await callGemini(prompt);
+    const rawReply = await callGemini(prompt, 'getCustomerInsights');
     const insights = parseJSONFromLLM(rawReply) || {
       summary: "Customer profile intelligence report generated successfully.",
       trends: ["Stable wholesale retail orders", "Payment outstanding recovery shows moderate delay"],
@@ -1114,7 +1214,17 @@ exports.getCustomerInsights = async (req, res, next) => {
       outstandingRecovery: sortedByOutstanding.slice(0, 3).map(c => `Follow up with ${c.name} for ₹${Math.round(c.outstanding)}`)
     };
 
-    res.json({ success: true, ...insights, data: insights });
+    // Cache results
+    try {
+      await AiSuggestion.upsert({
+        generatedDate: cacheKey,
+        suggestions: insights
+      });
+    } catch (cacheErr) {
+      console.error('Failed to cache customer insights:', cacheErr);
+    }
+
+    res.json({ success: true, ...insights, data: insights, cached: false });
   } catch (err) {
     next(err);
   }
@@ -1123,7 +1233,22 @@ exports.getCustomerInsights = async (req, res, next) => {
 // 2. Product Insights
 exports.getProductInsights = async (req, res, next) => {
   try {
-    const products = await Product.findAll();
+    const AiSuggestion = require('../models/AiSuggestion');
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    const cacheKey = `p_${todayStr.replace(/-/g, '')}`;
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    if (!forceRefresh) {
+      const cached = await AiSuggestion.findOne({ where: { generatedDate: cacheKey } });
+      if (cached) {
+        return res.json({ success: true, ...cached.suggestions, data: cached.suggestions, cached: true });
+      }
+    }
+
+    const products = await Product.findAll({
+      attributes: ['id', 'name', 'sku', 'stock', 'supplier']
+    });
     const invoiceItems = await InvoiceItem.findAll({ attributes: ['productId', 'qty', 'lineTotal'], limit: 1000 });
 
     // Aggregate sales volume & revenue per product
@@ -1166,7 +1291,7 @@ exports.getProductInsights = async (req, res, next) => {
       Do not wrap in markdown tags or include any text other than the JSON object.
     `;
 
-    const rawReply = await callGemini(prompt);
+    const rawReply = await callGemini(prompt, 'getProductInsights');
     const insights = parseJSONFromLLM(rawReply) || {
       summary: "Finished goods movement and SKU analysis successfully compiled.",
       trends: ["High volumes on organic malt SKUs", "Raw material packaging sync needs adjustment"],
@@ -1177,7 +1302,17 @@ exports.getProductInsights = async (req, res, next) => {
       deadStock: deadStock.map(p => p.name)
     };
 
-    res.json({ success: true, ...insights, data: insights });
+    // Cache results
+    try {
+      await AiSuggestion.upsert({
+        generatedDate: cacheKey,
+        suggestions: insights
+      });
+    } catch (cacheErr) {
+      console.error('Failed to cache product insights:', cacheErr);
+    }
+
+    res.json({ success: true, ...insights, data: insights, cached: false });
   } catch (err) {
     next(err);
   }
@@ -1186,6 +1321,19 @@ exports.getProductInsights = async (req, res, next) => {
 // 3. Sales Insights
 exports.getSalesInsights = async (req, res, next) => {
   try {
+    const AiSuggestion = require('../models/AiSuggestion');
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    const cacheKey = `s_${todayStr.replace(/-/g, '')}`;
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    if (!forceRefresh) {
+      const cached = await AiSuggestion.findOne({ where: { generatedDate: cacheKey } });
+      if (cached) {
+        return res.json({ success: true, ...cached.suggestions, data: cached.suggestions, cached: true });
+      }
+    }
+
     const invoices = await Invoice.findAll({ attributes: ['grandTotal', 'date', 'creatorId'], limit: 1000 });
     
     // Group sales by month
@@ -1214,7 +1362,7 @@ exports.getSalesInsights = async (req, res, next) => {
       Do not wrap in markdown tags or include any text other than the JSON object.
     `;
 
-    const rawReply = await callGemini(prompt);
+    const rawReply = await callGemini(prompt, 'getSalesInsights');
     const insights = parseJSONFromLLM(rawReply) || {
       summary: "Monthly revenue aggregates show steady performance across wholesale and retail.",
       trends: ["Steady sales pipeline month-over-month", "CRM lead conversions positively impact invoice growth"],
@@ -1223,7 +1371,17 @@ exports.getSalesInsights = async (req, res, next) => {
       riskAlerts: ["Sales rely heavily on top 3 billing accounts"]
     };
 
-    res.json({ success: true, ...insights, data: insights });
+    // Cache results
+    try {
+      await AiSuggestion.upsert({
+        generatedDate: cacheKey,
+        suggestions: insights
+      });
+    } catch (cacheErr) {
+      console.error('Failed to cache sales insights:', cacheErr);
+    }
+
+    res.json({ success: true, ...insights, data: insights, cached: false });
   } catch (err) {
     next(err);
   }
@@ -1232,7 +1390,22 @@ exports.getSalesInsights = async (req, res, next) => {
 // 4. Inventory Insights
 exports.getInventoryInsights = async (req, res, next) => {
   try {
-    const products = await Product.findAll();
+    const AiSuggestion = require('../models/AiSuggestion');
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    const cacheKey = `i_${todayStr.replace(/-/g, '')}`;
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    if (!forceRefresh) {
+      const cached = await AiSuggestion.findOne({ where: { generatedDate: cacheKey } });
+      if (cached) {
+        return res.json({ success: true, ...cached.suggestions, data: cached.suggestions, cached: true });
+      }
+    }
+
+    const products = await Product.findAll({
+      attributes: ['id', 'name', 'stock', 'minStockLevel', 'sellingPrice', 'price']
+    });
     const lowStockAlerts = products.filter(p => p.stock <= (p.minStockLevel || 10));
 
     // Calculate total holding value
@@ -1258,7 +1431,7 @@ exports.getInventoryInsights = async (req, res, next) => {
       Do not wrap in markdown tags or include any text other than the JSON object.
     `;
 
-    const rawReply = await callGemini(prompt);
+    const rawReply = await callGemini(prompt, 'getInventoryInsights');
     const insights = parseJSONFromLLM(rawReply) || {
       summary: `Warehouse holding valuation computed at ₹${Math.round(totalHoldingValue).toLocaleString('en-IN')}.`,
       trends: ["Stock turnover ratio is stable", "Low stock alerts trigger frequently on fast-moving consumer items"],
@@ -1267,18 +1440,48 @@ exports.getInventoryInsights = async (req, res, next) => {
       riskAlerts: lowStockAlerts.slice(0, 3).map(p => `Out of stock risk: ${p.name} (Current: ${p.stock})`)
     };
 
-    res.json({ success: true, ...insights, data: insights });
+    // Cache results
+    try {
+      await AiSuggestion.upsert({
+        generatedDate: cacheKey,
+        suggestions: insights
+      });
+    } catch (cacheErr) {
+      console.error('Failed to cache inventory insights:', cacheErr);
+    }
+
+    res.json({ success: true, ...insights, data: insights, cached: false });
   } catch (err) {
     next(err);
   }
 };
 
-// 5. Manufacturing Insights
 exports.getManufacturingInsights = async (req, res, next) => {
   try {
     const ManufacturingRecipe = require('../models/ManufacturingRecipe');
-    const entries = await ManufacturingEntry.findAll({ limit: 50, order: [['createdAt', 'DESC']] });
-    const recipes = await ManufacturingRecipe.findAll({ limit: 10 });
+    const ManufacturingEntry = require('../models/ManufacturingEntry');
+    const AiSuggestion = require('../models/AiSuggestion');
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    const cacheKey = `m_${todayStr.replace(/-/g, '')}`;
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    if (!forceRefresh) {
+      const cached = await AiSuggestion.findOne({ where: { generatedDate: cacheKey } });
+      if (cached) {
+        return res.json({ success: true, ...cached.suggestions, data: cached.suggestions, cached: true });
+      }
+    }
+
+    const entries = await ManufacturingEntry.findAll({
+      attributes: ['recipeName', 'quantityProduced', 'status'],
+      limit: 50,
+      order: [['createdAt', 'DESC']]
+    });
+    const recipes = await ManufacturingRecipe.findAll({
+      attributes: ['name', 'yieldPacks'],
+      limit: 10
+    });
 
     const prompt = `
       You are the AI Manufacturing Production Analyst for Amudhasurabiy Organics.
@@ -1297,7 +1500,7 @@ exports.getManufacturingInsights = async (req, res, next) => {
       Do not wrap in markdown tags or include any text other than the JSON object.
     `;
 
-    const rawReply = await callGemini(prompt);
+    const rawReply = await callGemini(prompt, 'getManufacturingInsights');
     const insights = parseJSONFromLLM(rawReply) || {
       summary: "Manufacturing production logs and recipe yields analysed successfully.",
       trends: ["Production yield consistency is high (95%+ match to recipe benchmarks)", "Repacking conversions track well to schedule"],
@@ -1306,7 +1509,17 @@ exports.getManufacturingInsights = async (req, res, next) => {
       riskAlerts: ["Overhead costs are climbing in packaging batches"]
     };
 
-    res.json({ success: true, ...insights, data: insights });
+    // Cache results
+    try {
+      await AiSuggestion.upsert({
+        generatedDate: cacheKey,
+        suggestions: insights
+      });
+    } catch (cacheErr) {
+      console.error('Failed to cache manufacturing insights:', cacheErr);
+    }
+
+    res.json({ success: true, ...insights, data: insights, cached: false });
   } catch (err) {
     next(err);
   }
@@ -1316,9 +1529,23 @@ exports.getManufacturingInsights = async (req, res, next) => {
 exports.getCrmInsights = async (req, res, next) => {
   try {
     const CrmOpportunity = require('../models/CrmOpportunity');
-    const leads = await Lead.findAll({ limit: 100 });
-    const opportunities = await CrmOpportunity.findAll({ limit: 50 });
-    const followups = await CrmFollowUp.findAll({ limit: 50 });
+    const CrmFollowUp = require('../models/CrmFollowUp');
+    const AiSuggestion = require('../models/AiSuggestion');
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    const cacheKey = `r_${todayStr.replace(/-/g, '')}`;
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    if (!forceRefresh) {
+      const cached = await AiSuggestion.findOne({ where: { generatedDate: cacheKey } });
+      if (cached) {
+        return res.json({ success: true, ...cached.suggestions, data: cached.suggestions, cached: true });
+      }
+    }
+
+    const leads = await Lead.findAll({ attributes: ['status'], limit: 100 });
+    const opportunities = await CrmOpportunity.findAll({ attributes: ['stage'], limit: 50 });
+    const followups = await CrmFollowUp.findAll({ attributes: ['status'], limit: 50 });
 
     const openLeads = leads.filter(l => l.status === 'Open' || l.status === 'New');
     const closedWon = opportunities.filter(o => o.stage === 'Closed Won');
@@ -1341,7 +1568,7 @@ exports.getCrmInsights = async (req, res, next) => {
       Do not wrap in markdown tags or include any text other than the JSON object.
     `;
 
-    const rawReply = await callGemini(prompt);
+    const rawReply = await callGemini(prompt, 'getCrmInsights');
     const insights = parseJSONFromLLM(rawReply) || {
       summary: "CRM pipeline lead conversion metrics are healthy with active outreach.",
       trends: ["Conversion rates are high for premium organic channels", "Follow-ups show slight delays in area beat route completion"],
@@ -1350,7 +1577,17 @@ exports.getCrmInsights = async (req, res, next) => {
       riskAlerts: [`${pendingFollowups.length} follow-up calls are past their scheduled dates`]
     };
 
-    res.json({ success: true, ...insights, data: insights });
+    // Cache results
+    try {
+      await AiSuggestion.upsert({
+        generatedDate: cacheKey,
+        suggestions: insights
+      });
+    } catch (cacheErr) {
+      console.error('Failed to cache CRM insights:', cacheErr);
+    }
+
+    res.json({ success: true, ...insights, data: insights, cached: false });
   } catch (err) {
     next(err);
   }
