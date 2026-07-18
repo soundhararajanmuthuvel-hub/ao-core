@@ -52,12 +52,28 @@ exports.buildPdfCatalog = async (products, settings, pricingType = 'retail') => 
       doc.on('data', (chunk) => buffers.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(buffers)));
 
-      const brandColor = settings.brandColor || '#5a2d0c';
+      const brandColor = settings.brandColor || '#5a2d0c'; // default warm brown
       const companyName = settings.companyName || 'Amudhasurabiy Organics';
       const website = settings.websiteUrl || 'www.amudhasurabiy.com';
       const phone = settings.phone || '7010602115';
       const email = settings.email || 'info@amudhasurabiy.com';
       const gstNumber = settings.gstNumber || '';
+
+      // Register custom premium serif fonts if available, fallback to standard serif
+      const regularFontPath = path.resolve(__dirname, '..', 'assets', 'fonts', 'Lora-Regular.ttf');
+      const boldFontPath = path.resolve(__dirname, '..', 'assets', 'fonts', 'Lora-Bold.ttf');
+      
+      if (fs.existsSync(regularFontPath)) {
+        doc.registerFont('Lora', regularFontPath);
+      } else {
+        doc.registerFont('Lora', 'Times-Roman');
+      }
+      
+      if (fs.existsSync(boldFontPath)) {
+        doc.registerFont('Lora-Bold', boldFontPath);
+      } else {
+        doc.registerFont('Lora-Bold', 'Times-Bold');
+      }
 
       // Load logo buffer if available
       const logoBuffer = await fetchImageBuffer(settings.logo || settings.logoUrl);
@@ -68,29 +84,20 @@ exports.buildPdfCatalog = async (products, settings, pricingType = 'retail') => 
       const drawHeaderFooter = (currentPage) => {
         doc.save();
         
-        // Header line
-        doc.strokeColor(brandColor).lineWidth(1.5).moveTo(40, 60).lineTo(555, 60).stroke();
+        // Header line (brass color)
+        doc.strokeColor('#c9a25d').lineWidth(1).moveTo(40, 60).lineTo(555, 60).stroke();
 
-        // Logo / Title
-        if (logoBuffer) {
-          try {
-            doc.image(logoBuffer, 40, 25, { height: 30 });
-          } catch (e) {
-            doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(14).text(companyName, 40, 32);
-          }
-        } else {
-          doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(14).text(companyName, 40, 32);
-        }
+        // Title Lora-Bold
+        doc.fillColor('#2b1d14').font('Lora-Bold').fontSize(11).text(companyName, 40, 42);
 
-        // Subtitle
-        doc.fillColor('#64748b').font('Helvetica').fontSize(8).text('PRODUCT CATALOG', 480, 28, { align: 'right', width: 75 });
-        doc.text(new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }), 450, 40, { align: 'right', width: 105 });
+        // Subtitle (Helvetica)
+        doc.fillColor('#8fa383').font('Helvetica-Bold').fontSize(7.5).text('PRODUCT CATALOG', 480, 44, { align: 'right', width: 75, characterSpacing: 1 });
 
         // Footer line
-        doc.strokeColor('#cbd5e1').lineWidth(0.5).moveTo(40, 800).lineTo(555, 800).stroke();
+        doc.strokeColor('#e6dfd5').lineWidth(0.5).moveTo(40, 800).lineTo(555, 800).stroke();
 
         // Footer details
-        doc.fillColor('#64748b').font('Helvetica').fontSize(7.5);
+        doc.fillColor('#8c7e75').font('Helvetica').fontSize(7.5);
         doc.text(`Contact: ${phone}  |  Email: ${email}  |  Web: ${website}`, 40, 808, { width: 400 });
         if (gstNumber) {
           doc.text(`GSTIN: ${gstNumber}`, 40, 820);
@@ -100,51 +107,90 @@ exports.buildPdfCatalog = async (products, settings, pricingType = 'retail') => 
         doc.restore();
       };
 
-      // 1. Cover Page
-      doc.rect(0, 0, 595, 842).fill('#fffaf5');
-      
-      // Decorative border
-      doc.strokeColor(brandColor).lineWidth(2).rect(20, 20, 555, 802).stroke();
-      doc.strokeColor(brandColor).lineWidth(0.5).rect(24, 24, 547, 794).stroke();
+      // Draw elegant botanical leaf illustration for the cover page
+      const drawBotanicalAccent = (centerX, centerY) => {
+        doc.save();
+        doc.strokeColor('#c9a25d').lineWidth(1.2).opacity(0.4);
+        
+        // Main stem curve
+        doc.moveTo(centerX, centerY + 80)
+           .bezierCurveTo(centerX - 10, centerY + 20, centerX + 10, centerY - 20, centerX, centerY - 80)
+           .stroke();
+        
+        // Helper to draw a leaf shape
+        const drawLeaf = (startX, startY, controlX1, controlY1, controlX2, controlY2, endX, endY) => {
+          doc.moveTo(startX, startY)
+             .bezierCurveTo(controlX1, controlY1, controlX2, controlY2, endX, endY)
+             .bezierCurveTo(controlX2 - 5, controlY2 + 5, controlX1 + 5, controlY1 - 5, startX, startY)
+             .fillAndStroke('#8fa383', '#c9a25d');
+        };
 
-      // Corner accents inside the decorative border
+        doc.fillColor('#8fa383').opacity(0.25);
+        
+        // Left leaf 1
+        drawLeaf(centerX - 2, centerY + 40, centerX - 30, centerY + 30, centerX - 35, centerY + 10, centerX - 12, centerY + 22);
+        // Right leaf 1
+        drawLeaf(centerX + 2, centerY + 20, centerX + 30, centerY + 10, centerX + 35, centerY - 10, centerX + 12, centerY + 2);
+        // Left leaf 2
+        drawLeaf(centerX - 2, centerY - 10, centerX - 28, centerY - 20, centerX - 30, centerY - 38, centerX - 10, centerY - 25);
+        // Right leaf 2
+        drawLeaf(centerX + 2, centerY - 30, centerX + 28, centerY - 40, centerX + 30, centerY - 58, centerX + 10, centerY - 45);
+        // Top leaf
+        drawLeaf(centerX, centerY - 80, centerX - 12, centerY - 95, centerX + 12, centerY - 95, centerX, centerY - 110);
+
+        doc.restore();
+      };
+
+      // 1. Cover Page (Dark espresso background)
+      doc.rect(0, 0, 595, 842).fill('#2b1d14');
+      
+      // Dual frame border (Aged Brass & Gold)
+      doc.strokeColor('#c9a25d').lineWidth(2).rect(20, 20, 555, 802).stroke();
+      doc.strokeColor('#c9a25d').lineWidth(0.5).opacity(0.5).rect(24, 24, 547, 794).stroke();
+
+      // Corner accents
       doc.save();
-      doc.strokeColor(brandColor).lineWidth(1.5);
-      // Top Left corner frame
-      doc.moveTo(24, 44).lineTo(24, 24).lineTo(44, 24).stroke();
-      // Top Right corner frame
-      doc.moveTo(568, 44).lineTo(568, 24).lineTo(548, 24).stroke();
-      // Bottom Left corner frame
-      doc.moveTo(24, 798).lineTo(24, 818).lineTo(44, 818).stroke();
-      // Bottom Right corner frame
-      doc.moveTo(568, 798).lineTo(568, 818).lineTo(548, 818).stroke();
+      doc.strokeColor('#c9a25d').lineWidth(1.5);
+      doc.moveTo(24, 44).lineTo(24, 24).lineTo(44, 24).stroke(); // Top Left
+      doc.moveTo(568, 44).lineTo(568, 24).lineTo(548, 24).stroke(); // Top Right
+      doc.moveTo(24, 798).lineTo(24, 818).lineTo(44, 818).stroke(); // Bottom Left
+      doc.moveTo(568, 798).lineTo(568, 818).lineTo(548, 818).stroke(); // Bottom Right
       doc.restore();
 
-      if (logoBuffer) {
-        try {
-          doc.image(logoBuffer, 197, 180, { width: 200 });
-        } catch (e) {}
-      }
+      // Draw custom leaf logo art in the center
+      drawBotanicalAccent(297, 280);
 
-      doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(32).text(companyName, 40, 400, { align: 'center' });
-      doc.fillColor('#334155').font('Helvetica-Bold').fontSize(16).text('OFFICIAL PRODUCT CATALOG & PRICE LIST', 40, 450, { align: 'center' });
+      // Company Name
+      doc.fillColor('#fffdf9').font('Lora-Bold').fontSize(24).text(companyName.toUpperCase(), 40, 420, { align: 'center', characterSpacing: 2 });
+      
+      // Separator Line
+      doc.strokeColor('#c9a25d').lineWidth(1).moveTo(200, 470).lineTo(395, 470).stroke();
+
+      doc.fillColor('#fffdf9').font('Lora').fontSize(14).text('OFFICIAL PRODUCT CATALOG', 40, 495, { align: 'center', characterSpacing: 1 });
 
       // Pricing context badge
       let tierLabel = 'RETAIL EDITION';
       if (pricingType === 'distributor') tierLabel = 'DISTRIBUTOR EDITION';
       if (pricingType === 'super_stockist') tierLabel = 'SUPER STOCKIST EDITION';
-      if (pricingType === 'hide') tierLabel = 'PRODUCT PROFILE DIRECTORY';
+      if (pricingType === 'hide') tierLabel = 'PRODUCT DIRECTORY';
 
-      doc.fillColor(brandColor).rect(172, 500, 250, 25, { rx: 5 }).fill();
-      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(10).text(tierLabel, 172, 508, { align: 'center', width: 250 });
+      doc.fillColor('#c9a25d').rect(172, 540, 250, 24, { rx: 4 }).fill();
+      doc.fillColor('#2b1d14').font('Helvetica-Bold').fontSize(8.5).text(tierLabel, 172, 548, { align: 'center', width: 250, characterSpacing: 1 });
 
-      doc.fillColor('#64748b').font('Helvetica').fontSize(10).text(`Generated on: ${new Date().toLocaleDateString('en-IN')}`, 40, 680, { align: 'center' });
-      doc.text(`Website: ${website}  |  Phone: ${phone}`, 40, 700, { align: 'center' });
+      doc.fillColor('#8c7e75').font('Helvetica').fontSize(9).text(`Generated on: ${new Date().toLocaleDateString('en-IN')}`, 40, 710, { align: 'center' });
+      doc.text(`Website: ${website}  |  Phone: ${phone}`, 40, 728, { align: 'center' });
 
+      // 2. Content Pages Setup
       pageNumber++;
       doc.addPage();
+      
+      // Draw background fill for first content page
+      doc.save();
+      doc.fillColor('#fffdf9').rect(0, 0, 595, 842).fill();
+      doc.restore();
+      
+      drawHeaderFooter(pageNumber);
 
-      // 2. Product Pages Grouped by Category
       const sortedProducts = [...products].sort((a, b) => {
         const catA = (a.category || 'General').toLowerCase();
         const catB = (b.category || 'General').toLowerCase();
@@ -158,176 +204,152 @@ exports.buildPdfCatalog = async (products, settings, pricingType = 'retail') => 
         return 0;
       });
 
-      let itemY = 80;
+      // 2-Column Grid Parameters
+      const colWidth = 250;
+      const cardHeight = 210;
+      const leftPositions = [40, 305];
+      const gutterY = 15;
+      
+      let rowY = 80;
+      let colIndex = 0;
       let lastCategory = null;
-      drawHeaderFooter(pageNumber);
 
       for (let i = 0; i < sortedProducts.length; i++) {
         const p = sortedProducts[i];
         const category = p.category || 'General';
 
-        // Strip and clean the text elements
-        const descText = cleanHtmlText(p.description || p.shortDescription || 'No description provided.');
-        const ingText = p.ingredients ? cleanHtmlText(p.ingredients) : '';
-
-        // Calculate card height dynamically
-        let rightContentHeight = 15; // top margin
-        
-        // Product name height
-        doc.font('Helvetica-Bold').fontSize(13);
-        rightContentHeight += doc.heightOfString(p.name, { width: 345 }) + 3;
-
-        // SKU / Category height
-        doc.font('Helvetica-Bold').fontSize(7.5);
-        const skuCatText = `SKU: ${p.sku || 'N/A'}    |    CATEGORY: ${category.toUpperCase()}`;
-        rightContentHeight += doc.heightOfString(skuCatText, { width: 345 }) + 6;
-
-        // Description height
-        doc.font('Helvetica').fontSize(9);
-        rightContentHeight += doc.heightOfString(descText, { width: 345, lineGap: 1 }) + 8;
-
-        // Ingredients height
-        if (ingText) {
-          doc.font('Helvetica-Bold').fontSize(8);
-          const fullIngText = `INGREDIENTS: ${ingText}`;
-          rightContentHeight += doc.heightOfString(fullIngText, { width: 345 }) + 6;
-        }
-
-        // Barcode height
-        if (p.barcode) {
-          doc.font('Helvetica').fontSize(7.5);
-          rightContentHeight += doc.heightOfString(`Barcode: ${p.barcode}`, { width: 345 }) + 6;
-        }
-
-        // Badge and Prices space
-        rightContentHeight += 30; 
-        rightContentHeight += 15; // bottom margin
-
-        // Card height clamp
-        const boxHeight = Math.max(150, rightContentHeight);
-
         // Check if category changed
         const categoryChanged = lastCategory !== category;
-        let dividerHeight = categoryChanged ? 45 : 0;
 
-        // Page break logic
-        if (itemY + dividerHeight + boxHeight > 780) {
-          pageNumber++;
-          doc.addPage();
-          drawHeaderFooter(pageNumber);
-          itemY = 80;
-        }
-
-        // Draw Category Section Divider
         if (categoryChanged) {
+          // If we were on the right column, reset to left column and move Y to next row
+          if (colIndex === 1) {
+            colIndex = 0;
+            rowY = rowY + cardHeight + gutterY;
+          }
+
+          // Check Y limit to fit category title + at least 1 row of cards
+          if (rowY + 45 + cardHeight > 780) {
+            pageNumber++;
+            doc.addPage();
+            doc.save();
+            doc.fillColor('#fffdf9').rect(0, 0, 595, 842).fill();
+            doc.restore();
+            drawHeaderFooter(pageNumber);
+            rowY = 80;
+          }
+
+          // Draw Category Title Banner
           doc.save();
-          doc.fillColor(brandColor).rect(40, itemY, 515, 26, { rx: 3 }).fill();
-          doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(10).text(category.toUpperCase(), 50, itemY + 8, { characterSpacing: 1.5 });
+          doc.fillColor('#2b1d14').rect(40, rowY, 515, 26, { rx: 4 }).fill();
+          doc.strokeColor('#c9a25d').lineWidth(1).moveTo(40, rowY + 26).lineTo(555, rowY + 26).stroke();
+          doc.fillColor('#fffdf9').font('Lora-Bold').fontSize(10).text(category.toUpperCase(), 52, rowY + 9, { characterSpacing: 1.5 });
           doc.restore();
-          itemY += 36;
+
+          rowY += 40;
           lastCategory = category;
         }
 
-        // Draw Product Card Box
+        // Draw Product Card at the current X/Y grid coordinate
+        const cardX = leftPositions[colIndex];
+        
         doc.save();
-        doc.rect(40, itemY, 515, boxHeight).fill('#ffffff');
-        doc.strokeColor('#e2e8f0').lineWidth(0.75).rect(40, itemY, 515, boxHeight).stroke();
+        // Soft white card box
+        doc.fillColor('#ffffff').rect(cardX, rowY, colWidth, cardHeight, { rx: 6 }).fill();
+        // Thin linen-like border
+        doc.strokeColor('#e6dfd5').lineWidth(1).rect(cardX, rowY, colWidth, cardHeight, { rx: 6 }).stroke();
+        doc.restore();
 
-        // Image / Branded Placeholder Left Column
-        const imgW = 110;
+        // 1. Image Thumbnail Frame
+        const imgX = cardX + 10;
+        const imgY = rowY + 10;
+        const imgW = 230;
         const imgH = 110;
-        const imgX = 55;
-        const imgY = itemY + (boxHeight - imgH) / 2;
 
-        const drawPlaceholder = (x, y, w, h) => {
+        doc.save();
+        doc.fillColor('#fdfaf6').rect(imgX, imgY, imgW, imgH, { rx: 4 }).fill();
+        doc.strokeColor('#c9a25d').lineWidth(0.5).opacity(0.3).rect(imgX, imgY, imgW, imgH, { rx: 4 }).stroke();
+        doc.restore();
+
+        const drawMonogramPlaceholder = (x, y, w, h) => {
           doc.save();
-          doc.fillColor(brandColor).fillOpacity(0.04).rect(x, y, w, h, { rx: 5 }).fill();
-          doc.strokeColor(brandColor).lineWidth(0.75).fillOpacity(1.0).rect(x + 4, y + 4, w - 8, h - 8, { rx: 4 }).stroke();
-          
           const initials = companyName.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase() || 'AO';
-          doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(20).text(initials, x, y + (h / 2) - 15, { align: 'center', width: w });
-          doc.font('Helvetica-Oblique').fontSize(7.5).text('Organic Premium', x, y + (h / 2) + 12, { align: 'center', width: w });
+          doc.fillColor('#2b1d14').opacity(0.08).font('Lora-Bold').fontSize(36).text(initials, x, y + (h / 2) - 22, { align: 'center', width: w });
+          doc.fillColor('#c9a25d').opacity(0.6).font('Lora').fontSize(7).text('ORGANIC SELECTION', x, y + (h / 2) + 16, { align: 'center', width: w, characterSpacing: 1.5 });
           doc.restore();
         };
 
         const imgBuffer = await fetchImageBuffer(p.image);
         if (imgBuffer) {
           try {
-            doc.image(imgBuffer, imgX, imgY, { width: imgW, height: imgH, fit: [imgW, imgH] });
+            doc.image(imgBuffer, imgX + 5, imgY + 5, {
+              width: imgW - 10,
+              height: imgH - 10,
+              fit: [imgW - 10, imgH - 10],
+              align: 'center',
+              valign: 'center'
+            });
           } catch (e) {
-            drawPlaceholder(imgX, imgY, imgW, imgH);
+            drawMonogramPlaceholder(imgX, imgY, imgW, imgH);
           }
         } else {
-          drawPlaceholder(imgX, imgY, imgW, imgH);
+          drawMonogramPlaceholder(imgX, imgY, imgW, imgH);
         }
 
-        // Content Layout (Right Column)
-        let textY = itemY + 15;
-        const textX = 185;
-        const textWidth = 355;
+        // 2. Product Name (Lora-Bold)
+        doc.fillColor('#2b1d14').font('Lora-Bold').fontSize(9.5);
+        doc.text(p.name, cardX + 12, rowY + 130, { width: colWidth - 24, height: 26, ellipsis: true });
 
-        // Product Name
-        doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(13);
-        doc.text(p.name, textX, textY, { width: textWidth });
-        textY += doc.heightOfString(p.name, { width: textWidth }) + 3;
-
-        // SKU / Category Info
-        doc.fillColor('#64748b').font('Helvetica-Bold').fontSize(7.5);
-        const skuCatString = `SKU: ${p.sku || 'N/A'}    |    CATEGORY: ${category.toUpperCase()}`;
-        doc.text(skuCatString, textX, textY, { characterSpacing: 1.0 });
-        textY += doc.heightOfString(skuCatString, { width: textWidth }) + 6;
-
-        // Description
-        doc.fillColor('#334155').font('Helvetica').fontSize(9);
-        doc.text(descText, textX, textY, { width: textWidth, lineGap: 1 });
-        textY += doc.heightOfString(descText, { width: textWidth, lineGap: 1 }) + 8;
-
-        // Ingredients
-        if (ingText) {
-          doc.fillColor('#475569').font('Helvetica-Bold').fontSize(8);
-          doc.text('INGREDIENTS: ', textX, textY, { continued: true });
-          doc.font('Helvetica').fillColor('#64748b').text(ingText, { width: textWidth - 80 });
-          textY += doc.heightOfString(`INGREDIENTS: ${ingText}`, { width: textWidth }) + 6;
-        }
-
-        // Barcode
-        if (p.barcode) {
-          doc.fillColor('#94a3b8').font('Helvetica').fontSize(7.5).text(`Barcode: ${p.barcode}`, textX, textY);
-          textY += doc.heightOfString(`Barcode: ${p.barcode}`, { width: textWidth }) + 6;
-        }
-
-        // Bottom Badge & Pricing Row
-        const bottomContentY = itemY + boxHeight - 30;
-
-        // Pack Size Badge
+        // 3. SKU / Pack Info
+        doc.fillColor('#8c7e75').font('Helvetica').fontSize(7.5);
+        const skuText = p.sku ? `SKU: ${p.sku}` : 'SKU: -';
         const packText = p.packSize ? `Pack: ${p.packSize}` : `Unit: 1 ${p.unit || 'pcs'}`;
-        
-        doc.save();
-        doc.fillColor(brandColor).fillOpacity(0.06);
-        doc.rect(textX, bottomContentY, 110, 16, { rx: 3 }).fill();
-        doc.restore();
-        
-        doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(7.5).text(packText, textX + 5, bottomContentY + 4, { width: 100, align: 'center' });
+        doc.text(`${skuText}   |   ${packText}`, cardX + 12, rowY + 160, { width: colWidth - 24, ellipsis: true });
 
-        // Prices Block
+        // Hairline separator before pricing
+        doc.save();
+        doc.strokeColor('#e6dfd5').lineWidth(0.5).moveTo(cardX + 12, rowY + 174).lineTo(cardX + colWidth - 12, rowY + 174).stroke();
+        doc.restore();
+
+        // 4. Prices
         if (pricingType !== 'hide') {
           let priceToShow = p.sellingPrice;
           let tierName = 'Retail Price';
 
           if (pricingType === 'distributor') {
             priceToShow = Number(p.wholesalePrice) > 0 ? p.wholesalePrice : (Number(p.yellowPrice) > 0 ? p.yellowPrice : p.sellingPrice);
-            tierName = 'Distributor Price';
+            tierName = 'Distr. Price';
           } else if (pricingType === 'super_stockist') {
             priceToShow = Number(p.greenPrice) > 0 ? p.greenPrice : p.sellingPrice;
             tierName = 'Stockist Price';
           }
 
-          doc.fillColor('#64748b').font('Helvetica').fontSize(8.5).text(`MRP: Rs. ${Number(p.mrp || p.sellingPrice).toFixed(2)}`, textX + 130, bottomContentY + 3);
-          doc.fillColor(brandColor).font('Helvetica-Bold').fontSize(10).text(`${tierName}: Rs. ${Number(priceToShow).toFixed(2)}`, textX + 220, bottomContentY + 2, { align: 'right', width: textWidth - 220 });
+          doc.fillColor('#8c7e75').font('Helvetica').fontSize(7.5).text(`MRP: Rs. ${Number(p.mrp || p.sellingPrice).toFixed(2)}`, cardX + 12, rowY + 184);
+          doc.fillColor('#2b1d14').font('Lora-Bold').fontSize(9.5).text(`Rs. ${Number(priceToShow).toFixed(2)}`, cardX + 120, rowY + 181, { align: 'right', width: colWidth - 132 });
+          doc.fillColor('#c9a25d').font('Helvetica-Bold').fontSize(6.5).text(tierName.toUpperCase(), cardX + 120, rowY + 194, { align: 'right', width: colWidth - 132, characterSpacing: 0.5 });
+        } else {
+          doc.fillColor('#8fa383').font('Helvetica-Bold').fontSize(7.5).text('PRODUCT PROFILE', cardX + 12, rowY + 184);
+          doc.fillColor('#c9a25d').font('Lora-Bold').fontSize(8.5).text('Details on Request', cardX + 120, rowY + 183, { align: 'right', width: colWidth - 132 });
         }
 
-        doc.restore();
-        itemY += boxHeight + 15;
+        // Advance layout coordinate parameters
+        colIndex++;
+        if (colIndex === 2) {
+          colIndex = 0;
+          rowY = rowY + cardHeight + gutterY;
+        }
+
+        // Check if next row will exceed vertical page threshold
+        if (rowY + cardHeight > 780 && i < sortedProducts.length - 1) {
+          pageNumber++;
+          doc.addPage();
+          doc.save();
+          doc.fillColor('#fffdf9').rect(0, 0, 595, 842).fill();
+          doc.restore();
+          drawHeaderFooter(pageNumber);
+          rowY = 80;
+          colIndex = 0;
+        }
       }
 
       // Finish document
@@ -337,6 +359,7 @@ exports.buildPdfCatalog = async (products, settings, pricingType = 'retail') => 
     }
   });
 };
+
 
 // Generates WhatsApp-friendly SVG Catalog Image
 exports.buildSvgCatalog = async (product, settings, format = '1080x1080', pricingType = 'retail') => {
