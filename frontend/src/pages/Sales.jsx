@@ -1295,7 +1295,10 @@ export default function Sales() {
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             width: '100%',
             maxWidth: '480px',
+            maxHeight: '90vh',
             border: '1px solid #e2e8f0',
+            display: 'flex',
+            flexDirection: 'column',
             overflow: 'hidden'
           }}>
             {/* Header */}
@@ -1305,7 +1308,8 @@ export default function Sales() {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              background: '#f8fafc'
+              background: '#f8fafc',
+              flexShrink: 0
             }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 🔧 Invoice Repair Tool Report
@@ -1320,12 +1324,12 @@ export default function Sales() {
             </div>
 
             {/* Body */}
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', overflowY: 'auto', minHeight: 0, flex: 1 }}>
               <p style={{ margin: 0, fontSize: '0.875rem', color: '#475569', lineHeight: '1.5' }}>
                 Reconciliation complete. All invoice outstanding balances and statuses have been corrected using actual payment records.
               </p>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', flexShrink: 0 }}>
                 <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                   <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.25rem' }}>Scanned</span>
                   <strong style={{ fontSize: '1.35rem', color: '#0f172a', fontWeight: 800 }}>{repairReport.scanned}</strong>
@@ -1344,7 +1348,7 @@ export default function Sales() {
                 type="button" 
                 className="btn btn-primary" 
                 onClick={() => setRepairReport(null)}
-                style={{ width: '100%', padding: '0.6rem', fontWeight: 750, borderRadius: '8px', fontSize: '0.9rem', marginTop: '0.25rem' }}
+                style={{ width: '100%', padding: '0.6rem', fontWeight: 750, borderRadius: '8px', fontSize: '0.9rem', marginTop: '0.25rem', flexShrink: 0 }}
               >
                 Close Report
               </button>

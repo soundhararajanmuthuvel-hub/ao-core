@@ -44,6 +44,9 @@ const Invoice = sequelize.define('Invoice', {
     type: DataTypes.ENUM('paid', 'partial', 'pending', 'unpaid', 'overdue'),
     defaultValue: 'unpaid',
   },
+  // REGRESSION NOTE: Do NOT rename this field to paidAmount or duplicate it without updating 
+  // all references in backend/controllers/aiController.js, salesController.js, etc.
+  // amountPaid is the single source of truth for the paid portion of the invoice.
   amountPaid: {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0,

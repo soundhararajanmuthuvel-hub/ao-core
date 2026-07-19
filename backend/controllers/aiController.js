@@ -1031,7 +1031,7 @@ exports.getDashboardSuggestions = async (req, res, next) => {
 
     // Pending collections list
     const pendingCollections = unpaidInvoices.map(inv => {
-      const remaining = Number(inv.grandTotal - (inv.paidAmount || 0));
+      const remaining = Number(inv.grandTotal - (inv.amountPaid || 0));
       return `Outstanding balance of ₹${remaining.toLocaleString('en-IN')} pending for Invoice #${inv.invoiceNumber}`;
     }).slice(0, 3);
 

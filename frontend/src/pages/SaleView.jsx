@@ -1689,6 +1689,7 @@ export default function SaleView() {
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
             width: '100%',
             maxWidth: '500px',
+            maxHeight: '90vh',
             border: '1px solid #e2e8f0',
             display: 'flex',
             flexDirection: 'column',
@@ -1701,7 +1702,8 @@ export default function SaleView() {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              background: '#f8fafc'
+              background: '#f8fafc',
+              flexShrink: 0
             }}>
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
                 💳 Record Payment
@@ -1716,8 +1718,8 @@ export default function SaleView() {
             </div>
 
             {/* Modal Body / Form */}
-            <form onSubmit={handleSavePayment}>
-              <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <form onSubmit={handleSavePayment} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto', minHeight: 0, flex: 1 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.85rem', color: '#475569', backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px' }}>
                   <div><strong>Invoice:</strong> {sale.invoiceNumber}</div>
                   <div><strong>Customer:</strong> {sale.customer?.name}</div>
@@ -1782,7 +1784,8 @@ export default function SaleView() {
                 display: 'flex',
                 justifyContent: 'flex-end',
                 gap: '0.75rem',
-                background: '#f8fafc'
+                background: '#f8fafc',
+                flexShrink: 0
               }}>
                 <button 
                   type="button" 
@@ -1826,6 +1829,7 @@ export default function SaleView() {
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
             width: '100%',
             maxWidth: '520px',
+            maxHeight: '90vh',
             border: '1px solid #e2e8f0',
             display: 'flex',
             flexDirection: 'column',
@@ -1838,7 +1842,8 @@ export default function SaleView() {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              background: '#f8fafc'
+              background: '#f8fafc',
+              flexShrink: 0
             }}>
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
                 💬 Send WhatsApp Notification
@@ -1853,7 +1858,7 @@ export default function SaleView() {
             </div>
 
             {/* Modal Body */}
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto', minHeight: 0, flex: 1 }}>
               <div className="form-group">
                 <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Recipient Phone Number</label>
                 <input 
@@ -1911,7 +1916,8 @@ export default function SaleView() {
               display: 'flex',
               justifyContent: 'flex-end',
               gap: '0.75rem',
-              background: '#f8fafc'
+              background: '#f8fafc',
+              flexShrink: 0
             }}>
               <button 
                 type="button" 

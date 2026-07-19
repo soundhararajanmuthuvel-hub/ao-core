@@ -1539,7 +1539,7 @@ export default function SalesmanApp() {
       {/* Check Out outcome drawer modal */}
       {showCheckoutModal && activeVisit && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}>
-          <div style={{ width: '100%', maxWidth: '500px', margin: '0 auto', backgroundColor: 'var(--bg-card)', borderTopLeftRadius: '16px', borderTopRightRadius: '16px', padding: '1.25rem', boxShadow: 'var(--shadow-lg)', display: 'flex', flexDirection: 'column', gap: '0.75rem', maxH: '80vh', overflowY: 'auto' }}>
+          <div style={{ width: '100%', maxWidth: '500px', margin: '0 auto', backgroundColor: 'var(--bg-card)', borderTopLeftRadius: '16px', borderTopRightRadius: '16px', padding: '1.25rem', boxShadow: 'var(--shadow-lg)', display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '80vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800 }}>Visit Check-Out: {activeVisit.customer.name}</h3>
               <button type="button" onClick={() => setShowCheckoutModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: 'var(--text-secondary)' }}>✕</button>
@@ -1591,58 +1591,60 @@ export default function SalesmanApp() {
       {/* Quick Lead Modal */}
       {showLeadModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
-          <div style={{ width: '100%', maxWidth: '400px', backgroundColor: 'var(--bg-card)', borderRadius: '12px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ width: '100%', maxWidth: '400px', maxHeight: '90vh', backgroundColor: 'var(--bg-card)', borderRadius: '12px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800 }}>Capture Field SFA Lead</h3>
               <button type="button" onClick={() => setShowLeadModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: 'var(--text-secondary)' }}>✕</button>
             </div>
 
-            <form onSubmit={handleCreateLead} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label>Shop / Outlet Name *</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  required 
-                  placeholder="e.g. Murugan Stores"
-                  value={leadForm.shopName}
-                  onChange={(e) => setLeadForm({ ...leadForm, shopName: e.target.value })}
-                />
-              </div>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label>Mobile Number *</label>
-                <input 
-                  type="tel" 
-                  className="form-control" 
-                  required 
-                  placeholder="10 digit number"
-                  value={leadForm.mobileNumber}
-                  onChange={(e) => setLeadForm({ ...leadForm, mobileNumber: e.target.value })}
-                />
-              </div>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label>Outlet Type *</label>
-                <select className="form-control" value={leadForm.customerType} onChange={(e) => setLeadForm({ ...leadForm, customerType: e.target.value })}>
-                  <option value="Retail Shop">Retail Shop</option>
-                  <option value="Super Market">Super Market</option>
-                  <option value="Organic Store">Organic Store</option>
-                  <option value="Medical">Medical</option>
-                  <option value="Distributor">Distributor</option>
-                  <option value="Wholesaler">Wholesaler</option>
-                </select>
-              </div>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label>Billing Address - Optional</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  placeholder="City / Area"
-                  value={leadForm.address}
-                  onChange={(e) => setLeadForm({ ...leadForm, address: e.target.value })}
-                />
+            <form onSubmit={handleCreateLead} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto', minHeight: 0, flex: 1 }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Shop / Outlet Name *</label>
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    required 
+                    placeholder="e.g. Murugan Stores"
+                    value={leadForm.shopName}
+                    onChange={(e) => setLeadForm({ ...leadForm, shopName: e.target.value })}
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Mobile Number *</label>
+                  <input 
+                    type="tel" 
+                    className="form-control" 
+                    required 
+                    placeholder="10 digit number"
+                    value={leadForm.mobileNumber}
+                    onChange={(e) => setLeadForm({ ...leadForm, mobileNumber: e.target.value })}
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Outlet Type *</label>
+                  <select className="form-control" value={leadForm.customerType} onChange={(e) => setLeadForm({ ...leadForm, customerType: e.target.value })}>
+                    <option value="Retail Shop">Retail Shop</option>
+                    <option value="Super Market">Super Market</option>
+                    <option value="Organic Store">Organic Store</option>
+                    <option value="Medical">Medical</option>
+                    <option value="Distributor">Distributor</option>
+                    <option value="Wholesaler">Wholesaler</option>
+                  </select>
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Billing Address - Optional</label>
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    placeholder="City / Area"
+                    value={leadForm.address}
+                    onChange={(e) => setLeadForm({ ...leadForm, address: e.target.value })}
+                  />
+                </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexShrink: 0 }}>
                 <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowLeadModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Save Lead (10s)</button>
               </div>
@@ -1654,64 +1656,66 @@ export default function SalesmanApp() {
       {/* Quick Customer Modal */}
       {showCustModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
-          <div style={{ width: '100%', maxWidth: '400px', backgroundColor: 'var(--bg-card)', borderRadius: '12px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ width: '100%', maxWidth: '400px', maxHeight: '90vh', backgroundColor: 'var(--bg-card)', borderRadius: '12px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800 }}>Quick Customer Enrollment</h3>
               <button type="button" onClick={() => setShowCustModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: 'var(--text-secondary)' }}>✕</button>
             </div>
 
-            <form onSubmit={handleCreateCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label>Shop / Customer Name *</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  required 
-                  placeholder="e.g. Sri Balaji Organics"
-                  value={custForm.name}
-                  onChange={(e) => setCustForm({ ...custForm, name: e.target.value })}
-                />
-              </div>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label>Mobile Number *</label>
-                <input 
-                  type="tel" 
-                  className="form-control" 
-                  required 
-                  placeholder="10 digit number"
-                  value={custForm.phone}
-                  onChange={(e) => setCustForm({ ...custForm, phone: e.target.value })}
-                />
-              </div>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label>Customer Type *</label>
-                <select className="form-control" value={custForm.customerType} onChange={(e) => setCustForm({ ...custForm, customerType: e.target.value })}>
-                  <option value="Retail Shop">Retail Shop</option>
-                  <option value="Super Market">Super Market</option>
-                  <option value="Organic Store">Organic Store</option>
-                  <option value="Medical">Medical</option>
-                  <option value="Distributor">Distributor</option>
-                </select>
+            <form onSubmit={handleCreateCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto', minHeight: 0, flex: 1 }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Shop / Customer Name *</label>
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    required 
+                    placeholder="e.g. Sri Balaji Organics"
+                    value={custForm.name}
+                    onChange={(e) => setCustForm({ ...custForm, name: e.target.value })}
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Mobile Number *</label>
+                  <input 
+                    type="tel" 
+                    className="form-control" 
+                    required 
+                    placeholder="10 digit number"
+                    value={custForm.phone}
+                    onChange={(e) => setCustForm({ ...custForm, phone: e.target.value })}
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Customer Type *</label>
+                  <select className="form-control" value={custForm.customerType} onChange={(e) => setCustForm({ ...custForm, customerType: e.target.value })}>
+                    <option value="Retail Shop">Retail Shop</option>
+                    <option value="Super Market">Super Market</option>
+                    <option value="Organic Store">Organic Store</option>
+                    <option value="Medical">Medical</option>
+                    <option value="Distributor">Distributor</option>
+                  </select>
+                </div>
+
+                {gpsCoords ? (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--success)', padding: '6px', background: 'rgba(34,197,94,0.1)', borderRadius: '6px', flexShrink: 0 }}>
+                    🎯 Coords bound: {gpsCoords.latitude.toFixed(5)}, {gpsCoords.longitude.toFixed(5)} (Address geocoded automatically on save)
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', flexShrink: 0 }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Lat</label>
+                      <input type="text" className="form-control" placeholder="11.01" value={custForm.latitude} onChange={(e) => setCustForm({ ...custForm, latitude: e.target.value })} />
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Lng</label>
+                      <input type="text" className="form-control" placeholder="76.96" value={custForm.longitude} onChange={(e) => setCustForm({ ...custForm, longitude: e.target.value })} />
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {gpsCoords ? (
-                <div style={{ fontSize: '0.75rem', color: 'var(--success)', padding: '6px', background: 'rgba(34,197,94,0.1)', borderRadius: '6px' }}>
-                  🎯 Coords bound: {gpsCoords.latitude.toFixed(5)}, {gpsCoords.longitude.toFixed(5)} (Address geocoded automatically on save)
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label>Lat</label>
-                    <input type="text" className="form-control" placeholder="11.01" value={custForm.latitude} onChange={(e) => setCustForm({ ...custForm, latitude: e.target.value })} />
-                  </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label>Lng</label>
-                    <input type="text" className="form-control" placeholder="76.96" value={custForm.longitude} onChange={(e) => setCustForm({ ...custForm, longitude: e.target.value })} />
-                  </div>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexShrink: 0 }}>
                 <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowCustModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn-success" style={{ flex: 1 }}>Enroll Instantly</button>
               </div>
