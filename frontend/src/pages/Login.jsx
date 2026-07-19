@@ -78,15 +78,15 @@ export default function Login() {
               alt="AO Core Logo"
               className="brand-logo-top"
             />
-            <span className="brand-logo-text-top">AO CORE ERP</span>
+            <span className="brand-logo-text-top">AO AURUM</span>
           </div>
 
           {/* Hero Typography with Spotlight */}
           <div className="left-panel-hero">
             <h1 className="giant-brand-title">
-              <span className="brand-ao-gradient">AO</span> <span className="brand-white-title">CORE ERP</span>
+              <span className="brand-ao-gradient">AO</span> <span className="brand-white-title">AURUM</span>
             </h1>
-            <h3 className="hero-subtitle-primary">Manufacturing ERP For Modern Businesses</h3>
+            <h3 className="hero-subtitle-primary">Quiet Luxury Enterprise Suite</h3>
             <p className="hero-subtitle-detail">
               Control Production, Inventory, GST, Sales, Logistics & Analytics from a single platform.
             </p>
@@ -140,7 +140,7 @@ export default function Login() {
                     alt="Logo"
                     className="mobile-logo"
                   />
-                <h3>AO CORE ERP</h3>
+                <h3>AO AURUM</h3>
               </div>
               
               <h2>Welcome Back</h2>
@@ -238,7 +238,7 @@ export default function Login() {
                     Authenticating...
                   </span>
                 ) : (
-                  "Login to AO Core"
+                  "Login to AO Aurum"
                 )}
               </button>
             </form>
@@ -246,7 +246,7 @@ export default function Login() {
           
           {/* Footer */}
           <footer className="login-footer">
-            <p className="footer-copyright">AO Core ERP • Version 1.0</p>
+            <p className="footer-copyright">AO Aurum • Version 1.0</p>
             <p className="footer-powered">Powered by Amudhasurabiy Technologies</p>
           </footer>
         </div>
