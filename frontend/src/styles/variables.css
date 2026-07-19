@@ -1,24 +1,24 @@
 :root {
-  --brand-primary: #5a2d0c;
-  --brand-primary-hover: #401e07;
-  --bg-page: #fcfaf7;
-  --bg-card: #ffffff;
+  --brand-primary: #2b1d14;
+  --brand-primary-hover: #1c120c;
+  --bg-page: #fff9ef;
+  --bg-card: #f3ede4;
   --bg-sidebar: #2b1d14;
   --text-primary: #2b1d14;
   --text-secondary: #5c4d44;
   --text-muted: #8c7b72;
-  --border: #e6dfd8;
+  --border: rgba(201, 162, 93, 0.3);
   --shadow: 0 2px 8px rgba(43, 29, 20, 0.08);
   --shadow-lg: 0 12px 30px rgba(43, 29, 20, 0.12);
-  --radius: 8px;
+  --radius: 4px;
   --sidebar-width: 260px;
   --header-height: 64px;
-  --success: #526c48;
-  --warning: #b38224;
-  --danger: #b0382e;
+  --success: #8fa383;
+  --warning: #c9a25d;
+  --danger: #ba1a1a;
   --info: #7a8d6f;
   --font-headline: 'Playfair Display', Georgia, serif;
-  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-body: 'Fira Sans', system-ui, -apple-system, sans-serif;
 }
 
 [data-theme='dark'] {
