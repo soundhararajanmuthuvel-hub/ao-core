@@ -1711,3 +1711,110 @@ exports.updateSale = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.updatePayment = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { amount, paymentMethod, referenceNumber, allocations, paymentDate } = req.body;
+
+    const Payment = require('../models/Payment');
+    const payment = await Payment.findByPk(id, { transaction: t });
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+
+    if (payment.status !== 'Success') {
+      return res.status(400).json({ message: 'Cannot edit a payment that is not in Success status' });
+    }
+
+    let totalAllocated = 0;
+    if (allocations && allocations.length) {
+      for (const alloc of allocations) {
+        totalAllocated += Number(alloc.amount || 0);
+      }
+    } else {
+      totalAllocated = Number(amount || payment.amount || 0);
+    }
+
+    payment.amount = totalAllocated;
+    if (paymentMethod) payment.paymentMethod = paymentMethod;
+    if (referenceNumber !== undefined) payment.referenceNumber = referenceNumber;
+    if (allocations) payment.allocations = allocations;
+    if (paymentDate) payment.date = new Date(paymentDate);
+
+    await payment.save({ transaction: t });
+
+    await t.commit();
+
+    // Call reconcileInvoicesHelper to recalculate all invoices and customer balance
+    await exports.reconcileInvoicesHelper(payment.customerId);
+
+    // Fetch the updated customer record to get correct balance/outstanding count
+    const customerRecord = await Customer.findByPk(payment.customerId);
+
+    // Log activity
+    await logActivity(
+      req.user.id,
+      'update',
+      'payments',
+      payment.id,
+      `Updated payment ${payment.paymentNumber} of amount ₹${totalAllocated.toFixed(2)}`
+    );
+
+    res.json({
+      message: 'Payment updated and reconciled successfully',
+      outstandingBalance: customerRecord ? customerRecord.balance : 0,
+      invoiceOutstandingCount: customerRecord ? customerRecord.invoiceOutstandingCount : 0
+    });
+  } catch (err) {
+    await t.rollback();
+    next(err);
+  }
+};
+
+exports.deletePayment = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+
+    const Payment = require('../models/Payment');
+    const payment = await Payment.findByPk(id, { transaction: t });
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+
+    if (payment.status !== 'Success') {
+      return res.status(400).json({ message: 'Payment is already cancelled' });
+    }
+
+    payment.status = 'Cancelled';
+    await payment.save({ transaction: t });
+
+    await t.commit();
+
+    // Reconcile invoices and customer balance (it will exclude the cancelled payment)
+    await exports.reconcileInvoicesHelper(payment.customerId);
+
+    // Fetch the updated customer record
+    const customerRecord = await Customer.findByPk(payment.customerId);
+
+    // Log activity
+    await logActivity(
+      req.user.id,
+      'delete',
+      'payments',
+      payment.id,
+      `Cancelled payment ${payment.paymentNumber}`
+    );
+
+    res.json({
+      message: 'Payment cancelled and reconciled successfully',
+      outstandingBalance: customerRecord ? customerRecord.balance : 0,
+      invoiceOutstandingCount: customerRecord ? customerRecord.invoiceOutstandingCount : 0
+    });
+  } catch (err) {
+    await t.rollback();
+    next(err);
+  }
+};

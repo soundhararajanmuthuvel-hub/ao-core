@@ -12,6 +12,8 @@ const {
   getPayments,
   repairInvoiceStatus,
   updateSale,
+  updatePayment,
+  deletePayment,
 } = require('../controllers/salesController');
 
 router.use(auth);
@@ -20,6 +22,8 @@ router.post('/reconcile', repairInvoiceStatus);
 router.get('/outstanding', getOutstandingInvoices);
 router.get('/payments', getPayments);
 router.post('/payment', recordPayment);
+router.put('/payment/:id', updatePayment);
+router.delete('/payment/:id', deletePayment);
 router.get('/:id', getSale);
 router.get('/:id/whatsapp-reminder', getWhatsAppReminder);
 router.post('/', createSale);

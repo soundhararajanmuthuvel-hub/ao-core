@@ -69,6 +69,8 @@ export const salesApi = {
   listPayments: (params) => client.get('/sales/payments', { params }),
   reconcile: () => client.post('/sales/reconcile'),
   update: (id, data) => client.put(`/sales/${id}`, data),
+  updatePayment: (id, data) => client.put(`/sales/payment/${id}`, data),
+  deletePayment: (id) => client.delete(`/sales/payment/${id}`),
 };
 
 export const purchasesApi = {

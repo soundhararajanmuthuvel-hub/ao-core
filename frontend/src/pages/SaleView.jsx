@@ -59,6 +59,13 @@ export default function SaleView() {
   const [payMethod, setPayMethod] = useState('upi');
   const [payRefNumber, setPayRefNumber] = useState('');
 
+  // Payment edit state
+  const [editingPayment, setEditingPayment] = useState(null);
+  const [payEditAmount, setPayEditAmount] = useState(0);
+  const [payEditDate, setPayEditDate] = useState('');
+  const [payEditMethod, setPayEditMethod] = useState('upi');
+  const [payEditRefNumber, setPayEditRefNumber] = useState('');
+
   // WhatsApp dispatch modal state
   const [waModalOpen, setWaModalOpen] = useState(false);
   const [waPhone, setWaPhone] = useState('');
@@ -273,6 +280,89 @@ export default function SaleView() {
     } catch (err) {
       console.error(err);
       toast(err.response?.data?.message || 'Failed to record payment', 'error');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const handleStartEditPayment = (payment) => {
+    setEditingPayment(payment);
+    setPayEditAmount(getInvoiceAllocatedAmount(payment));
+    setPayEditDate(new Date(payment.date).toISOString().split('T')[0]);
+    setPayEditMethod(payment.paymentMethod || 'upi');
+    setPayEditRefNumber(payment.referenceNumber || '');
+  };
+
+  const handleUpdatePayment = async (e) => {
+    e.preventDefault();
+    if (payEditAmount <= 0) {
+      toast('Payment amount must be greater than zero', 'error');
+      return;
+    }
+
+    setBusy('saving-payment');
+    try {
+      // Find the specific allocation for this invoice to update its amount
+      let allocs = [];
+      if (typeof editingPayment.allocations === 'string') {
+        try { allocs = JSON.parse(editingPayment.allocations); } catch (e) {}
+      } else if (Array.isArray(editingPayment.allocations)) {
+        allocs = editingPayment.allocations;
+      }
+      
+      const newAllocs = allocs.map(alloc => {
+        if (String(alloc.invoiceId) === String(sale.id || id)) {
+          return { ...alloc, amount: parseFloat(payEditAmount) };
+        }
+        return alloc;
+      });
+
+      await salesApi.updatePayment(editingPayment.id, {
+        amount: parseFloat(payEditAmount),
+        paymentMethod: payEditMethod,
+        referenceNumber: payEditRefNumber || null,
+        paymentDate: payEditDate,
+        allocations: newAllocs
+      });
+
+      toast('Payment updated successfully', 'success');
+      setEditingPayment(null);
+
+      // Reload sale details and payment history
+      const { data } = await salesApi.get(id);
+      setSale(data.sale);
+      setSettings(data.settings);
+      if (data.sale?.customerId || data.sale?.customer?.id) {
+        loadPaymentHistory(data.sale.customerId || data.sale.customer?.id);
+      }
+    } catch (err) {
+      console.error(err);
+      toast(err.response?.data?.message || 'Failed to update payment', 'error');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const handleDeletePayment = async (paymentId) => {
+    if (!window.confirm('Are you sure you want to cancel this payment? This action cannot be undone.')) {
+      return;
+    }
+
+    setBusy('deleting-payment');
+    try {
+      await salesApi.deletePayment(paymentId);
+      toast('Payment cancelled successfully', 'success');
+
+      // Reload sale details and payment history
+      const { data } = await salesApi.get(id);
+      setSale(data.sale);
+      setSettings(data.settings);
+      if (data.sale?.customerId || data.sale?.customer?.id) {
+        loadPaymentHistory(data.sale.customerId || data.sale.customer?.id);
+      }
+    } catch (err) {
+      console.error(err);
+      toast(err.response?.data?.message || 'Failed to delete payment', 'error');
     } finally {
       setBusy('');
     }
@@ -1101,6 +1191,7 @@ export default function SaleView() {
                         <th>Method</th>
                         <th>Reference No</th>
                         <th style={{ textAlign: 'right' }}>Amount Paid</th>
+                        <th style={{ textAlign: 'center' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1112,6 +1203,28 @@ export default function SaleView() {
                           <td>{p.referenceNumber || 'N/A'}</td>
                           <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#16a34a' }}>
                             ₹{getInvoiceAllocatedAmount(p).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                              <button 
+                                type="button" 
+                                onClick={() => handleStartEditPayment(p)} 
+                                className="btn btn-secondary btn-sm" 
+                                style={{ padding: '0.2rem 0.4rem', minWidth: 'auto', border: 'none', background: 'transparent' }}
+                                title="Edit Payment"
+                              >
+                                ✏️
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={() => handleDeletePayment(p.id)} 
+                                className="btn btn-danger btn-sm" 
+                                style={{ padding: '0.2rem 0.4rem', minWidth: 'auto', border: 'none', background: 'transparent' }}
+                                title="Cancel Payment"
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1806,6 +1919,141 @@ export default function SaleView() {
               </div>
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {editingPayment && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{
+            width: '100%',
+            maxWidth: '500px',
+            maxHeight: '90vh',
+            border: '1px solid #e2e8f0',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid #f1f5f9',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#f8fafc',
+              flexShrink: 0
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                ✏️ Edit Payment ({editingPayment.paymentNumber})
+              </h2>
+              <button 
+                type="button" 
+                onClick={() => setEditingPayment(null)}
+                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body / Form */}
+            <form onSubmit={handleUpdatePayment} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto', minHeight: 0, flex: 1 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.85rem', color: '#475569', backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px' }}>
+                  <div><strong>Invoice:</strong> {sale.invoiceNumber}</div>
+                  <div><strong>Customer:</strong> {sale.customer?.name}</div>
+                  <div><strong>Total Amount:</strong> ₹{Number(sale.grandTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Payment Amount (₹)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    className="form-control" 
+                    value={payEditAmount} 
+                    onChange={(e) => setPayEditAmount(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Payment Date</label>
+                  <input 
+                    type="date" 
+                    className="form-control" 
+                    value={payEditDate} 
+                    onChange={(e) => setPayEditDate(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Payment Method</label>
+                  <select 
+                    className="form-control" 
+                    value={payEditMethod} 
+                    onChange={(e) => setPayEditMethod(e.target.value)}
+                    required
+                  >
+                    <option value="cash">CASH</option>
+                    <option value="upi">UPI / GPAY / PHONEPE</option>
+                    <option value="bank">BANK TRANSFER</option>
+                    <option value="card">CREDIT/DEBIT CARD</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontWeight: 650, fontSize: '0.85rem' }}>Reference / Transaction No</label>
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    placeholder="Optional reference number"
+                    value={payEditRefNumber} 
+                    onChange={(e) => setPayEditRefNumber(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer Actions */}
+              <div style={{
+                padding: '1rem 1.5rem',
+                borderTop: '1px solid #f1f5f9',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '0.75rem',
+                background: '#f8fafc',
+                flexShrink: 0
+              }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => setEditingPayment(null)}
+                  disabled={busy === 'saving-payment'}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-success" 
+                  style={{ backgroundColor: '#10b981', borderColor: '#10b981', color: '#ffffff', minWidth: '120px', fontWeight: 650 }}
+                  disabled={busy === 'saving-payment'}
+                >
+                  {busy === 'saving-payment' ? 'Updating...' : 'Update Payment'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

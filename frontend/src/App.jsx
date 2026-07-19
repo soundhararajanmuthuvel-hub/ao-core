@@ -27,7 +27,7 @@ export default function App() {
               )}
             </div>
           </div>
-          <h1 className="splash-brand-title">{companyName ? companyName.toUpperCase() : 'AO AURUM'}</h1>
+          <h1 className="splash-brand-title">{companyName ? companyName.toUpperCase() : 'AO Core ERP'}</h1>
           <p className="splash-brand-subtitle">MANAGE BLOVIT MALTS</p>
           <div className="splash-loader-bar">
             <div className="splash-loader-progress"></div>
