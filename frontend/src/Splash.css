@@ -22,8 +22,8 @@
 }
 
 .splash-logo-outer {
-  width: 96px;
-  height: 96px;
+  width: 240px;
+  height: 240px;
   border-radius: 50%;
   border: 1px solid rgba(201, 162, 93, 0.3); /* Antique Gold Hairline */
   display: flex;
@@ -35,8 +35,8 @@
 }
 
 .splash-logo-inner {
-  width: 76px;
-  height: 76px;
+  width: 190px;
+  height: 190px;
   border-radius: 50%;
   background-color: #2b1d14; /* Espresso */
   display: flex;
@@ -50,8 +50,8 @@
 }
 
 .splash-logo-img {
-  width: 52px;
-  height: 52px;
+  width: 170px;
+  height: 170px;
   object-fit: contain;
   border-radius: 4px;
 }
