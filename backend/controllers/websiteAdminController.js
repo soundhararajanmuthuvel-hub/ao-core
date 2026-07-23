@@ -872,6 +872,8 @@ const getAdminAnalytics = async (req, res) => {
     console.error('Error fetching admin analytics:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch analytics' });
   }
+};
+
 const generateProductAIContent = async (req, res) => {
   try {
     const { callGemini } = require('./aiController');
