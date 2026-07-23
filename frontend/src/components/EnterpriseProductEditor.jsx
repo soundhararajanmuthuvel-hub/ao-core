@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import client from '../api/client';
 import { resolveAssetUrl } from '../utils/url';
+import ErrorBoundary from './ErrorBoundary';
 
 export default function EnterpriseProductEditor({
   product = null,
@@ -191,6 +192,40 @@ export default function EnterpriseProductEditor({
       executeUpload(lastFailedFiles);
     }
   };
+
+  // Single Source of Truth - Derived Computed Values
+  const calculatedDiscount = useMemo(() => {
+    const p = parseFloat(formData.price) || 0;
+    const mrp = parseFloat(formData.mrp) || parseFloat(formData.compareAtPrice) || 0;
+    if (mrp > p && mrp > 0) {
+      return Math.round(((mrp - p) / mrp) * 100);
+    }
+    return 0;
+  }, [formData.price, formData.mrp, formData.compareAtPrice]);
+
+  const stockStatus = useMemo(() => {
+    const s = parseInt(formData.stock, 10) || 0;
+    if (s <= 0) return { label: 'Out of Stock', color: '#EF4444', badge: 'badge-danger' };
+    if (s <= (formData.lowStockThreshold || 10)) return { label: 'Low Stock', color: '#F59E0B', badge: 'badge-warning' };
+    return { label: 'In Stock', color: '#10B981', badge: 'badge-success' };
+  }, [formData.stock, formData.lowStockThreshold]);
+
+  const seoScore = useMemo(() => {
+    let score = 0;
+    if (formData.metaTitle && formData.metaTitle.length >= 30 && formData.metaTitle.length <= 60) score += 40;
+    else if (formData.metaTitle) score += 20;
+    if (formData.metaDescription && formData.metaDescription.length >= 70 && formData.metaDescription.length <= 160) score += 40;
+    else if (formData.metaDescription) score += 20;
+    if (formData.keywords) score += 20;
+    return score;
+  }, [formData.metaTitle, formData.metaDescription, formData.keywords]);
+
+  const previewImage = useMemo(() => {
+    if (formData.images && formData.images.length > 0 && formData.images[0]) {
+      return resolveAssetUrl(formData.images[0]);
+    }
+    return null;
+  }, [formData.images]);
 
   // AI Assistant One-Click Generator
   const triggerAiGenerator = async (field) => {
@@ -453,8 +488,8 @@ export default function EnterpriseProductEditor({
         
         {/* LEFT COLUMN (70%) - PRODUCT CONTENT & CONFIGURATION */}
         <div style={{ overflowY: 'auto', padding: '1.5rem 2rem 5rem 2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          
-          {/* GENERAL PRODUCT INFORMATION CARD */}
+          <ErrorBoundary>
+            {/* GENERAL PRODUCT INFORMATION CARD */}
           <div style={{ background: '#FFF', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Box size={18} color="#0284C7" /> General Information
@@ -802,12 +837,13 @@ export default function EnterpriseProductEditor({
               </div>
             </div>
           </div>
-        </div>
+        </ErrorBoundary>
+      </div>
 
         {/* RIGHT COLUMN (30%) - CLOUDINARY MEDIA MANAGER & LIVE STOREFRONT PREVIEW */}
         <div style={{ borderLeft: '1px solid #E2E8F0', background: '#FFF', display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: '1.5rem' }}>
-          
-          {/* CLOUDINARY MEDIA MANAGER CARD */}
+          <ErrorBoundary>
+            {/* CLOUDINARY MEDIA MANAGER CARD */}
           <div style={{ marginBottom: '1.5rem', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '1rem', background: '#FAFAFA' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <h4 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -1022,7 +1058,8 @@ export default function EnterpriseProductEditor({
               </label>
             </div>
           </div>
-        </div>
+        </ErrorBoundary>
+      </div>
 
       </div>
     </div>
