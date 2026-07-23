@@ -121,79 +121,74 @@ export default function EnterpriseProductEditor({
   const [uploadingToCloudinary, setUploadingToCloudinary] = useState(false);
   const [selectedMediaItems, setSelectedMediaItems] = useState([]);
   const [customImageUrl, setCustomImageUrl] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadErrorMsg, setUploadErrorMsg] = useState('');
+  const [lastFailedFiles, setLastFailedFiles] = useState([]);
+  const [optimisticPreviews, setOptimisticPreviews] = useState([]);
 
-  // Auto-generate slug when name changes if slug hasn't been manually edited
-  useEffect(() => {
-    if (formData.name && !editingSlugManually) {
-      const generated = formData.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '');
-      setFormData((prev) => ({ ...prev, slug: generated }));
-    }
-  }, [formData.name]);
-
-  const [editingSlugManually, setEditingSlugManually] = useState(false);
-
-  // Auto-calculate discount percentage
-  const calculatedDiscount = useMemo(() => {
-    const p = parseFloat(formData.price) || 0;
-    const mrp = parseFloat(formData.mrp) || parseFloat(formData.compareAtPrice) || 0;
-    if (mrp > p && mrp > 0) {
-      return Math.round(((mrp - p) / mrp) * 100);
-    }
-    return 0;
-  }, [formData.price, formData.mrp, formData.compareAtPrice]);
-
-  // Fetch Cloudinary / Website Media Library
-  const loadMediaLibrary = async () => {
-    try {
-      const res = await client.get('/frontend/images');
-      if (res.data && res.data.data) {
-        setMediaLibrary(res.data.data);
-      }
-    } catch {
-      setMediaLibrary([
-        { id: '1', name: 'Sprouted Ragi Malt', url: 'https://demo.amudhasurabiy.com/images/products/sprouted-ragi-malt.webp', tags: ['ragi', 'malt'] },
-        { id: '2', name: 'Multi-Grain Drink', url: 'https://demo.amudhasurabiy.com/images/products/multi-grain-health-drink.webp', tags: ['multigrain'] },
-        { id: '3', name: 'Millet Energy Mix', url: 'https://demo.amudhasurabiy.com/images/products/millet-energy-mix.webp', tags: ['millet'] },
-      ]);
-    }
-  };
-
-  useEffect(() => {
-    loadMediaLibrary();
-  }, []);
-
-  // Direct File Upload to Cloudinary Stream API
-  const handleCloudinaryFileUpload = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
+  // Fully asynchronous File Upload with Progress Tracking & Error Recovery
+  const executeUpload = async (filesToUpload) => {
+    if (!filesToUpload || filesToUpload.length === 0) return;
 
     setUploadingToCloudinary(true);
+    setUploadProgress(0);
+    setUploadErrorMsg('');
     setMsg({ type: '', text: '' });
+
+    // Generate optimistic blob preview URLs
+    const tempPreviews = filesToUpload.map((f) => URL.createObjectURL(f));
+    setOptimisticPreviews(tempPreviews);
+
     const formDataUpload = new FormData();
-    files.forEach((f) => formDataUpload.append('images', f));
+    filesToUpload.forEach((f) => formDataUpload.append('images', f));
 
     try {
       const res = await client.post('/website-admin/upload-image', formDataUpload, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (progressEvent) => {
+          const total = progressEvent.total || progressEvent.loaded;
+          const percent = Math.round((progressEvent.loaded * 100) / total);
+          setUploadProgress(percent);
+        },
       });
 
       if (res.data.success && res.data.urls) {
         setFormData((prev) => ({
           ...prev,
           images: [...prev.images, ...res.data.urls],
+          imagePublicId: res.data.publicIds?.[0] || prev.imagePublicId,
         }));
         setIsDirty(true);
-        setMsg({ type: 'success', text: `Uploaded ${res.data.urls.length} file(s) to Cloudinary successfully!` });
+        setMsg({ type: 'success', text: `✨ ${res.data.urls.length} image(s) uploaded to Cloudinary CDN successfully!` });
+        setLastFailedFiles([]);
         loadMediaLibrary();
       }
     } catch (err) {
-      setMsg({ type: 'error', text: err.response?.data?.message || 'Cloudinary upload failed' });
+      console.error('[Async Upload Failure]', err);
+      const errMsg = err.response?.data?.reason || err.response?.data?.message || err.message || 'Cloudinary upload failed';
+      const suggestion = err.response?.data?.suggestion || '';
+      const fullMsg = suggestion ? `${errMsg}. ${suggestion}` : errMsg;
+      setUploadErrorMsg(fullMsg);
+      setLastFailedFiles(filesToUpload);
+      setMsg({ type: 'error', text: `Upload Failed: ${fullMsg}` });
     } finally {
       setUploadingToCloudinary(false);
+      setOptimisticPreviews([]);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleCloudinaryFileUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      executeUpload(files);
       e.target.value = '';
+    }
+  };
+
+  const handleRetryUpload = () => {
+    if (lastFailedFiles.length > 0) {
+      executeUpload(lastFailedFiles);
     }
   };
 
@@ -400,15 +395,15 @@ export default function EnterpriseProductEditor({
 
           <button
             onClick={() => handleSaveProduct(formData.status)}
-            disabled={saving}
+            disabled={saving || uploadingToCloudinary}
             style={{
-              background: 'var(--primary-color, #0284C7)',
+              background: uploadingToCloudinary ? '#94A3B8' : 'var(--primary-color, #0284C7)',
               color: '#FFF',
               border: 'none',
               padding: '0.5rem 1.25rem',
               borderRadius: '8px',
               fontWeight: 700,
-              cursor: saving ? 'not-allowed' : 'pointer',
+              cursor: (saving || uploadingToCloudinary) ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '0.4rem',
@@ -416,7 +411,19 @@ export default function EnterpriseProductEditor({
               boxShadow: '0 2px 4px rgba(2, 132, 199, 0.2)',
             }}
           >
-            {saving ? <RefreshCw size={16} className="spin" /> : <Check size={16} />} Save Product
+            {uploadingToCloudinary ? (
+              <>
+                <RefreshCw size={16} className="spin" /> Uploading ({uploadProgress}%)
+              </>
+            ) : saving ? (
+              <>
+                <RefreshCw size={16} className="spin" /> Saving...
+              </>
+            ) : (
+              <>
+                <Check size={16} /> Save Product
+              </>
+            )}
           </button>
         </div>
       </header>
@@ -808,6 +815,40 @@ export default function EnterpriseProductEditor({
               </h4>
             </div>
 
+            {/* UPLOAD PROGRESS BAR */}
+            {uploadingToCloudinary && (
+              <div style={{ marginBottom: '1rem', background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '8px', padding: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 700, color: '#0284C7', marginBottom: '4px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <RefreshCw size={12} className="spin" /> Uploading to Cloudinary...
+                  </span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <div style={{ width: '100%', height: '6px', background: '#E0F2FE', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: `${uploadProgress}%`, height: '100%', background: '#0284C7', transition: 'width 0.2s ease' }} />
+                </div>
+              </div>
+            )}
+
+            {/* INLINE UPLOAD ERROR & RETRY BUTTON */}
+            {uploadErrorMsg && !uploadingToCloudinary && (
+              <div style={{ marginBottom: '1rem', background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '0.75rem' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#991B1B', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <AlertTriangle size={14} /> Cloudinary Upload Failed
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#7F1D1D', marginBottom: '0.6rem', lineHeight: '1.4' }}>
+                  {uploadErrorMsg}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRetryUpload}
+                  style={{ background: '#DC2626', color: '#FFF', border: 'none', borderRadius: '6px', padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                >
+                  <RotateCcw size={12} /> Retry Upload
+                </button>
+              </div>
+            )}
+
             {/* DIRECT CLOUDINARY UPLOAD BUTTON */}
             <div style={{ marginBottom: '1rem' }}>
               <label
@@ -827,7 +868,7 @@ export default function EnterpriseProductEditor({
                 }}
               >
                 <Upload size={16} />
-                {uploadingToCloudinary ? 'Uploading to Cloudinary...' : 'Upload to Cloudinary'}
+                {uploadingToCloudinary ? `Uploading (${uploadProgress}%)...` : 'Upload to Cloudinary'}
                 <input
                   type="file"
                   multiple
@@ -861,6 +902,20 @@ export default function EnterpriseProductEditor({
                 </button>
               </div>
             </div>
+
+            {/* OPTIMISTIC PREVIEW THUMBNAILS */}
+            {optimisticPreviews.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                {optimisticPreviews.map((url, idx) => (
+                  <div key={idx} style={{ position: 'relative', border: '1px dashed #0284C7', borderRadius: '6px', overflow: 'hidden', height: '80px', opacity: 0.7 }}>
+                    <img src={url} alt="Uploading..." style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <span style={{ position: 'absolute', inset: 0, background: 'rgba(2, 132, 199, 0.4)', color: '#FFF', fontSize: '0.65rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {uploadProgress}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* PRODUCT IMAGES GALLERY GRID */}
             {formData.images && formData.images.length > 0 ? (
