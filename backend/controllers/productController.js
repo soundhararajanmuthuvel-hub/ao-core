@@ -3,8 +3,46 @@ const Product = require('../models/Product');
 const ProductPackSize = require('../models/ProductPackSize');
 const StockMovement = require('../models/StockMovement');
 const User = require('../models/User');
+const WebsiteProduct = require('../models/WebsiteProduct');
 const { logActivity } = require('../utils/helpers');
 const { recalculateAllProductPrices, recalculateProductPrice } = require('../utils/priceService');
+
+const syncToWebsiteProduct = async (product) => {
+  if (!product || !product.publishToWebsite) return;
+  try {
+    let websiteProd = await WebsiteProduct.findOne({ where: { managementProductId: product.id } });
+    if (!websiteProd) {
+      const slug = product.name
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/[\s\W-]+/g, '-') + '-' + product.id;
+
+      websiteProd = await WebsiteProduct.create({
+        name: product.name,
+        slug,
+        price: product.sellingPrice || product.price || 0,
+        stock: product.stock || 0,
+        sku: product.sku || '',
+        category: product.category || 'General',
+        description: product.description || '',
+        shortDescription: product.shortDescription || '',
+        managementProductId: product.id,
+        isActive: true,
+      });
+      console.log(`Auto-created WebsiteProduct for Product ID ${product.id}`);
+    } else {
+      websiteProd.name = product.name;
+      websiteProd.price = product.sellingPrice || product.price || websiteProd.price;
+      websiteProd.stock = product.stock;
+      websiteProd.sku = product.sku || websiteProd.sku;
+      websiteProd.isActive = true;
+      await websiteProd.save();
+    }
+  } catch (err) {
+    console.error('Failed to sync Product to WebsiteProduct:', err.message);
+  }
+};
 
 exports.getProducts = async (req, res, next) => {
   try {
@@ -156,6 +194,7 @@ exports.createProduct = async (req, res, next) => {
     const updatedProduct = await Product.findByPk(product.id, {
       include: [{ model: ProductPackSize, as: 'packSizes' }]
     });
+    await syncToWebsiteProduct(updatedProduct);
     res.status(201).json({ product: updatedProduct });
   } catch (err) {
     next(err);
@@ -219,6 +258,7 @@ exports.updateProduct = async (req, res, next) => {
     const updatedProduct = await Product.findByPk(product.id, {
       include: [{ model: ProductPackSize, as: 'packSizes' }]
     });
+    await syncToWebsiteProduct(updatedProduct);
     res.json({ product: updatedProduct });
   } catch (err) {
     next(err);

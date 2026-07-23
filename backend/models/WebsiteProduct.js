@@ -80,15 +80,19 @@ const WebsiteProduct = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
-    weight: {
-      type: DataTypes.STRING,
-      allowNull: true, // e.g. "500g", "1kg"
+    managementProductId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
     },
   },
   {
     timestamps: true,
   }
 );
+
+const Product = require('./Product');
+WebsiteProduct.belongsTo(Product, { as: 'managementProduct', foreignKey: 'managementProductId' });
+Product.hasOne(WebsiteProduct, { as: 'websiteProduct', foreignKey: 'managementProductId' });
 
 makeMongooseCompatible(WebsiteProduct);
 

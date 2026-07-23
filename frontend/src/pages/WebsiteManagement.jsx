@@ -57,6 +57,7 @@ export default function WebsiteManagement() {
   // State
   const [apiKeyData, setApiKeyData] = useState(null);
   const [products, setProducts] = useState([]);
+  const [managementProductsList, setManagementProductsList] = useState([]);
   const [orders, setOrders] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [testimonials, setTestimonials] = useState([]);
@@ -86,6 +87,7 @@ export default function WebsiteManagement() {
     usageInstructions: '',
     isBestseller: false,
     isActive: true,
+    managementProductId: '',
   });
 
   // Image Upload & Management Handlers
@@ -243,6 +245,9 @@ export default function WebsiteManagement() {
       } else if (tab === 'products') {
         const res = await client.get(`${API_BASE}/products`);
         setProducts(res.data.data || []);
+        if (res.data.managementProductsList) {
+          setManagementProductsList(res.data.managementProductsList);
+        }
       } else if (tab === 'orders') {
         const res = await client.get(`${API_BASE}/orders`);
         setOrders(res.data.data || []);
@@ -624,7 +629,14 @@ export default function WebsiteManagement() {
                             </div>
                           )}
                           <div>
-                            <div style={{ fontWeight: 700 }}>{p.name}</div>
+                            <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              {p.name}
+                              {p.isLinkedToManagement && (
+                                <span style={{ background: '#DEF7EC', color: '#03543F', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px' }}>
+                                  ERP Synced
+                                </span>
+                              )}
+                            </div>
                             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>/{p.slug}</div>
                           </div>
                         </div>
@@ -682,6 +694,7 @@ export default function WebsiteManagement() {
                                 usageInstructions: p.usageInstructions || '',
                                 isBestseller: !!p.isBestseller,
                                 isActive: !!p.isActive,
+                                managementProductId: p.managementProductId || '',
                               });
                               setShowProductModal(true);
                             }}
@@ -1035,6 +1048,45 @@ export default function WebsiteManagement() {
           <div className="card" style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', padding: '1.5rem' }}>
             <h3 style={{ fontWeight: 700, marginBottom: '1rem' }}>{editingProduct ? 'Edit Website Product' : 'Add New Website Product'}</h3>
             <form onSubmit={handleSaveProduct}>
+              {/* MANAGEMENT & BILLING LINK SELECTOR */}
+              <div style={{ marginBottom: '1rem', background: '#F0FDF4', border: '1px solid #BBF7D0', padding: '0.85rem', borderRadius: '8px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#166534', display: 'block', marginBottom: '0.3rem' }}>
+                  🔗 Link to Management & Billing Inventory (Single Source of Truth)
+                </label>
+                <select
+                  value={productForm.managementProductId || ''}
+                  onChange={(e) => {
+                    const selectedId = e.target.value;
+                    const selectedMgmt = managementProductsList.find((p) => String(p.id) === String(selectedId));
+                    setProductForm({
+                      ...productForm,
+                      managementProductId: selectedId,
+                      name: productForm.name || selectedMgmt?.name || '',
+                      price: productForm.price !== '' ? productForm.price : (selectedMgmt?.sellingPrice || selectedMgmt?.price || ''),
+                      stock: selectedMgmt ? selectedMgmt.stock : productForm.stock,
+                      category: productForm.category || selectedMgmt?.category || 'General',
+                    });
+                  }}
+                  style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #86EFAC', background: '#FFF', fontWeight: 600, fontSize: '0.9rem' }}
+                >
+                  <option value="">-- Standalone Product (Unlinked) --</option>
+                  {managementProductsList.map((mp) => (
+                    <option key={mp.id} value={mp.id}>
+                      {mp.name} ({mp.sku || `ID #${mp.id}`}) — Stock: {mp.stock} | ₹{mp.sellingPrice || mp.price}
+                    </option>
+                  ))}
+                </select>
+                {productForm.managementProductId ? (
+                  <div style={{ fontSize: '0.75rem', color: '#15803D', fontWeight: 600, marginTop: '0.36rem' }}>
+                    ✓ Linked to Management & Billing Product #{productForm.managementProductId}. Stock levels are managed centrally via ERP inventory.
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.75rem', color: '#166534', opacity: 0.8, marginTop: '0.36rem' }}>
+                    Select an existing Management & Billing product to sync stock and prices automatically.
+                  </div>
+                )}
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Product Name *</label>
@@ -1080,12 +1132,22 @@ export default function WebsiteManagement() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Stock Units</label>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                    Stock Units {productForm.managementProductId ? '(Managed via Management & Billing)' : ''}
+                  </label>
                   <input
                     type="number"
+                    disabled={!!productForm.managementProductId}
                     value={productForm.stock}
                     onChange={(e) => setProductForm({ ...productForm, stock: Number(e.target.value) })}
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-color)',
+                      background: productForm.managementProductId ? '#F3F4F6' : '#FFF',
+                      cursor: productForm.managementProductId ? 'not-allowed' : 'text',
+                    }}
                   />
                 </div>
                 <div>

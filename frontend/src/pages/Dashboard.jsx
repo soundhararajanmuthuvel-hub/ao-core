@@ -559,6 +559,9 @@ export default function Dashboard() {
                       subtextStyle: { color: outStyle.color }
                     }}
                   />
+                  <StatCard label="Website Orders Today" value={dataLoading ? <span className="skeleton-loader" /> : cards.websiteOrdersToday || 0} onClick={() => navigate('/website?tab=orders')} />
+                  <StatCard label="Website Revenue Today" value={dataLoading ? <span className="skeleton-loader" /> : fmt(cards.websiteRevenueToday || 0)} onClick={() => navigate('/website?tab=orders')} />
+                  <StatCard label="Pending Website Orders" value={dataLoading ? <span className="skeleton-loader" /> : cards.pendingWebsiteOrders || 0} onClick={() => navigate('/website?tab=orders')} className={!dataLoading && cards.pendingWebsiteOrders > 0 ? 'warning' : ''} />
                   <StatCard label="Pending Dispatch Orders" value={dataLoading ? <span className="skeleton-loader" /> : cards.pendingDispatchOrders || 0} />
                   <StatCard label="Low Stock Products" value={dataLoading ? <span className="skeleton-loader" /> : cards.lowStockCount || 0} className={!dataLoading && cards.lowStockCount > 0 ? 'danger' : ''} />
                   <StatCard

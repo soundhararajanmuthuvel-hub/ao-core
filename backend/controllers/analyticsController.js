@@ -6,6 +6,7 @@ const Order = require('../models/Order');
 const Customer = require('../models/Customer');
 const PackingConversion = require('../models/PackingConversion');
 const PackingConversionItem = require('../models/PackingConversionItem');
+const WebsiteOrder = require('../models/WebsiteOrder');
 
 const dashboardCache = {
   data: null,
@@ -40,7 +41,10 @@ const getDashboardDataInternal = async () => {
     retailPackStockSum,
     packingDoneTodayResult,
     mfgDoneTodayResult,
-    packingConversionsToday
+    packingConversionsToday,
+    websiteOrdersTodayCount,
+    websiteRevenueTodayResult,
+    pendingWebsiteOrdersCount
   ] = await Promise.all([
     Product.count({ where: { isArchived: false } }),
     sequelize.query(
@@ -138,6 +142,20 @@ const getDashboardDataInternal = async () => {
           ],
         },
       ],
+    }),
+    WebsiteOrder.count({
+      where: {
+        createdAt: { [Op.gte]: today, [Op.lt]: tomorrow }
+      }
+    }),
+    WebsiteOrder.sum('totalAmount', {
+      where: {
+        createdAt: { [Op.gte]: today, [Op.lt]: tomorrow },
+        paymentStatus: 'Captured'
+      }
+    }),
+    WebsiteOrder.count({
+      where: { status: 'Pending' }
     })
   ]);
 
@@ -365,7 +383,10 @@ const getDashboardDataInternal = async () => {
       bulkStockValue,
       retailPackStock,
       packingDoneToday,
-      mfgDoneToday
+      mfgDoneToday,
+      websiteOrdersToday: Number(websiteOrdersTodayCount || 0),
+      websiteRevenueToday: Number(websiteRevenueTodayResult || 0),
+      pendingWebsiteOrders: Number(pendingWebsiteOrdersCount || 0)
     },
     charts: {
       monthlyRevenue: monthlyRevenue.map((m) => ({

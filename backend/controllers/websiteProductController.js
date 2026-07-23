@@ -1,5 +1,6 @@
 const WebsiteProduct = require('../models/WebsiteProduct');
 const WebsiteProductReview = require('../models/WebsiteProductReview');
+const Product = require('../models/Product');
 const { Op } = require('sequelize');
 
 // GET /api/website/products
@@ -24,10 +25,20 @@ const getProducts = async (req, res) => {
 
     const products = await WebsiteProduct.findAll({
       where,
+      include: [
+        {
+          model: Product,
+          as: 'managementProduct',
+          attributes: ['id', 'name', 'sku', 'stock', 'sellingPrice', 'price', 'mrp', 'lowStockThreshold', 'unit'],
+        },
+      ],
       order: [['isBestseller', 'DESC'], ['createdAt', 'DESC']],
     });
 
     const formattedProducts = products.map((p) => {
+      const pJson = p.toJSON();
+      const mgmt = pJson.managementProduct;
+
       let imagesArr = [];
       try { imagesArr = JSON.parse(p.images || '[]'); } catch { imagesArr = p.images ? [p.images] : []; }
 
@@ -37,8 +48,16 @@ const getProducts = async (req, res) => {
       let ingredientsArr = [];
       try { ingredientsArr = JSON.parse(p.ingredients || '[]'); } catch { ingredientsArr = p.ingredients ? [p.ingredients] : []; }
 
+      // Real-time Option A read-through of central Management & Billing stock & price
+      const effectiveStock = mgmt ? Number(mgmt.stock) : Number(p.stock || 0);
+      const effectivePrice = mgmt ? (Number(mgmt.sellingPrice) || Number(mgmt.price) || Number(p.price)) : Number(p.price || 0);
+      const effectiveSku = mgmt?.sku || p.sku || '';
+
       return {
-        ...p.toJSON(),
+        ...pJson,
+        stock: effectiveStock,
+        price: effectivePrice,
+        sku: effectiveSku,
         images: imagesArr,
         benefits: benefitsArr,
         ingredients: ingredientsArr,
@@ -62,11 +81,21 @@ const getProductBySlug = async (req, res) => {
     const { slug } = req.params;
     const product = await WebsiteProduct.findOne({
       where: { slug, isActive: true },
+      include: [
+        {
+          model: Product,
+          as: 'managementProduct',
+          attributes: ['id', 'name', 'sku', 'stock', 'sellingPrice', 'price', 'mrp', 'lowStockThreshold', 'unit'],
+        },
+      ],
     });
 
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
+
+    const pJson = product.toJSON();
+    const mgmt = pJson.managementProduct;
 
     let imagesArr = [];
     try { imagesArr = JSON.parse(product.images || '[]'); } catch { imagesArr = product.images ? [product.images] : []; }
@@ -92,10 +121,17 @@ const getProductBySlug = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
+    const effectiveStock = mgmt ? Number(mgmt.stock) : Number(product.stock || 0);
+    const effectivePrice = mgmt ? (Number(mgmt.sellingPrice) || Number(mgmt.price) || Number(product.price)) : Number(product.price || 0);
+    const effectiveSku = mgmt?.sku || product.sku || '';
+
     res.json({
       success: true,
       data: {
-        ...product.toJSON(),
+        ...pJson,
+        stock: effectiveStock,
+        price: effectivePrice,
+        sku: effectiveSku,
         images: imagesArr,
         benefits: benefitsArr,
         ingredients: ingredientsArr,

@@ -198,6 +198,10 @@ const Product = sequelize.define('Product', {
     type: DataTypes.TEXT,
     allowNull: true,
   },
+  publishToWebsite: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
   isLowStock: {
     type: DataTypes.VIRTUAL,
     get() {

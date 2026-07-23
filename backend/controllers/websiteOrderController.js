@@ -5,6 +5,7 @@ const WebsiteProduct = require('../models/WebsiteProduct');
 const WebsiteCoupon = require('../models/WebsiteCoupon');
 const WebsiteShippingRule = require('../models/WebsiteShippingRule');
 const WebsiteEvent = require('../models/WebsiteEvent');
+const { updateStock } = require('../utils/stockService');
 
 const getRazorpayKeyId = () => process.env.RAZORPAY_KEY_ID || 'rzp_test_blovit_mock_key';
 const getRazorpayKeySecret = () => process.env.RAZORPAY_KEY_SECRET || 'rzp_test_blovit_mock_secret';
@@ -252,15 +253,25 @@ const handleWebhook = async (req, res) => {
           if (razorpayPaymentId) order.razorpayPaymentId = razorpayPaymentId;
           await order.save();
 
-          // Auto-decrement product stock
+          // Auto-decrement central Management & Billing product stock
           try {
             const items = JSON.parse(order.items || '[]');
             for (const item of items) {
               if (item.productId && item.qty) {
-                const product = await WebsiteProduct.findByPk(item.productId);
-                if (product) {
-                  product.stock = Math.max(0, product.stock - Number(item.qty));
-                  await product.save();
+                const websiteProduct = await WebsiteProduct.findByPk(item.productId);
+                if (websiteProduct) {
+                  websiteProduct.stock = Math.max(0, websiteProduct.stock - Number(item.qty));
+                  await websiteProduct.save();
+
+                  if (websiteProduct.managementProductId) {
+                    await updateStock(websiteProduct.managementProductId, -Number(item.qty), {
+                      type: 'website_sale',
+                      referenceId: order.id,
+                      referenceModel: 'WebsiteOrder',
+                      notes: `Blovit Storefront Order #${order.orderNumber}`,
+                    });
+                    console.log(`✓ Central inventory stock decremented for Product ID ${websiteProduct.managementProductId} by ${item.qty}`);
+                  }
                 }
               }
             }

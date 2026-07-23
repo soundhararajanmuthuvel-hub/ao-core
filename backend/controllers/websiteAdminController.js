@@ -10,6 +10,7 @@ const WebsiteCoupon = require('../models/WebsiteCoupon');
 const WebsiteEvent = require('../models/WebsiteEvent');
 const WebsiteAddress = require('../models/WebsiteAddress');
 const WebsiteWishlist = require('../models/WebsiteWishlist');
+const Product = require('../models/Product');
 const { Op } = require('sequelize');
 
 // Helper to generate slug
@@ -78,11 +79,28 @@ const regenerateApiKey = async (req, res) => {
    ========================================================= */
 const getAdminProducts = async (req, res) => {
   try {
-    const products = await WebsiteProduct.findAll({
-      order: [['createdAt', 'DESC']],
-    });
+    const [products, managementProductsList] = await Promise.all([
+      WebsiteProduct.findAll({
+        include: [
+          {
+            model: Product,
+            as: 'managementProduct',
+            attributes: ['id', 'name', 'sku', 'stock', 'sellingPrice', 'price', 'mrp', 'publishToWebsite', 'unit'],
+          },
+        ],
+        order: [['createdAt', 'DESC']],
+      }),
+      Product.findAll({
+        where: { isArchived: false },
+        attributes: ['id', 'name', 'sku', 'stock', 'sellingPrice', 'price', 'mrp', 'publishToWebsite', 'unit', 'category'],
+        order: [['name', 'ASC']],
+      }),
+    ]);
 
     const data = products.map((p) => {
+      const pJson = p.toJSON();
+      const mgmt = pJson.managementProduct;
+
       let imagesArr = [];
       try { imagesArr = JSON.parse(p.images || '[]'); } catch { imagesArr = p.images ? [p.images] : []; }
 
@@ -92,15 +110,23 @@ const getAdminProducts = async (req, res) => {
       let ingredientsArr = [];
       try { ingredientsArr = JSON.parse(p.ingredients || '[]'); } catch { ingredientsArr = p.ingredients ? [p.ingredients] : []; }
 
+      const effectiveStock = mgmt ? Number(mgmt.stock) : Number(p.stock || 0);
+      const effectivePrice = mgmt ? (Number(mgmt.sellingPrice) || Number(mgmt.price) || Number(p.price)) : Number(p.price || 0);
+      const effectiveSku = mgmt?.sku || p.sku || '';
+
       return {
-        ...p.toJSON(),
+        ...pJson,
+        stock: effectiveStock,
+        price: effectivePrice,
+        sku: effectiveSku,
         images: imagesArr,
         benefits: benefitsArr,
         ingredients: ingredientsArr,
+        isLinkedToManagement: !!mgmt,
       };
     });
 
-    res.json({ success: true, count: data.length, data });
+    res.json({ success: true, count: data.length, data, managementProductsList });
   } catch (err) {
     console.error('Error fetching admin products:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch products' });
@@ -127,13 +153,32 @@ const createAdminProduct = async (req, res) => {
       isActive,
       sku,
       weight,
+      managementProductId,
     } = req.body;
 
-    if (!name || price === undefined) {
+    let linkedMgmtProduct = null;
+    let finalName = name;
+    let finalPrice = price;
+    let finalStock = stock;
+    let finalSku = sku;
+
+    if (managementProductId) {
+      linkedMgmtProduct = await Product.findByPk(managementProductId);
+      if (linkedMgmtProduct) {
+        finalName = name || linkedMgmtProduct.name;
+        finalPrice = price !== undefined && price !== '' ? price : (linkedMgmtProduct.sellingPrice || linkedMgmtProduct.price || 0);
+        finalStock = linkedMgmtProduct.stock || 0;
+        finalSku = linkedMgmtProduct.sku || sku || '';
+        linkedMgmtProduct.publishToWebsite = true;
+        await linkedMgmtProduct.save();
+      }
+    }
+
+    if (!finalName || finalPrice === undefined) {
       return res.status(400).json({ success: false, message: 'Product Name and Price are required.' });
     }
 
-    const finalSlug = slug ? generateSlug(slug) : generateSlug(name);
+    const finalSlug = slug ? generateSlug(slug) : generateSlug(finalName);
     const existing = await WebsiteProduct.findOne({ where: { slug: finalSlug } });
     if (existing) {
       return res.status(400).json({ success: false, message: 'A product with this URL slug already exists.' });
@@ -150,23 +195,24 @@ const createAdminProduct = async (req, res) => {
     };
 
     const newProduct = await WebsiteProduct.create({
-      name,
+      name: finalName,
       slug: finalSlug,
-      price,
+      price: finalPrice,
       compareAtPrice: compareAtPrice || 0,
-      stock: stock || 0,
+      stock: finalStock || 0,
       images: formatArrayJson(images),
-      category: category || 'General',
-      description: description || '',
-      shortDescription: shortDescription || '',
+      category: category || linkedMgmtProduct?.category || 'General',
+      description: description || linkedMgmtProduct?.description || '',
+      shortDescription: shortDescription || linkedMgmtProduct?.shortDescription || '',
       benefits: formatArrayJson(benefits),
       ingredients: formatArrayJson(ingredients),
       nutritionFacts: typeof nutritionFacts === 'object' ? JSON.stringify(nutritionFacts) : nutritionFacts || '{}',
       usageInstructions: usageInstructions || '',
       isBestseller: !!isBestseller,
       isActive: isActive !== undefined ? !!isActive : true,
-      sku: sku || '',
-      weight: weight || '',
+      sku: finalSku || '',
+      weight: weight || linkedMgmtProduct?.weight || '',
+      managementProductId: managementProductId || null,
     });
 
     res.status(201).json({ success: true, message: 'Product created successfully', data: newProduct });
@@ -202,7 +248,15 @@ const updateAdminProduct = async (req, res) => {
       isActive,
       sku,
       weight,
+      managementProductId,
     } = req.body;
+
+    if (managementProductId !== undefined && managementProductId !== product.managementProductId) {
+      product.managementProductId = managementProductId || null;
+      if (managementProductId) {
+        await Product.update({ publishToWebsite: true }, { where: { id: managementProductId } });
+      }
+    }
 
     if (slug && slug !== product.slug) {
       const newSlug = generateSlug(slug);
