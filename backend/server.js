@@ -18,9 +18,9 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://127.0.0.1:5173",
   "http://localhost:5050",
-  "http://127.0.0.1:5050"
-  // TODO: add Cloud Run URL here after first deploy (e.g. https://ao-core-backend-xxxxx-uc.a.run.app)
-];
+  "http://127.0.0.1:5050",
+  process.env.BLOVIT_FRONTEND_URL || ""
+].filter(Boolean);
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -36,7 +36,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-API-Key", "x-api-key"]
 };
 
 const { profileMiddleware } = require('./middleware/profileMiddleware');
@@ -136,6 +136,20 @@ app.use('/api/migration', require('./routes/migrationRoutes'));
 app.use('/api/whatsapp', require('./routes/whatsappRoutes'));
 app.use('/api/catalog', require('./routes/catalogRoutes'));
 app.use('/api/external', require('./routes/externalRoutes'));
+
+/* =========================
+   WEBSITE MODULE ROUTES (BLOVIT ECOMMERCE)
+   ========================= */
+app.use('/api/website/products', require('./routes/websiteProductRoutes'));
+app.use('/api/website/auth', require('./routes/websiteAuthRoutes'));
+app.use('/api/website/account', require('./routes/websiteAccountRoutes'));
+app.use('/api/website/cart', require('./routes/websiteAccountRoutes'));
+app.use('/api/website/razorpay', require('./routes/websiteOrderRoutes'));
+app.use('/api/website', require('./routes/websiteReviewRoutes'));
+app.use('/api/website/referrals', require('./routes/websiteReferralRoutes'));
+app.use('/api/website', require('./routes/websiteShippingCouponRoutes'));
+app.use('/api/website', require('./routes/websiteEventRoutes'));
+app.use('/api/website-admin', require('./routes/websiteAdminRoutes'));
 
 /* =========================
    PUBLIC REVIEW PORTAL ROUTES

@@ -175,7 +175,20 @@ const tableNameMap = {
   WhatsAppLog: 'whatsapp_logs',
   PackingConversion: 'packing_conversions',
   PackingConversionItem: 'packing_conversion_items',
-  SalesTarget: 'sales_targets'
+  SalesTarget: 'sales_targets',
+  WebsiteApiKey: 'website_api_keys',
+  WebsiteProduct: 'website_products',
+  WebsiteCustomer: 'website_customers',
+  WebsiteAddress: 'website_addresses',
+  WebsiteWishlist: 'website_wishlists',
+  WebsiteCart: 'website_carts',
+  WebsiteOrder: 'website_orders',
+  WebsiteTestimonial: 'website_testimonials',
+  WebsiteProductReview: 'website_product_reviews',
+  WebsiteReferral: 'website_referrals',
+  WebsiteShippingRule: 'website_shipping_rules',
+  WebsiteCoupon: 'website_coupons',
+  WebsiteEvent: 'website_events'
 };
 
 // Global hook to enforce lowercase table names mapping to prevent Linux/MySQL case sensitivity issues
@@ -339,6 +352,19 @@ const connectDB = async () => {
   require('../models/WebhookEndpoint');
   require('../models/WebhookLog');
   require('../models/ApiAuditLog');
+  require('../models/WebsiteApiKey');
+  require('../models/WebsiteProduct');
+  require('../models/WebsiteCustomer');
+  require('../models/WebsiteAddress');
+  require('../models/WebsiteWishlist');
+  require('../models/WebsiteCart');
+  require('../models/WebsiteOrder');
+  require('../models/WebsiteTestimonial');
+  require('../models/WebsiteProductReview');
+  require('../models/WebsiteReferral');
+  require('../models/WebsiteShippingRule');
+  require('../models/WebsiteCoupon');
+  require('../models/WebsiteEvent');
 
   const shouldAlter = false;
   await dropStaleSqliteBackupTables();

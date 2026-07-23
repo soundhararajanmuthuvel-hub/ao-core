@@ -11,7 +11,8 @@ import {
   Target, 
   MapPinned, 
   ClipboardList, 
-  Truck 
+  Truck,
+  Globe
 } from 'lucide-react';
 
 export const menuStructure = [
@@ -179,6 +180,16 @@ export const menuStructure = [
     icon: Users,
     emoji: '🔐',
     label: 'Users',
+    roles: ['Super Admin', 'admin'],
+    showOnMobileDrawer: true
+  },
+  {
+    id: 'website',
+    type: 'link',
+    to: '/website',
+    icon: Globe,
+    emoji: '🌐',
+    label: 'Website (Blovit)',
     roles: ['Super Admin', 'admin'],
     showOnMobileDrawer: true
   },

@@ -57,6 +57,7 @@ const DeliveryTracking = lazy(() => import('../pages/DeliveryTracking'));
 const ReviewPortal = lazy(() => import('../pages/ReviewPortal'));
 const IntegrationsMarketplace = lazy(() => import('../pages/IntegrationsMarketplace'));
 const DeveloperCenter = lazy(() => import('../pages/DeveloperCenter'));
+const WebsiteManagement = lazy(() => import('../pages/WebsiteManagement'));
 
 // CRM Pages
 const CrmDashboard = lazy(() => import('../pages/CrmDashboard'));
@@ -344,6 +345,14 @@ export default function AppRoutes() {
                 <DeveloperCenter />
               </RoleRoute>
             </DesktopOnlyRoute>
+          }
+        />
+        <Route
+          path="website"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin']}>
+              <WebsiteManagement />
+            </RoleRoute>
           }
         />
         <Route
