@@ -273,8 +273,13 @@ export default function WebsiteManagement() {
         setShippingRules(resShip.data.data || []);
         setCoupons(resCoup.data.data || []);
       } else if (tab === 'analytics') {
-        const res = await client.get(`${API_BASE}/analytics`);
-        setAnalytics(res.data.data || null);
+        try {
+          const res = await client.get(`${API_BASE}/analytics`);
+          setAnalytics(res.data.data || { ordersToday: 0, totalRevenue: 0, cartAbandonmentCount: 0 });
+        } catch (analyticsErr) {
+          console.warn('[WebsiteManagement] Analytics API unavailable (503/CORS):', analyticsErr?.message);
+          setAnalytics(null);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -283,6 +288,9 @@ export default function WebsiteManagement() {
       setLoading(false);
     }
   };
+
+  // Safe global fetchData alias ensuring zero ReferenceError crashes
+  const fetchData = () => fetchDataForTab(activeTab);
 
   const handleCopyKey = () => {
     if (apiKeyData?.apiKey) {
@@ -1029,21 +1037,39 @@ export default function WebsiteManagement() {
       {/* TAB 8: CRM & ANALYTICS */}
       {!loading && activeTab === 'analytics' && (
         <div>
-          <h3 style={{ fontWeight: 700, marginBottom: '1rem' }}>Webstore CRM & Analytics Metrics</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div className="card" style={{ padding: '1.25rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Orders Today</div>
-              <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary-color)' }}>{analytics?.ordersToday || 0}</div>
-            </div>
-            <div className="card" style={{ padding: '1.25rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Paid Revenue</div>
-              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#10B981' }}>₹{analytics?.totalRevenue || 0}</div>
-            </div>
-            <div className="card" style={{ padding: '1.25rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Cart Abandonment Events</div>
-              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#F59E0B' }}>{analytics?.cartAbandonmentCount || 0}</div>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ fontWeight: 700, margin: 0 }}>Webstore CRM & Analytics Metrics</h3>
+            <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem' }} onClick={() => fetchDataForTab('analytics')}>
+              <RefreshCw size={14} /> Retry Analytics
+            </button>
           </div>
+          {analytics ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div className="card" style={{ padding: '1.25rem', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Orders Today</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary-color)' }}>{analytics?.ordersToday || 0}</div>
+              </div>
+              <div className="card" style={{ padding: '1.25rem', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Paid Revenue</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800, color: '#10B981' }}>₹{analytics?.totalRevenue || 0}</div>
+              </div>
+              <div className="card" style={{ padding: '1.25rem', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Cart Abandonment Events</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800, color: '#F59E0B' }}>{analytics?.cartAbandonmentCount || 0}</div>
+              </div>
+            </div>
+          ) : (
+            <div className="card" style={{ padding: '2rem', textAlign: 'center', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px' }}>
+              <AlertCircle size={32} color="#DC2626" style={{ marginBottom: '0.5rem' }} />
+              <h4 style={{ fontWeight: 800, color: '#991B1B', margin: '0 0 0.4rem 0' }}>Analytics Service Temporarily Unavailable</h4>
+              <p style={{ fontSize: '0.85rem', color: '#7F1D1D', maxWidth: '500px', margin: '0 auto 1rem auto' }}>
+                The webstore analytics service returned status 503 or is currently unreachable. The rest of your Website Management module remains 100% operational.
+              </p>
+              <button className="btn btn-secondary" onClick={() => fetchDataForTab('analytics')}>
+                Retry Loading Analytics
+              </button>
+            </div>
+          )}
         </div>
       )}
 

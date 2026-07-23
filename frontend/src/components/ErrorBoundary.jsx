@@ -30,6 +30,10 @@ export default class ErrorBoundary extends React.Component {
     window.location.reload(true);
   };
 
+  handleResetError = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
   render() {
     if (this.state.hasError) {
       return (
@@ -60,7 +64,24 @@ export default class ErrorBoundary extends React.Component {
           }}>
             {this.state.error?.message || 'An unexpected rendering error occurred inside the application components.'}
           </p>
-          <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              type="button"
+              onClick={this.handleResetError}
+              style={{
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '0.65rem 1.5rem',
+                fontSize: '0.9rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 4px 6px rgba(37, 99, 235, 0.15)',
+              }}
+            >
+              Try Component Again
+            </button>
             <button
               type="button"
               onClick={this.handleReload}
