@@ -64,21 +64,28 @@ router.use(auth);
 router.get('/api-key', getApiKey);
 router.post('/api-key/regenerate', regenerateApiKey);
 
+// Cloudinary Diagnostic Health Endpoint
+router.get('/cloudinary-health', async (req, res) => {
+  const health = await cloudinaryService.checkHealth();
+  const status = health.connected ? 200 : (health.error?.httpStatus || 500);
+  res.status(status).json(health);
+});
+
 // Cloudinary Image upload endpoint
 router.post('/upload-image', (req, res, next) => {
   upload.array('images', 10)(req, res, async (err) => {
     if (err) {
       if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({ success: false, message: 'Image size exceeds maximum limit of 10MB.' });
+          return res.status(400).json({ success: false, error: 'File Too Large', reason: 'Image size exceeds maximum limit of 10MB.' });
         }
-        return res.status(400).json({ success: false, message: err.message });
+        return res.status(400).json({ success: false, error: 'Multer Error', reason: err.message });
       }
-      return res.status(400).json({ success: false, message: err.message || 'Image upload failed.' });
+      return res.status(400).json({ success: false, error: 'Upload Error', reason: err.message || 'Image upload failed.' });
     }
     try {
       if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ success: false, message: 'No image files uploaded.' });
+        return res.status(400).json({ success: false, error: 'No Files', reason: 'No image files uploaded.' });
       }
       
       const uploadResults = await Promise.all(
@@ -97,7 +104,14 @@ router.post('/upload-image', (req, res, next) => {
       });
     } catch (error) {
       console.error('[Cloudinary Upload Route Error]', error);
-      res.status(500).json({ success: false, message: `Cloudinary upload failed: ${error.message}` });
+      const status = error.httpStatus || 500;
+      res.status(status).json({
+        success: false,
+        error: 'Cloudinary Upload Failed',
+        type: error.type || 'CLOUDINARY_UPLOAD_ERROR',
+        reason: error.message || 'Unknown Cloudinary error',
+        suggestion: error.suggestion || 'Please verify Cloudinary configuration in Cloudinary Settings.',
+      });
     }
   });
 });

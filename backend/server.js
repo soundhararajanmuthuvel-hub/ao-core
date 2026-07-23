@@ -172,6 +172,14 @@ app.use('/api/website', require('./routes/websiteReviewRoutes'));
 app.use('/api/website/referrals', require('./routes/websiteReferralRoutes'));
 app.use('/api/website', require('./routes/websiteShippingCouponRoutes'));
 app.use('/api/website', require('./routes/websiteEventRoutes'));
+const cloudinaryService = require('./services/cloudinaryService');
+
+app.get('/api/system/cloudinary-health', async (req, res) => {
+  const health = await cloudinaryService.checkHealth();
+  const status = health.connected ? 200 : (health.error?.httpStatus || 500);
+  res.status(status).json(health);
+});
+
 app.use('/api/website-admin', require('./routes/websiteAdminRoutes'));
 
 /* =========================
