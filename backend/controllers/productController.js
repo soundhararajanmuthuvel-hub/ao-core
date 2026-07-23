@@ -113,8 +113,19 @@ exports.getStockHistory = async (req, res, next) => {
 
 exports.createProduct = async (req, res, next) => {
   try {
+    const cloudinaryService = require('../services/cloudinaryService');
     const data = { ...req.body };
-    if (req.file) data.image = `/uploads/products/${req.file.filename}`;
+    
+    // Cloudinary image upload handling
+    if (req.file) {
+      const cloudRes = await cloudinaryService.uploadImage(req.file.buffer);
+      data.imageUrl = cloudRes.secure_url;
+      data.imagePublicId = cloudRes.public_id;
+      data.image = cloudRes.secure_url;
+    } else if (data.imageUrl) {
+      data.imagePublicId = data.imagePublicId || cloudinaryService.extractPublicId(data.imageUrl);
+      data.image = data.imageUrl;
+    }
     
     if (data.preferredSupplierId === '' || data.preferredSupplierId === 'null' || data.preferredSupplierId === null) {
       data.preferredSupplierId = null;
@@ -156,16 +167,43 @@ exports.createProduct = async (req, res, next) => {
     const updatedProduct = await Product.findByPk(product.id, {
       include: [{ model: ProductPackSize, as: 'packSizes' }]
     });
-    res.status(201).json({ product: updatedProduct });
+
+    res.status(201).json({
+      success: true,
+      message: 'Product created successfully',
+      product: updatedProduct,
+      data: updatedProduct,
+    });
   } catch (err) {
+    console.error('[createProduct Error]', err);
     next(err);
   }
 };
 
 exports.updateProduct = async (req, res, next) => {
   try {
+    const cloudinaryService = require('../services/cloudinaryService');
     const data = { ...req.body };
-    if (req.file) data.image = `/uploads/products/${req.file.filename}`;
+    const product = await Product.findByPk(req.params.id);
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+
+    // Cloudinary image upload & replacement handling
+    if (req.file) {
+      if (product.imagePublicId) {
+        try {
+          await cloudinaryService.deleteImage(product.imagePublicId);
+        } catch (err) {
+          console.warn('[Cloudinary Delete Previous Image Warning]', err.message);
+        }
+      }
+      const cloudRes = await cloudinaryService.uploadImage(req.file.buffer);
+      data.imageUrl = cloudRes.secure_url;
+      data.imagePublicId = cloudRes.public_id;
+      data.image = cloudRes.secure_url;
+    } else if (data.imageUrl && data.imageUrl !== product.imageUrl) {
+      data.imagePublicId = data.imagePublicId || cloudinaryService.extractPublicId(data.imageUrl);
+      data.image = data.imageUrl;
+    }
     
     if (data.preferredSupplierId === '' || data.preferredSupplierId === 'null' || data.preferredSupplierId === null) {
       data.preferredSupplierId = null;
@@ -194,9 +232,6 @@ exports.updateProduct = async (req, res, next) => {
       }
     }
     
-    const product = await Product.findByPk(req.params.id);
-    if (!product) return res.status(404).json({ message: 'Product not found' });
-    
     await product.update(data);
     
     const existingPacks = await ProductPackSize.findAll({ where: { productId: product.id } });
@@ -219,8 +254,15 @@ exports.updateProduct = async (req, res, next) => {
     const updatedProduct = await Product.findByPk(product.id, {
       include: [{ model: ProductPackSize, as: 'packSizes' }]
     });
-    res.json({ product: updatedProduct });
+
+    res.json({
+      success: true,
+      message: 'Product updated successfully',
+      product: updatedProduct,
+      data: updatedProduct,
+    });
   } catch (err) {
+    console.error('[updateProduct Error]', err);
     next(err);
   }
 };
@@ -457,41 +499,13 @@ exports.deleteProductPermanent = async (req, res, next) => {
     await StockMovement.destroy({ where: { productId: product.id } });
     await ProductPackSize.destroy({ where: { productId: product.id } });
 
-    // Remove images from disk
-    if (product.image && product.image.startsWith('/uploads/')) {
-      const fs = require('fs');
-      const path = require('path');
-      const filePath = path.join(__dirname, '..', product.image.substring(1));
-      if (fs.existsSync(filePath)) {
-        try {
-          fs.unlinkSync(filePath);
-        } catch (e) {
-          console.error('Failed to delete product image file:', e);
-        }
-      }
-    }
-
-    if (product.galleryImages) {
+    // Purge image from Cloudinary
+    if (product.imagePublicId) {
       try {
-        const gallery = JSON.parse(product.galleryImages);
-        if (Array.isArray(gallery)) {
-          const fs = require('fs');
-          const path = require('path');
-          gallery.forEach(img => {
-            if (img && img.startsWith('/uploads/')) {
-              const filePath = path.join(__dirname, '..', img.substring(1));
-              if (fs.existsSync(filePath)) {
-                try {
-                  fs.unlinkSync(filePath);
-                } catch (e) {
-                  console.error('Failed to delete gallery image file:', e);
-                }
-              }
-            }
-          });
-        }
-      } catch (e) {
-        console.error('Failed to parse galleryImages:', e);
+        const cloudinaryService = require('../services/cloudinaryService');
+        await cloudinaryService.deleteImage(product.imagePublicId);
+      } catch (cloudErr) {
+        console.error(`[Cloudinary Delete Error] Failed to purge asset (${product.imagePublicId}):`, cloudErr.message);
       }
     }
 

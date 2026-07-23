@@ -57,6 +57,14 @@ const Product = sequelize.define('Product', {
     type: DataTypes.STRING,
     defaultValue: '',
   },
+  imageUrl: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  imagePublicId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   productType: {
     type: DataTypes.STRING,
     defaultValue: 'BULK_PRODUCT',

@@ -39,6 +39,14 @@ const WebsiteProduct = sequelize.define(
       allowNull: true,
       defaultValue: '[]', // JSON array of image URLs
     },
+    imageUrl: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    imagePublicId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     category: {
       type: DataTypes.STRING,
       allowNull: true,

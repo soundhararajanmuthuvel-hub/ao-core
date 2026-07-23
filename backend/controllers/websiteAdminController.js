@@ -304,11 +304,21 @@ const updateAdminProduct = async (req, res) => {
 
 const deleteAdminProduct = async (req, res) => {
   try {
+    const cloudinaryService = require('../services/cloudinaryService');
     const { id } = req.params;
     const product = await WebsiteProduct.findByPk(id);
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
+
+    if (product.imagePublicId) {
+      try {
+        await cloudinaryService.deleteImage(product.imagePublicId);
+      } catch (err) {
+        console.warn(`[Cloudinary Delete] Failed to delete image (${product.imagePublicId}):`, err.message);
+      }
+    }
+
     await product.destroy();
     res.json({ success: true, message: 'Product deleted successfully' });
   } catch (err) {

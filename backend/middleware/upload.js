@@ -1,30 +1,20 @@
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 
-const ensureDir = (dir) => {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-};
+// Memory storage for zero-disk-footprint Cloudinary buffer uploads
+const memoryStorage = multer.memoryStorage();
 
-const storage = (subfolder) =>
-  multer.diskStorage({
-    destination: (req, file, cb) => {
-      const dir = path.join(__dirname, '..', 'uploads', subfolder);
-      ensureDir(dir);
-      cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-      const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-      cb(null, `${unique}${path.extname(file.originalname)}`);
-    },
-  });
+const imageFileFilter = (req, file, cb) => {
+  const allowedExts = /jpeg|jpg|png|webp/;
+  const allowedMimes = /image\/(jpeg|jpg|png|webp)/;
+  const ext = allowedExts.test(path.extname(file.originalname).toLowerCase());
+  const mime = allowedMimes.test(file.mimetype.toLowerCase());
 
-const fileFilter = (req, file, cb) => {
-  const allowed = /jpeg|jpg|png|gif|webp|svg/;
-  const ext = allowed.test(path.extname(file.originalname).toLowerCase());
-  const mime = allowed.test(file.mimetype);
-  if (ext && mime) cb(null, true);
-  else cb(new Error('Only image files allowed'));
+  if (ext && mime) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid image file format. Only JPG, JPEG, PNG, and WEBP images up to 10MB are allowed.'));
+  }
 };
 
 const purchaseInvoiceFileFilter = (req, file, cb) => {
@@ -35,21 +25,32 @@ const purchaseInvoiceFileFilter = (req, file, cb) => {
 };
 
 const uploadLogo = multer({
-  storage: storage('logos'),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter,
+  storage: memoryStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB Max
+  fileFilter: imageFileFilter,
 }).single('logo');
 
 const uploadProduct = multer({
-  storage: storage('products'),
-  limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter,
+  storage: memoryStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB Max
+  fileFilter: imageFileFilter,
 }).single('image');
 
+const uploadMultipleProductImages = multer({
+  storage: memoryStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB Max per file
+  fileFilter: imageFileFilter,
+}).array('images', 10);
+
 const uploadPurchaseInvoice = multer({
-  storage: storage('purchase-invoices'),
+  storage: memoryStorage,
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: purchaseInvoiceFileFilter,
 }).single('invoicePdf');
 
-module.exports = { uploadLogo, uploadProduct, uploadPurchaseInvoice };
+module.exports = {
+  uploadLogo,
+  uploadProduct,
+  uploadMultipleProductImages,
+  uploadPurchaseInvoice,
+};

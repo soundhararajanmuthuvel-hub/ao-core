@@ -43,11 +43,26 @@ const getProducts = async (req, res) => {
       let ingredientsArr = [];
       try { ingredientsArr = JSON.parse(p.ingredients || '[]'); } catch { ingredientsArr = p.ingredients ? [p.ingredients] : []; }
 
+      const primaryImageUrl = p.imageUrl || (imagesArr && imagesArr[0]) || 'https://demo.amudhasurabiy.com/images/products/placeholder-product.webp';
+
       return {
-        ...pJson,
-        stock: Number(p.stock || 0),
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        sku: p.sku || `SKU-${p.id}`,
         price: Number(p.price || 0),
-        images: imagesArr,
+        compareAtPrice: p.compareAtPrice ? Number(p.compareAtPrice) : null,
+        description: p.description || '',
+        shortDescription: p.shortDescription || '',
+        stock: Number(p.stock || 0),
+        category: p.category || 'General',
+        brand: p.brand || 'Blovit',
+        imageUrl: primaryImageUrl,
+        imagePublicId: p.imagePublicId || null,
+        images: imagesArr.length > 0 ? imagesArr : [primaryImageUrl],
+        rating: 5.0,
+        status: p.isActive ? 'active' : 'inactive',
+        isBestseller: !!p.isBestseller,
         benefits: benefitsArr,
         ingredients: ingredientsArr,
       };

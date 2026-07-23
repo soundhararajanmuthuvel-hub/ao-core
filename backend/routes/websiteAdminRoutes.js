@@ -37,33 +37,23 @@ const {
   getAdminAnalytics,
 } = require('../controllers/websiteAdminController');
 
-// Multer storage for website product image uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../uploads'));
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `website_prod_${Date.now()}_${Math.random().toString(36).substring(2, 7)}${ext}`);
-  },
-});
+const cloudinaryService = require('../services/cloudinaryService');
 
-const fileFilter = (req, file, cb) => {
-  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-  const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
-  const ext = path.extname(file.originalname).toLowerCase();
-
-  if (allowedMimeTypes.includes(file.mimetype) || allowedExts.includes(ext)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Invalid file format. Only JPG, PNG, and WEBP images are allowed.'), false);
-  }
-};
-
+// Multer memory storage for website product image uploads to Cloudinary
 const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB per file max
-  fileFilter,
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per file max
+  fileFilter: (req, file, cb) => {
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
+    const ext = path.extname(file.originalname).toLowerCase();
+
+    if (allowedMimeTypes.includes(file.mimetype) || allowedExts.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file format. Only JPG, JPEG, PNG, and WEBP images up to 10MB are allowed.'), false);
+    }
+  },
 });
 
 // All website admin routes require AO Core ERP Admin Auth
@@ -73,13 +63,13 @@ router.use(auth);
 router.get('/api-key', getApiKey);
 router.post('/api-key/regenerate', regenerateApiKey);
 
-// Image upload
+// Cloudinary Image upload endpoint
 router.post('/upload-image', (req, res, next) => {
-  upload.array('images', 10)(req, res, (err) => {
+  upload.array('images', 10)(req, res, async (err) => {
     if (err) {
       if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({ success: false, message: 'Image size exceeds maximum limit of 5MB.' });
+          return res.status(400).json({ success: false, message: 'Image size exceeds maximum limit of 10MB.' });
         }
         return res.status(400).json({ success: false, message: err.message });
       }
@@ -89,10 +79,24 @@ router.post('/upload-image', (req, res, next) => {
       if (!req.files || req.files.length === 0) {
         return res.status(400).json({ success: false, message: 'No image files uploaded.' });
       }
-      const fileUrls = req.files.map((file) => `/uploads/${file.filename}`);
-      res.json({ success: true, urls: fileUrls });
+      
+      const uploadResults = await Promise.all(
+        req.files.map((file) => cloudinaryService.uploadImage(file.buffer))
+      );
+
+      const urls = uploadResults.map((r) => r.secure_url);
+      const publicIds = uploadResults.map((r) => r.public_id);
+
+      res.json({
+        success: true,
+        message: `${uploadResults.length} image(s) uploaded to Cloudinary successfully!`,
+        urls,
+        publicIds,
+        data: uploadResults,
+      });
     } catch (error) {
-      res.status(500).json({ success: false, message: 'Image upload processing failed.' });
+      console.error('[Cloudinary Upload Route Error]', error);
+      res.status(500).json({ success: false, message: `Cloudinary upload failed: ${error.message}` });
     }
   });
 });
