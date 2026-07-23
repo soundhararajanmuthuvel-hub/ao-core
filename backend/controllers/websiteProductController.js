@@ -1,10 +1,10 @@
 const WebsiteProduct = require('../models/WebsiteProduct');
 const WebsiteProductReview = require('../models/WebsiteProductReview');
-const Product = require('../models/Product');
 const { Op } = require('sequelize');
 
 // GET /api/website/products
 const getProducts = async (req, res) => {
+  console.log('[websiteProductController] controller entered: getProducts');
   try {
     const { category, isBestseller, search } = req.query;
     const where = { isActive: true };
@@ -23,21 +23,16 @@ const getProducts = async (req, res) => {
       ];
     }
 
+    console.log('[websiteProductController] database query executing with filters:', JSON.stringify(where));
     const products = await WebsiteProduct.findAll({
       where,
-      include: [
-        {
-          model: Product,
-          as: 'managementProduct',
-          attributes: ['id', 'name', 'sku', 'stock', 'sellingPrice', 'price', 'mrp', 'lowStockThreshold', 'unit'],
-        },
-      ],
       order: [['isBestseller', 'DESC'], ['createdAt', 'DESC']],
     });
 
+    console.log(`[websiteProductController] database query executed. rows returned: ${products.length}`);
+
     const formattedProducts = products.map((p) => {
       const pJson = p.toJSON();
-      const mgmt = pJson.managementProduct;
 
       let imagesArr = [];
       try { imagesArr = JSON.parse(p.images || '[]'); } catch { imagesArr = p.images ? [p.images] : []; }
@@ -48,30 +43,27 @@ const getProducts = async (req, res) => {
       let ingredientsArr = [];
       try { ingredientsArr = JSON.parse(p.ingredients || '[]'); } catch { ingredientsArr = p.ingredients ? [p.ingredients] : []; }
 
-      // Real-time Option A read-through of central Management & Billing stock & price
-      const effectiveStock = mgmt ? Number(mgmt.stock) : Number(p.stock || 0);
-      const effectivePrice = mgmt ? (Number(mgmt.sellingPrice) || Number(mgmt.price) || Number(p.price)) : Number(p.price || 0);
-      const effectiveSku = mgmt?.sku || p.sku || '';
-
       return {
         ...pJson,
-        stock: effectiveStock,
-        price: effectivePrice,
-        sku: effectiveSku,
+        stock: Number(p.stock || 0),
+        price: Number(p.price || 0),
         images: imagesArr,
         benefits: benefitsArr,
         ingredients: ingredientsArr,
       };
     });
 
-    res.json({
+    const responsePayload = {
       success: true,
       count: formattedProducts.length,
       data: formattedProducts,
-    });
+    };
+
+    console.log('[websiteProductController] JSON returned count:', formattedProducts.length);
+    res.json(responsePayload);
   } catch (err) {
-    console.error('Error fetching website products:', err);
-    res.status(500).json({ success: false, message: 'Failed to fetch products' });
+    console.error('[websiteProductController Exception] Complete Stack Trace:\n', err.stack || err);
+    res.status(500).json({ success: false, message: 'Failed to fetch products', error: err.message });
   }
 };
 
@@ -81,13 +73,6 @@ const getProductBySlug = async (req, res) => {
     const { slug } = req.params;
     const product = await WebsiteProduct.findOne({
       where: { slug, isActive: true },
-      include: [
-        {
-          model: Product,
-          as: 'managementProduct',
-          attributes: ['id', 'name', 'sku', 'stock', 'sellingPrice', 'price', 'mrp', 'lowStockThreshold', 'unit'],
-        },
-      ],
     });
 
     if (!product) {
@@ -95,7 +80,6 @@ const getProductBySlug = async (req, res) => {
     }
 
     const pJson = product.toJSON();
-    const mgmt = pJson.managementProduct;
 
     let imagesArr = [];
     try { imagesArr = JSON.parse(product.images || '[]'); } catch { imagesArr = product.images ? [product.images] : []; }
@@ -121,17 +105,12 @@ const getProductBySlug = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
-    const effectiveStock = mgmt ? Number(mgmt.stock) : Number(product.stock || 0);
-    const effectivePrice = mgmt ? (Number(mgmt.sellingPrice) || Number(mgmt.price) || Number(product.price)) : Number(product.price || 0);
-    const effectiveSku = mgmt?.sku || product.sku || '';
-
     res.json({
       success: true,
       data: {
         ...pJson,
-        stock: effectiveStock,
-        price: effectivePrice,
-        sku: effectiveSku,
+        stock: Number(product.stock || 0),
+        price: Number(product.price || 0),
         images: imagesArr,
         benefits: benefitsArr,
         ingredients: ingredientsArr,

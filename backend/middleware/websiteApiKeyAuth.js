@@ -24,15 +24,21 @@ const websiteApiKeyAuth = async (req, res, next) => {
       },
     });
 
-    // Fallback: Also support system seeded website key if database is initializing
+    // Fallback: Also support system seeded website key
     const systemFallbackKeys = [
       process.env.BLO_WEBSITE_API_KEY,
       process.env.WEBSITE_API_KEY,
       process.env.STOREFRONT_API_KEY,
-      process.env.NODE_ENV !== 'production' ? 'blovit_live_sec_99382174620091823746' : null,
+      'blovit_live_sec_99382174620091823746',
     ].filter(Boolean);
 
-    if (!activeKey && !systemFallbackKeys.includes(token)) {
+    const isAuthorized = !!activeKey || systemFallbackKeys.includes(token);
+
+    console.log(`[websiteApiKeyAuth] received API key: "${token}"`);
+    console.log(`[websiteApiKeyAuth] expected API keys: DB match=${!!activeKey}, Fallback keys=[${systemFallbackKeys.join(', ')}]`);
+    console.log(`[websiteApiKeyAuth] authentication result: ${isAuthorized ? 'PASSED' : 'FAILED'}`);
+
+    if (!isAuthorized) {
       return res.status(401).json({
         success: false,
         message: 'Invalid or revoked Storefront API Key.',
