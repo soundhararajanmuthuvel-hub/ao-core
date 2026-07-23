@@ -1,10 +1,23 @@
 const cloudinary = require('cloudinary').v2;
 
-// Configure Cloudinary SDK with environment credentials
+// Dynamically resolve Cloudinary environment credentials
+let cloudName = process.env.CLOUDINARY_CLOUD_NAME || 'dacgzzpi';
+let apiKey = process.env.CLOUDINARY_API_KEY || '248258869444973';
+let apiSecret = process.env.CLOUDINARY_API_SECRET || 'b7if9RfwcV4XV3DJEH7Sry-rF-g';
+
+if (process.env.CLOUDINARY_URL) {
+  const match = process.env.CLOUDINARY_URL.match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
+  if (match) {
+    apiKey = match[1].trim();
+    apiSecret = match[2].trim();
+    cloudName = match[3].trim();
+  }
+}
+
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dacgzzpi',
-  api_key: process.env.CLOUDINARY_API_KEY || '248258869444973',
-  api_secret: process.env.CLOUDINARY_API_SECRET || 'b7if9RfwcV4XV3DJEH7Sry-rF-g',
+  cloud_name: cloudName,
+  api_key: apiKey,
+  api_secret: apiSecret,
   secure: true,
 });
 
@@ -25,41 +38,32 @@ const uploadImage = async (fileBufferOrPath, customOptions = {}) => {
   };
 
   return new Promise((resolve, reject) => {
-    if (Buffer.isBuffer(fileBufferOrPath)) {
-      const uploadStream = cloudinary.uploader.upload_stream(options, (error, result) => {
-        if (error) {
-          console.error('[Cloudinary Upload Error]', error);
-          return reject(new Error(`Cloudinary upload failed: ${error.message}`));
+    const handleUploadResult = (error, result) => {
+      if (error) {
+        console.error('[Cloudinary Upload Error]', error);
+        let errorMsg = error.message || 'Unknown upload error';
+        if (errorMsg.includes('Invalid api_key') || errorMsg.includes('unknown api_key')) {
+          errorMsg = `Cloudinary API Key "${apiKey}" is invalid or revoked. Please verify the active API Key in Cloudinary Settings.`;
         }
-        console.log(`[Cloudinary Upload Success] Public ID: ${result.public_id}, URL: ${result.secure_url}`);
-        resolve({
-          secure_url: result.secure_url,
-          url: result.secure_url,
-          public_id: result.public_id,
-          format: result.format,
-          width: result.width,
-          height: result.height,
-          bytes: result.bytes,
-        });
+        return reject(new Error(errorMsg));
+      }
+      console.log(`[Cloudinary Upload Success] Public ID: ${result.public_id}, URL: ${result.secure_url}`);
+      resolve({
+        secure_url: result.secure_url,
+        url: result.secure_url,
+        public_id: result.public_id,
+        format: result.format,
+        width: result.width,
+        height: result.height,
+        bytes: result.bytes,
       });
+    };
+
+    if (Buffer.isBuffer(fileBufferOrPath)) {
+      const uploadStream = cloudinary.uploader.upload_stream(options, handleUploadResult);
       uploadStream.end(fileBufferOrPath);
     } else if (typeof fileBufferOrPath === 'string') {
-      cloudinary.uploader.upload(fileBufferOrPath, options, (error, result) => {
-        if (error) {
-          console.error('[Cloudinary Upload Error]', error);
-          return reject(new Error(`Cloudinary upload failed: ${error.message}`));
-        }
-        console.log(`[Cloudinary Upload Success] Public ID: ${result.public_id}, URL: ${result.secure_url}`);
-        resolve({
-          secure_url: result.secure_url,
-          url: result.secure_url,
-          public_id: result.public_id,
-          format: result.format,
-          width: result.width,
-          height: result.height,
-          bytes: result.bytes,
-        });
-      });
+      cloudinary.uploader.upload(fileBufferOrPath, options, handleUploadResult);
     } else {
       reject(new Error('Invalid file input for Cloudinary upload. Must be Buffer or String path/DataURI.'));
     }

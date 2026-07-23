@@ -836,6 +836,29 @@ export default function EnterpriseProductEditor({
                   style={{ display: 'none' }}
                 />
               </label>
+
+              {/* FALLBACK DIRECT IMAGE URL INPUT */}
+              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem' }}>
+                <input
+                  type="url"
+                  placeholder="Or paste direct image URL..."
+                  value={customImageUrl || ''}
+                  onChange={(e) => setCustomImageUrl(e.target.value)}
+                  style={{ flex: 1, padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.78rem' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!customImageUrl?.trim()) return;
+                    setFormData((prev) => ({ ...prev, images: [...prev.images, customImageUrl.trim()] }));
+                    setCustomImageUrl('');
+                    setIsDirty(true);
+                  }}
+                  style={{ background: '#0284C7', color: '#FFF', border: 'none', borderRadius: '6px', padding: '0.4rem 0.65rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Add URL
+                </button>
+              </div>
             </div>
 
             {/* PRODUCT IMAGES GALLERY GRID */}
