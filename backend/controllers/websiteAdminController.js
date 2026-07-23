@@ -872,6 +872,40 @@ const getAdminAnalytics = async (req, res) => {
     console.error('Error fetching admin analytics:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch analytics' });
   }
+const generateProductAIContent = async (req, res) => {
+  try {
+    const { callGemini } = require('./aiController');
+    const { field, name, category } = req.body;
+    const prodName = name || 'Organic Health Drink';
+    const prodCat = category || 'Health Foods';
+    let prompt = '';
+
+    switch (field) {
+      case 'description':
+        prompt = `Generate an engaging, SEO-optimized product description for an organic health food product named "${prodName}" in category "${prodCat}". Keep it professional, enticing, and between 80-120 words. Return plain text.`;
+        break;
+      case 'benefits':
+        prompt = `Generate a JSON array of 4 distinct health benefits for product "${prodName}". Return ONLY a raw JSON array like ["100% Organic", "Boosts Energy", "Rich in Fiber", "Immunity Booster"]. No markdown codeblocks.`;
+        break;
+      case 'ingredients':
+        prompt = `Generate a JSON array of 5 natural ingredients for "${prodName}". Return ONLY a raw JSON array like ["Sprouted Ragi", "Almonds", "Cardamom", "Dates", "Cashews"]. No markdown codeblocks.`;
+        break;
+      case 'nutrition':
+        prompt = `Generate a JSON object of nutrition facts per 100g for product "${prodName}". Return ONLY a raw JSON object like {"Calories": "380 kcal", "Protein": "12.5g", "Calcium": "340mg", "Iron": "4.2mg", "Fiber": "8.1g"}. No markdown codeblocks.`;
+        break;
+      case 'seo':
+        prompt = `Generate SEO meta tags for product "${prodName}" in category "${prodCat}". Return ONLY a raw JSON object: {"metaTitle": "${prodName} - Pure Organic Health Drink", "metaDescription": "Buy ${prodName} online. 100% natural, nutrient-dense organic health blend.", "keywords": "${prodName.toLowerCase()}, organic malt, healthy drink, blovit"}. No markdown codeblocks.`;
+        break;
+      default:
+        prompt = `Provide 3 key highlights for product "${prodName}".`;
+    }
+
+    const aiResult = await callGemini(prompt, `ai_product_${field}`);
+    res.json({ success: true, field, result: aiResult });
+  } catch (err) {
+    console.error('AI Generation Error:', err);
+    res.status(500).json({ success: false, message: 'AI generation failed', error: err.message });
+  }
 };
 
 module.exports = {
@@ -906,4 +940,5 @@ module.exports = {
   updateAdminCoupon,
   deleteAdminCoupon,
   getAdminAnalytics,
+  generateProductAIContent,
 };

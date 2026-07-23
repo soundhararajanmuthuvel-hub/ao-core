@@ -35,6 +35,7 @@ const {
   updateAdminCoupon,
   deleteAdminCoupon,
   getAdminAnalytics,
+  generateProductAIContent,
 } = require('../controllers/websiteAdminController');
 
 const cloudinaryService = require('../services/cloudinaryService');
@@ -143,7 +144,8 @@ router.post('/coupons', createAdminCoupon);
 router.put('/coupons/:id', updateAdminCoupon);
 router.delete('/coupons/:id', deleteAdminCoupon);
 
-// Analytics
+// Analytics & AI Assistant
 router.get('/analytics', getAdminAnalytics);
+router.post('/ai-generate', generateProductAIContent);
 
 module.exports = router;
