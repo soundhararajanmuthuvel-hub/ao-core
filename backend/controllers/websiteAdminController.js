@@ -531,7 +531,13 @@ const approveAdminReferral = async (req, res) => {
     const { id } = req.params;
     const { discountAmount, adminNotes } = req.body;
 
-    const discountVal = Number(discountAmount) || 100.0; // Default ₹100 reward if unspecified
+    const discountVal = Number(discountAmount);
+    if (discountAmount === undefined || discountAmount === null || isNaN(discountVal) || discountVal <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Discount amount is required and must be a positive number.',
+      });
+    }
 
     const referral = await WebsiteReferral.findByPk(id);
     if (!referral) {
@@ -555,10 +561,6 @@ const approveAdminReferral = async (req, res) => {
       websiteCustomerId: referrer.id,
       isActive: true,
     });
-
-    // Also increment referrer accountCredit balance
-    referrer.accountCredit = Number(referrer.accountCredit || 0) + discountVal;
-    await referrer.save();
 
     referral.status = 'Approved';
     referral.discountAmount = discountVal;

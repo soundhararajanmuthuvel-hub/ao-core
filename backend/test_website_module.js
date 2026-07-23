@@ -114,31 +114,50 @@ async function runWebsiteModuleVerification() {
     });
     console.log(`✓ Customer cart state synced.`);
 
-    // 6. Admin Referral Approval -> Single-Use Coupon Auto-Generation Test
+    // 6. Admin Referral Approval Tests: Validation Error & Single Reward Mechanism
+    const websiteAdminController = require('./controllers/websiteAdminController');
+
+    // Test (a): Approval without discount amount should return 400 error
+    let validationErrorCaught = false;
+    const reqMockMissing = { params: { id: referralRecord.id }, body: {} };
+    const resMockMissing = {
+      status: function (code) {
+        this.statusCode = code;
+        return this;
+      },
+      json: function (data) {
+        if (this.statusCode === 400 && data.message.includes('Discount amount is required')) {
+          validationErrorCaught = true;
+        }
+        return this;
+      },
+    };
+    await websiteAdminController.approveAdminReferral(reqMockMissing, resMockMissing);
+
+    if (validationErrorCaught) {
+      console.log('✓ Validation Test Passed: Approving referral without discount amount correctly returned HTTP 400 ("Discount amount is required").');
+    } else {
+      throw new Error('Validation test failed: Missing discount amount was not rejected with HTTP 400.');
+    }
+
+    // Test (b): Approval with valid discount amount creates single-use coupon and does NOT double-reward accountCredit
     const rewardDiscountAmount = 150.0;
-    const couponCode = `REF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    let approvalResponseData = null;
+    const reqMockValid = { params: { id: referralRecord.id }, body: { discountAmount: rewardDiscountAmount } };
+    const resMockValid = {
+      status: function (code) { this.statusCode = code; return this; },
+      json: function (data) { approvalResponseData = data; return this; },
+    };
+    await websiteAdminController.approveAdminReferral(reqMockValid, resMockValid);
 
-    const rewardCoupon = await WebsiteCoupon.create({
-      code: couponCode,
-      type: 'flat',
-      value: rewardDiscountAmount,
-      minOrderValue: 0,
-      usageLimit: 1,
-      usedCount: 0,
-      websiteCustomerId: referrerCustomer.id,
-      isActive: true,
-    });
+    const checkReferrer = await WebsiteCustomer.findByPk(referrerCustomer.id);
+    const createdCoupon = await WebsiteCoupon.findOne({ where: { websiteCustomerId: referrerCustomer.id } });
 
-    referralRecord.status = 'Approved';
-    referralRecord.discountAmount = rewardDiscountAmount;
-    referralRecord.generatedCouponCode = couponCode;
-    referralRecord.approvedAt = new Date();
-    await referralRecord.save();
-
-    referrerCustomer.accountCredit = rewardDiscountAmount;
-    await referrerCustomer.save();
-
-    console.log(`✓ Referral approved! Auto-generated single-use reward coupon ${rewardCoupon.code} (₹${rewardCoupon.value}) for ${referrerCustomer.fullName}.`);
+    if (createdCoupon && createdCoupon.value == rewardDiscountAmount && checkReferrer.accountCredit == 0) {
+      console.log(`✓ Single Reward Test Passed: Referral approved! Single-use coupon ${createdCoupon.code} (₹${createdCoupon.value}) created for referrer. accountCredit remains 0.00 (no double reward).`);
+    } else {
+      throw new Error(`Single reward test failed: coupon=${!!createdCoupon}, accountCredit=${checkReferrer.accountCredit}`);
+    }
 
     // 7. Shipping Rule & Order Creation Test
     await WebsiteShippingRule.destroy({ where: { name: 'Standard Tamil Nadu Shipping' } });
