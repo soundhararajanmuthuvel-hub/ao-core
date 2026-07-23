@@ -120,6 +120,7 @@ export default function EnterpriseProductEditor({
   const [mediaSearchQuery, setMediaSearchQuery] = useState('');
   const [uploadingToCloudinary, setUploadingToCloudinary] = useState(false);
   const [selectedMediaItems, setSelectedMediaItems] = useState([]);
+  const [customImageUrl, setCustomImageUrl] = useState('');
 
   // Auto-generate slug when name changes if slug hasn't been manually edited
   useEffect(() => {

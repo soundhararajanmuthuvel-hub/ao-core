@@ -34,6 +34,7 @@ import {
 import client from '../api/client';
 import { resolveAssetUrl } from '../utils/url';
 import EnterpriseProductEditor from '../components/EnterpriseProductEditor';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const API_BASE = '/website-admin';
 
@@ -1074,13 +1075,15 @@ export default function WebsiteManagement() {
       )}
 
       {/* ENTERPRISE SHOPIFY-LEVEL PRODUCT EDITOR MODAL */}
-      <EnterpriseProductEditor
-        product={editingProduct}
-        isOpen={showProductModal}
-        onClose={() => setShowProductModal(false)}
-        onSaveSuccess={fetchData}
-        managementProductsList={managementProductsList}
-      />
+      <ErrorBoundary>
+        <EnterpriseProductEditor
+          product={editingProduct}
+          isOpen={showProductModal}
+          onClose={() => setShowProductModal(false)}
+          onSaveSuccess={fetchData}
+          managementProductsList={managementProductsList}
+        />
+      </ErrorBoundary>
 
       {/* MODAL: APPROVE REFERRAL */}
       {showApproveReferralModal && selectedReferral && (
