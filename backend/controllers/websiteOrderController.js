@@ -1,13 +1,14 @@
 const crypto = require('crypto');
+const Razorpay = require('razorpay');
 const WebsiteOrder = require('../models/WebsiteOrder');
 const WebsiteProduct = require('../models/WebsiteProduct');
 const WebsiteCoupon = require('../models/WebsiteCoupon');
 const WebsiteShippingRule = require('../models/WebsiteShippingRule');
 const WebsiteEvent = require('../models/WebsiteEvent');
 
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_blovit_mock_key';
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'rzp_test_blovit_mock_secret';
-const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET || 'whsec_blovit_webhook_secret_2026';
+const getRazorpayKeyId = () => process.env.RAZORPAY_KEY_ID || 'rzp_test_blovit_mock_key';
+const getRazorpayKeySecret = () => process.env.RAZORPAY_KEY_SECRET || 'rzp_test_blovit_mock_secret';
+const getRazorpayWebhookSecret = () => process.env.RAZORPAY_WEBHOOK_SECRET || 'whsec_blovit_webhook_secret_2026';
 
 // POST /api/website/razorpay/create-order
 const createRazorpayOrder = async (req, res) => {
@@ -83,10 +84,7 @@ const createRazorpayOrder = async (req, res) => {
     }
 
     // Calculate shipping
-    const pincode = shippingAddress.pincode || '';
-    const state = shippingAddress.state || '';
     let shippingCost = 50.0; // Default flat rate
-
     const shippingRule = await WebsiteShippingRule.findOne({
       where: { isActive: true },
       order: [['freeShippingThreshold', 'ASC']],
@@ -103,27 +101,33 @@ const createRazorpayOrder = async (req, res) => {
     }
 
     const totalAmount = Math.max(0, subtotal - discountAmount + shippingCost);
+    const amountPaise = Math.round(totalAmount * 100);
     const orderNumber = `BLO-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 90 + 10)}`;
+
+    const keyId = getRazorpayKeyId();
+    const keySecret = getRazorpayKeySecret();
 
     // Create Razorpay Order ID
     let razorpayOrderId = `order_${Math.random().toString(36).substring(2, 15)}`;
-    try {
-      if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
-        const Razorpay = require('razorpay');
+    if (keyId && keySecret && !keyId.includes('placeholder') && !keyId.includes('mock')) {
+      try {
         const instance = new Razorpay({
-          key_id: process.env.RAZORPAY_KEY_ID,
-          key_secret: process.env.RAZORPAY_KEY_SECRET,
+          key_id: keyId,
+          key_secret: keySecret,
         });
         const razorpayOrder = await instance.orders.create({
-          amount: Math.round(totalAmount * 100), // amount in paise
+          amount: amountPaise, // amount in paise
           currency: 'INR',
           receipt: orderNumber,
-          payment_capture: 1,
+          notes: {
+            orderNumber,
+            websiteCustomerId: customerId ? String(customerId) : 'guest',
+          },
         });
         razorpayOrderId = razorpayOrder.id;
+      } catch (rzpErr) {
+        console.warn('Razorpay API call failed, fallback to mock order ID:', rzpErr.message);
       }
-    } catch (rzpErr) {
-      console.warn('Razorpay API call fallback to generated order ID:', rzpErr.message);
     }
 
     // Save pending WebsiteOrder
@@ -152,9 +156,9 @@ const createRazorpayOrder = async (req, res) => {
       orderNumber: newOrder.orderNumber,
       razorpayOrderId: newOrder.razorpayOrderId,
       amount: totalAmount,
-      amountPaise: Math.round(totalAmount * 100),
+      amountPaise,
       currency: 'INR',
-      keyId: RAZORPAY_KEY_ID,
+      keyId,
     });
   } catch (err) {
     console.error('Error creating Razorpay order:', err);
@@ -162,7 +166,7 @@ const createRazorpayOrder = async (req, res) => {
   }
 };
 
-// POST /api/website/razorpay/verify
+// POST /api/website/razorpay/verify (Fast client-side UX verification)
 const verifyPayment = async (req, res) => {
   try {
     const { websiteOrderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
@@ -176,10 +180,11 @@ const verifyPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
+    const keySecret = getRazorpayKeySecret();
     let isValidSignature = true;
-    if (process.env.RAZORPAY_KEY_SECRET && razorpaySignature && razorpayOrderId) {
+    if (keySecret && razorpaySignature && razorpayOrderId && !keySecret.includes('mock') && !keySecret.includes('placeholder')) {
       const generatedSignature = crypto
-        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+        .createHmac('sha256', keySecret)
         .update(`${razorpayOrderId}|${razorpayPaymentId}`)
         .digest('hex');
       isValidSignature = generatedSignature === razorpaySignature;
@@ -205,17 +210,21 @@ const verifyPayment = async (req, res) => {
   }
 };
 
-// POST /api/website/razorpay/webhook (SOURCE OF TRUTH)
+// POST /api/website/razorpay/webhook (PRIMARY SOURCE OF TRUTH)
 const handleWebhook = async (req, res) => {
   try {
     const webhookSignature = req.headers['x-razorpay-signature'];
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || RAZORPAY_WEBHOOK_SECRET;
+    const webhookSecret = getRazorpayWebhookSecret();
 
-    // Verify HMAC SHA256 Signature
-    if (webhookSignature && webhookSecret) {
+    // Verify HMAC SHA256 Signature using raw request body
+    if (webhookSignature && webhookSecret && !webhookSecret.includes('placeholder')) {
+      const rawBody = req.rawBody 
+        ? (Buffer.isBuffer(req.rawBody) ? req.rawBody.toString('utf8') : req.rawBody) 
+        : (typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
+
       const expectedSignature = crypto
         .createHmac('sha256', webhookSecret)
-        .update(JSON.stringify(req.body))
+        .update(rawBody)
         .digest('hex');
 
       if (expectedSignature !== webhookSignature) {
@@ -279,10 +288,43 @@ const handleWebhook = async (req, res) => {
             eventData: JSON.stringify({
               orderNumber: order.orderNumber,
               totalAmount: order.totalAmount,
+              razorpayPaymentId,
             }),
           });
 
           console.log(`✓ Webhook successfully confirmed Order #${order.orderNumber} as Paid.`);
+        }
+      }
+    } else if (event === 'payment.failed') {
+      const paymentEntity = payload?.payment?.entity;
+      const razorpayOrderId = paymentEntity?.order_id;
+      const errorCode = paymentEntity?.error_code || 'PAYMENT_FAILED';
+      const errorDescription = paymentEntity?.error_description || 'Payment was unsuccessful';
+
+      if (razorpayOrderId) {
+        const order = await WebsiteOrder.findOne({ where: { razorpayOrderId } });
+        if (order && order.paymentStatus !== 'Captured') {
+          order.status = 'Failed';
+          order.paymentStatus = 'Failed';
+          order.notes = `Payment Failed: [${errorCode}] ${errorDescription}`;
+          await order.save();
+          console.warn(`⚠️ Webhook recorded payment failure for Order #${order.orderNumber}: ${errorDescription}`);
+        }
+      }
+    } else if (event === 'refund.processed' || event === 'refund.created') {
+      const refundEntity = payload?.refund?.entity;
+      const paymentId = refundEntity?.payment_id;
+      const refundId = refundEntity?.id;
+      const refundAmount = refundEntity?.amount ? (Number(refundEntity.amount) / 100) : 0;
+
+      if (paymentId) {
+        const order = await WebsiteOrder.findOne({ where: { razorpayPaymentId: paymentId } });
+        if (order) {
+          order.paymentStatus = 'Refunded';
+          order.status = 'Cancelled';
+          order.notes = `Refund Processed (${refundId}): ₹${refundAmount}`;
+          await order.save();
+          console.log(`✓ Webhook recorded refund for Order #${order.orderNumber}: ID ${refundId}, Amount ₹${refundAmount}`);
         }
       }
     }

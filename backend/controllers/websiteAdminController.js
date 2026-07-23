@@ -294,6 +294,8 @@ const updateAdminOrderStatus = async (req, res) => {
 const refundAdminOrder = async (req, res) => {
   try {
     const { id } = req.params;
+    const { amount, reason } = req.body;
+
     const order = await WebsiteOrder.findByPk(id);
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
@@ -303,31 +305,51 @@ const refundAdminOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No Razorpay payment ID recorded for this order.' });
     }
 
-    let refundResult = { id: `rfnd_mock_${Date.now()}` };
-    if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+    const refundAmount = (amount && Number(amount) > 0) ? Number(amount) : Number(order.totalAmount);
+    const refundAmountPaise = Math.round(refundAmount * 100);
+
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    let refundResult = null;
+
+    if (keyId && keySecret && !keyId.includes('placeholder') && !keyId.includes('mock')) {
       try {
         const Razorpay = require('razorpay');
         const instance = new Razorpay({
-          key_id: process.env.RAZORPAY_KEY_ID,
-          key_secret: process.env.RAZORPAY_KEY_SECRET,
+          key_id: keyId,
+          key_secret: keySecret,
         });
         refundResult = await instance.payments.refund(order.razorpayPaymentId, {
-          amount: Math.round(Number(order.totalAmount) * 100),
-          notes: { reason: 'Cancelled by ERP Admin' },
+          amount: refundAmountPaise,
+          notes: {
+            reason: reason || 'Triggered by ERP Admin',
+            orderNumber: order.orderNumber,
+          },
         });
       } catch (rzpErr) {
-        console.warn('Razorpay refund API call fallback:', rzpErr.message);
+        console.error('Razorpay refund API call error:', rzpErr);
+        return res.status(400).json({
+          success: false,
+          message: rzpErr.error?.description || rzpErr.message || 'Razorpay refund request failed',
+        });
       }
+    } else {
+      refundResult = { id: `rfnd_mock_${Date.now()}`, amount: refundAmountPaise, status: 'processed' };
     }
 
-    order.paymentStatus = 'Refunded';
-    order.status = 'Cancelled';
+    const isFullRefund = refundAmount >= Number(order.totalAmount);
+    order.paymentStatus = isFullRefund ? 'Refunded' : 'Partially Refunded';
+    if (isFullRefund) {
+      order.status = 'Cancelled';
+    }
+    order.notes = `Refund of ₹${refundAmount.toFixed(2)} processed (${refundResult.id || 'N/A'}). ${reason || ''}`.trim();
     await order.save();
 
     res.json({
       success: true,
-      message: `Order #${order.orderNumber} successfully refunded via Razorpay.`,
+      message: `Order #${order.orderNumber} successfully refunded ₹${refundAmount.toFixed(2)} via Razorpay.`,
       refundData: refundResult,
+      order,
     });
   } catch (err) {
     console.error('Error processing refund:', err);
