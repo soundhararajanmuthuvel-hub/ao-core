@@ -27,9 +27,9 @@ const websiteApiKeyAuth = async (req, res, next) => {
     // Fallback: Also support system seeded website key if database is initializing
     const systemFallbackKeys = [
       process.env.BLO_WEBSITE_API_KEY,
-      'blovit_live_sec_99382174620091823746',
-      'blovit_live_mrxfusiy_04ux73qg',
-      'blovit_website_secret_key_2026',
+      process.env.WEBSITE_API_KEY,
+      process.env.STOREFRONT_API_KEY,
+      process.env.NODE_ENV !== 'production' ? 'blovit_live_sec_99382174620091823746' : null,
     ].filter(Boolean);
 
     if (!activeKey && !systemFallbackKeys.includes(token)) {
