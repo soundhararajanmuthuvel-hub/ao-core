@@ -43,11 +43,28 @@ const storage = multer.diskStorage({
     cb(null, path.join(__dirname, '../uploads'));
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(file.originalname).toLowerCase();
     cb(null, `website_prod_${Date.now()}_${Math.random().toString(36).substring(2, 7)}${ext}`);
   },
 });
-const upload = multer({ storage });
+
+const fileFilter = (req, file, cb) => {
+  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+  const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
+  const ext = path.extname(file.originalname).toLowerCase();
+
+  if (allowedMimeTypes.includes(file.mimetype) || allowedExts.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file format. Only JPG, PNG, and WEBP images are allowed.'), false);
+  }
+};
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB per file max
+  fileFilter,
+});
 
 // All website admin routes require AO Core ERP Admin Auth
 router.use(auth);
@@ -57,16 +74,27 @@ router.get('/api-key', getApiKey);
 router.post('/api-key/regenerate', regenerateApiKey);
 
 // Image upload
-router.post('/upload-image', upload.array('images', 5), (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ success: false, message: 'No image files uploaded.' });
+router.post('/upload-image', (req, res, next) => {
+  upload.array('images', 10)(req, res, (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ success: false, message: 'Image size exceeds maximum limit of 5MB.' });
+        }
+        return res.status(400).json({ success: false, message: err.message });
+      }
+      return res.status(400).json({ success: false, message: err.message || 'Image upload failed.' });
     }
-    const fileUrls = req.files.map((file) => `/uploads/${file.filename}`);
-    res.json({ success: true, urls: fileUrls });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Image upload failed' });
-  }
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ success: false, message: 'No image files uploaded.' });
+      }
+      const fileUrls = req.files.map((file) => `/uploads/${file.filename}`);
+      res.json({ success: true, urls: fileUrls });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Image upload processing failed.' });
+    }
+  });
 });
 
 // Product Management

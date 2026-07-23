@@ -29,14 +29,19 @@ const getProducts = async (req, res) => {
 
     const formattedProducts = products.map((p) => {
       let imagesArr = [];
-      try {
-        imagesArr = JSON.parse(p.images || '[]');
-      } catch {
-        imagesArr = p.images ? [p.images] : [];
-      }
+      try { imagesArr = JSON.parse(p.images || '[]'); } catch { imagesArr = p.images ? [p.images] : []; }
+
+      let benefitsArr = [];
+      try { benefitsArr = JSON.parse(p.benefits || '[]'); } catch { benefitsArr = p.benefits ? [p.benefits] : []; }
+
+      let ingredientsArr = [];
+      try { ingredientsArr = JSON.parse(p.ingredients || '[]'); } catch { ingredientsArr = p.ingredients ? [p.ingredients] : []; }
+
       return {
         ...p.toJSON(),
         images: imagesArr,
+        benefits: benefitsArr,
+        ingredients: ingredientsArr,
       };
     });
 

@@ -85,7 +85,19 @@ const getAdminProducts = async (req, res) => {
     const data = products.map((p) => {
       let imagesArr = [];
       try { imagesArr = JSON.parse(p.images || '[]'); } catch { imagesArr = p.images ? [p.images] : []; }
-      return { ...p.toJSON(), images: imagesArr };
+
+      let benefitsArr = [];
+      try { benefitsArr = JSON.parse(p.benefits || '[]'); } catch { benefitsArr = p.benefits ? [p.benefits] : []; }
+
+      let ingredientsArr = [];
+      try { ingredientsArr = JSON.parse(p.ingredients || '[]'); } catch { ingredientsArr = p.ingredients ? [p.ingredients] : []; }
+
+      return {
+        ...p.toJSON(),
+        images: imagesArr,
+        benefits: benefitsArr,
+        ingredients: ingredientsArr,
+      };
     });
 
     res.json({ success: true, count: data.length, data });
@@ -127,18 +139,28 @@ const createAdminProduct = async (req, res) => {
       return res.status(400).json({ success: false, message: 'A product with this URL slug already exists.' });
     }
 
+    const formatArrayJson = (val) => {
+      if (Array.isArray(val)) return JSON.stringify(val);
+      if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (trimmed.startsWith('[')) return trimmed;
+        return JSON.stringify(trimmed ? [trimmed] : []);
+      }
+      return '[]';
+    };
+
     const newProduct = await WebsiteProduct.create({
       name,
       slug: finalSlug,
       price,
       compareAtPrice: compareAtPrice || 0,
       stock: stock || 0,
-      images: typeof images === 'object' ? JSON.stringify(images) : images || '[]',
+      images: formatArrayJson(images),
       category: category || 'General',
       description: description || '',
       shortDescription: shortDescription || '',
-      benefits: typeof benefits === 'object' ? JSON.stringify(benefits) : benefits || '[]',
-      ingredients: typeof ingredients === 'object' ? JSON.stringify(ingredients) : ingredients || '[]',
+      benefits: formatArrayJson(benefits),
+      ingredients: formatArrayJson(ingredients),
       nutritionFacts: typeof nutritionFacts === 'object' ? JSON.stringify(nutritionFacts) : nutritionFacts || '{}',
       usageInstructions: usageInstructions || '',
       isBestseller: !!isBestseller,
@@ -191,16 +213,26 @@ const updateAdminProduct = async (req, res) => {
       product.slug = newSlug;
     }
 
+    const formatArrayJson = (val) => {
+      if (Array.isArray(val)) return JSON.stringify(val);
+      if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (trimmed.startsWith('[')) return trimmed;
+        return JSON.stringify(trimmed ? [trimmed] : []);
+      }
+      return '[]';
+    };
+
     if (name !== undefined) product.name = name;
     if (price !== undefined) product.price = price;
     if (compareAtPrice !== undefined) product.compareAtPrice = compareAtPrice;
     if (stock !== undefined) product.stock = stock;
-    if (images !== undefined) product.images = typeof images === 'object' ? JSON.stringify(images) : images;
+    if (images !== undefined) product.images = formatArrayJson(images);
     if (category !== undefined) product.category = category;
     if (description !== undefined) product.description = description;
     if (shortDescription !== undefined) product.shortDescription = shortDescription;
-    if (benefits !== undefined) product.benefits = typeof benefits === 'object' ? JSON.stringify(benefits) : benefits;
-    if (ingredients !== undefined) product.ingredients = typeof ingredients === 'object' ? JSON.stringify(ingredients) : ingredients;
+    if (benefits !== undefined) product.benefits = formatArrayJson(benefits);
+    if (ingredients !== undefined) product.ingredients = formatArrayJson(ingredients);
     if (nutritionFacts !== undefined) product.nutritionFacts = typeof nutritionFacts === 'object' ? JSON.stringify(nutritionFacts) : nutritionFacts;
     if (usageInstructions !== undefined) product.usageInstructions = usageInstructions;
     if (isBestseller !== undefined) product.isBestseller = !!isBestseller;

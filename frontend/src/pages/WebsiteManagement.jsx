@@ -24,11 +24,17 @@ import {
   Check,
   X,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Upload,
+  Image as ImageIcon,
+  ArrowLeft,
+  ArrowRight,
+  Star as StarIcon
 } from 'lucide-react';
 import client from '../api/client';
+import { resolveAssetUrl } from '../utils/url';
 
-const API_BASE = '/api/website-admin';
+const API_BASE = '/website-admin';
 
 export default function WebsiteManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -61,9 +67,9 @@ export default function WebsiteManagement() {
   const [analytics, setAnalytics] = useState(null);
 
   // Modals & Selections
-  const [selectedOrder, setSelectedOrder] = useState(null);
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [productForm, setProductForm] = useState({
     name: '',
     slug: '',
@@ -73,13 +79,124 @@ export default function WebsiteManagement() {
     category: 'Malt Blends',
     description: '',
     shortDescription: '',
-    benefits: '',
-    ingredients: '',
+    images: [],
+    benefits: ['100% Organic', 'Boosts Immunity', 'Rich in Calcium'],
+    ingredients: ['Sprouted Ragi', 'Almonds', 'Cardamom'],
     nutritionFacts: '',
     usageInstructions: '',
     isBestseller: false,
     isActive: true,
   });
+
+  // Image Upload & Management Handlers
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    for (const file of files) {
+      if (file.size > 5 * 1024 * 1024) {
+        setMsg({ type: 'error', text: `File "${file.name}" exceeds maximum allowed size of 5MB.` });
+        return;
+      }
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+      if (!validTypes.includes(file.type.toLowerCase()) && !file.name.match(/\.(jpg|jpeg|png|webp)$/i)) {
+        setMsg({ type: 'error', text: `File "${file.name}" is not a supported format. Only JPG, PNG, and WEBP images are allowed.` });
+        return;
+      }
+    }
+
+    setUploadingImage(true);
+    setMsg({ type: '', text: '' });
+    const formData = new FormData();
+    files.forEach((file) => formData.append('images', file));
+
+    try {
+      const res = await client.post(`${API_BASE}/upload-image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (res.data.success && res.data.urls) {
+        setProductForm((prev) => ({
+          ...prev,
+          images: [...(prev.images || []), ...res.data.urls],
+        }));
+        setMsg({ type: 'success', text: `${res.data.urls.length} image(s) uploaded successfully!` });
+      }
+    } catch (err) {
+      setMsg({ type: 'error', text: err.response?.data?.message || 'Image upload failed.' });
+    } finally {
+      setUploadingImage(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleSetPrimaryImage = (index) => {
+    if (index === 0) return;
+    setProductForm((prev) => {
+      const newImages = [...prev.images];
+      const [selected] = newImages.splice(index, 1);
+      newImages.unshift(selected);
+      return { ...prev, images: newImages };
+    });
+  };
+
+  const handleMoveImage = (index, direction) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= productForm.images.length) return;
+    setProductForm((prev) => {
+      const newImages = [...prev.images];
+      const temp = newImages[index];
+      newImages[index] = newImages[targetIndex];
+      newImages[targetIndex] = temp;
+      return { ...prev, images: newImages };
+    });
+  };
+
+  const handleRemoveImage = (index) => {
+    setProductForm((prev) => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index),
+    }));
+  };
+
+  // Benefits Repeatable List Handlers
+  const handleAddBenefit = () => {
+    setProductForm((prev) => ({ ...prev, benefits: [...(prev.benefits || []), ''] }));
+  };
+
+  const handleUpdateBenefit = (index, val) => {
+    setProductForm((prev) => {
+      const updated = [...(prev.benefits || [])];
+      updated[index] = val;
+      return { ...prev, benefits: updated };
+    });
+  };
+
+  const handleRemoveBenefit = (index) => {
+    setProductForm((prev) => ({
+      ...prev,
+      benefits: (prev.benefits || []).filter((_, i) => i !== index),
+    }));
+  };
+
+  // Ingredients Repeatable List Handlers
+  const handleAddIngredient = () => {
+    setProductForm((prev) => ({ ...prev, ingredients: [...(prev.ingredients || []), ''] }));
+  };
+
+  const handleUpdateIngredient = (index, val) => {
+    setProductForm((prev) => {
+      const updated = [...(prev.ingredients || [])];
+      updated[index] = val;
+      return { ...prev, ingredients: updated };
+    });
+  };
+
+  const handleRemoveIngredient = (index) => {
+    setProductForm((prev) => ({
+      ...prev,
+      ingredients: (prev.ingredients || []).filter((_, i) => i !== index),
+    }));
+  };
 
   const [showResetPassModal, setShowResetPassModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -186,11 +303,22 @@ export default function WebsiteManagement() {
     e.preventDefault();
     setLoading(true);
     try {
+      const payload = {
+        ...productForm,
+        benefits: Array.isArray(productForm.benefits)
+          ? productForm.benefits.map((b) => b.trim()).filter(Boolean)
+          : [],
+        ingredients: Array.isArray(productForm.ingredients)
+          ? productForm.ingredients.map((i) => i.trim()).filter(Boolean)
+          : [],
+        images: Array.isArray(productForm.images) ? productForm.images : [],
+      };
+
       if (editingProduct) {
-        await client.put(`${API_BASE}/products/${editingProduct.id}`, productForm);
+        await client.put(`${API_BASE}/products/${editingProduct.id}`, payload);
         setMsg({ type: 'success', text: 'Product updated successfully!' });
       } else {
-        await client.post(`${API_BASE}/products`, productForm);
+        await client.post(`${API_BASE}/products`, payload);
         setMsg({ type: 'success', text: 'New website product created!' });
       }
       setShowProductModal(false);
@@ -441,8 +569,9 @@ export default function WebsiteManagement() {
                   category: 'Malt Blends',
                   description: '',
                   shortDescription: '',
-                  benefits: '["100% Organic", "Boosts Immunity", "Rich in Calcium"]',
-                  ingredients: '["Sprouted Ragi", "Almonds", "Cardamom"]',
+                  images: [],
+                  benefits: ['100% Organic', 'Boosts Immunity', 'Rich in Calcium'],
+                  ingredients: ['Sprouted Ragi', 'Almonds', 'Cardamom'],
                   nutritionFacts: '{"Calories": "180 kcal", "Protein": "6g", "Calcium": "120mg"}',
                   usageInstructions: 'Mix 2 tbsp with warm milk or water. Stir well and serve.',
                   isBestseller: false,
@@ -471,65 +600,106 @@ export default function WebsiteManagement() {
                 </tr>
               </thead>
               <tbody>
-                {products.map((p) => (
-                  <tr key={p.id}>
-                    <td>
-                      <div style={{ fontWeight: 700 }}>{p.name}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>/{p.slug}</div>
-                    </td>
-                    <td>{p.category || 'General'}</td>
-                    <td style={{ fontWeight: 700, color: 'var(--primary-color)' }}>₹{p.price}</td>
-                    <td style={{ textDecoration: 'line-through', color: 'var(--text-secondary)' }}>{p.compareAtPrice ? `₹${p.compareAtPrice}` : '-'}</td>
-                    <td>
-                      <span className={`badge ${p.stock > 10 ? 'badge-success' : 'badge-warning'}`}>
-                        {p.stock} units
-                      </span>
-                    </td>
-                    <td>{p.isBestseller ? <Sparkles size={16} style={{ color: '#F59E0B' }} /> : '-'}</td>
-                    <td>
-                      <span className={`badge ${p.isActive ? 'badge-success' : 'badge-secondary'}`}>
-                        {p.isActive ? 'Active' : 'Draft'}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                          className="btn btn-secondary"
-                          style={{ padding: '0.3rem 0.5rem' }}
-                          onClick={() => {
-                            setEditingProduct(p);
-                            setProductForm({
-                              name: p.name,
-                              slug: p.slug,
-                              price: p.price,
-                              compareAtPrice: p.compareAtPrice || '',
-                              stock: p.stock,
-                              category: p.category || '',
-                              description: p.description || '',
-                              shortDescription: p.shortDescription || '',
-                              benefits: typeof p.benefits === 'object' ? JSON.stringify(p.benefits) : p.benefits || '',
-                              ingredients: typeof p.ingredients === 'object' ? JSON.stringify(p.ingredients) : p.ingredients || '',
-                              nutritionFacts: typeof p.nutritionFacts === 'object' ? JSON.stringify(p.nutritionFacts) : p.nutritionFacts || '',
-                              usageInstructions: p.usageInstructions || '',
-                              isBestseller: !!p.isBestseller,
-                              isActive: !!p.isActive,
-                            });
-                            setShowProductModal(true);
-                          }}
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          style={{ padding: '0.3rem 0.5rem', color: '#EF4444' }}
-                          onClick={() => handleDeleteProduct(p.id)}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {products.map((p) => {
+                  let pImages = [];
+                  if (Array.isArray(p.images)) {
+                    pImages = p.images;
+                  } else {
+                    try { pImages = JSON.parse(p.images || '[]'); } catch { pImages = p.images ? [p.images] : []; }
+                  }
+
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          {pImages && pImages.length > 0 ? (
+                            <img
+                              src={resolveAssetUrl(pImages[0])}
+                              alt={p.name}
+                              style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-color)' }}
+                            />
+                          ) : (
+                            <div style={{ width: 40, height: 40, borderRadius: '6px', background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF' }}>
+                              <ImageIcon size={20} />
+                            </div>
+                          )}
+                          <div>
+                            <div style={{ fontWeight: 700 }}>{p.name}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>/{p.slug}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>{p.category || 'General'}</td>
+                      <td style={{ fontWeight: 700, color: 'var(--primary-color)' }}>₹{p.price}</td>
+                      <td style={{ textDecoration: 'line-through', color: 'var(--text-secondary)' }}>{p.compareAtPrice ? `₹${p.compareAtPrice}` : '-'}</td>
+                      <td>
+                        <span className={`badge ${p.stock > 10 ? 'badge-success' : 'badge-warning'}`}>
+                          {p.stock} units
+                        </span>
+                      </td>
+                      <td>{p.isBestseller ? <Sparkles size={16} style={{ color: '#F59E0B' }} /> : '-'}</td>
+                      <td>
+                        <span className={`badge ${p.isActive ? 'badge-success' : 'badge-secondary'}`}>
+                          {p.isActive ? 'Active' : 'Draft'}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '0.3rem 0.5rem' }}
+                            onClick={() => {
+                              let ben = [];
+                              if (Array.isArray(p.benefits)) {
+                                ben = p.benefits;
+                              } else {
+                                try { ben = JSON.parse(p.benefits || '[]'); } catch { ben = p.benefits ? [p.benefits] : []; }
+                              }
+                              if (ben.length === 0) ben = [''];
+
+                              let ing = [];
+                              if (Array.isArray(p.ingredients)) {
+                                ing = p.ingredients;
+                              } else {
+                                try { ing = JSON.parse(p.ingredients || '[]'); } catch { ing = p.ingredients ? [p.ingredients] : []; }
+                              }
+                              if (ing.length === 0) ing = [''];
+
+                              setEditingProduct(p);
+                              setProductForm({
+                                name: p.name,
+                                slug: p.slug,
+                                price: p.price,
+                                compareAtPrice: p.compareAtPrice || '',
+                                stock: p.stock,
+                                category: p.category || '',
+                                description: p.description || '',
+                                shortDescription: p.shortDescription || '',
+                                images: pImages,
+                                benefits: ben,
+                                ingredients: ing,
+                                nutritionFacts: typeof p.nutritionFacts === 'object' ? JSON.stringify(p.nutritionFacts) : p.nutritionFacts || '',
+                                usageInstructions: p.usageInstructions || '',
+                                isBestseller: !!p.isBestseller,
+                                isActive: !!p.isActive,
+                              });
+                              setShowProductModal(true);
+                            }}
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '0.3rem 0.5rem', color: '#EF4444' }}
+                            onClick={() => handleDeleteProduct(p.id)}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {products.length === 0 && (
                   <tr>
                     <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
@@ -929,23 +1099,208 @@ export default function WebsiteManagement() {
                 </div>
               </div>
 
+              {/* PRODUCT PHOTOS UPLOAD & GALLERY */}
+              <div style={{ marginBottom: '1.25rem', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '1rem', background: '#FAFAFA' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                  <ImageIcon size={18} style={{ color: 'var(--primary-color)' }} /> Product Photos (Multiple Images)
+                </label>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                  Upload product gallery photos (JPG, PNG, WEBP, max 5MB each). The first image will be set as the <strong>Cover / Primary Image</strong>.
+                </p>
+
+                {/* FILE INPUT / UPLOAD ZONE */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justify: 'center',
+                      padding: '1rem',
+                      border: '2px dashed var(--border-color)',
+                      borderRadius: '8px',
+                      cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                      background: '#FFF',
+                      transition: 'border-color 0.2s',
+                    }}
+                  >
+                    <Upload size={24} style={{ color: 'var(--primary-color)', marginBottom: '0.4rem' }} />
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {uploadingImage ? 'Uploading Photos...' : 'Click or Drag images to upload'}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Supports JPG, PNG, WEBP (Max 5MB per file)</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/jpeg,image/png,image/webp,image/jpg"
+                      disabled={uploadingImage}
+                      onChange={handleImageUpload}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </div>
+
+                {/* THUMBNAIL GALLERY GRID */}
+                {productForm.images && productForm.images.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.75rem' }}>
+                    {productForm.images.map((imgUrl, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          position: 'relative',
+                          border: index === 0 ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          background: '#FFF',
+                          padding: '4px',
+                        }}
+                      >
+                        <img
+                          src={resolveAssetUrl(imgUrl)}
+                          alt={`Thumbnail ${index + 1}`}
+                          style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
+                        />
+                        {index === 0 && (
+                          <span
+                            style={{
+                              position: 'absolute',
+                              top: 6,
+                              left: 6,
+                              background: 'var(--primary-color)',
+                              color: '#FFF',
+                              fontSize: '0.65rem',
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                            }}
+                          >
+                            Cover
+                          </span>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                          {index !== 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => handleSetPrimaryImage(index)}
+                              title="Set as Cover Image"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--primary-color)', fontSize: '0.7rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 2 }}
+                            >
+                              <StarIcon size={12} /> Cover
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Primary</span>
+                          )}
+                          <div style={{ display: 'flex', gap: 2 }}>
+                            {index > 0 && (
+                              <button type="button" onClick={() => handleMoveImage(index, -1)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }} title="Move Left">
+                                <ArrowLeft size={12} />
+                              </button>
+                            )}
+                            {index < productForm.images.length - 1 && (
+                              <button type="button" onClick={() => handleMoveImage(index, 1)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }} title="Move Right">
+                                <ArrowRight size={12} />
+                              </button>
+                            )}
+                            <button type="button" onClick={() => handleRemoveImage(index)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#EF4444' }} title="Remove Image">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* BENEFITS (REPEATABLE LIST) */}
               <div style={{ marginBottom: '1rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Benefits (JSON array string)</label>
-                <input
-                  type="text"
-                  value={productForm.benefits}
-                  onChange={(e) => setProductForm({ ...productForm, benefits: e.target.value })}
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontFamily: 'monospace' }}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Key Product Benefits (Structured Tag List)</label>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleAddBenefit}
+                    style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    <Plus size={14} /> Add Benefit
+                  </button>
+                </div>
+                {(productForm.benefits || []).map((benefit, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                    <input
+                      type="text"
+                      placeholder={`Benefit #${index + 1} (e.g. Boosts immunity)`}
+                      value={benefit}
+                      onChange={(e) => handleUpdateBenefit(index, e.target.value)}
+                      style={{ flex: 1, padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.9rem' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveBenefit(index)}
+                      style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#EF4444', padding: '0.4rem 0.6rem', cursor: 'pointer' }}
+                      title="Remove Benefit"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* INGREDIENTS (REPEATABLE LIST) */}
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Product Ingredients (Structured List)</label>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleAddIngredient}
+                    style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    <Plus size={14} /> Add Ingredient
+                  </button>
+                </div>
+                {(productForm.ingredients || []).map((ingredient, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                    <input
+                      type="text"
+                      placeholder={`Ingredient #${index + 1} (e.g. Sprouted Ragi)`}
+                      value={ingredient}
+                      onChange={(e) => handleUpdateIngredient(index, e.target.value)}
+                      style={{ flex: 1, padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.9rem' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveIngredient(index)}
+                      style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#EF4444', padding: '0.4rem 0.6rem', cursor: 'pointer' }}
+                      title="Remove Ingredient"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* USAGE INSTRUCTIONS */}
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Usage Instructions (Single Formatted Text)</label>
+                <textarea
+                  rows="3"
+                  value={productForm.usageInstructions}
+                  onChange={(e) => setProductForm({ ...productForm, usageInstructions: e.target.value })}
+                  placeholder="e.g. Mix 2 tbsp with warm milk or water. Stir well and serve."
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.9rem' }}
                 />
               </div>
 
+              {/* SHORT DESCRIPTION */}
               <div style={{ marginBottom: '1rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Ingredients (JSON array string)</label>
-                <input
-                  type="text"
-                  value={productForm.ingredients}
-                  onChange={(e) => setProductForm({ ...productForm, ingredients: e.target.value })}
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontFamily: 'monospace' }}
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Short Description</label>
+                <textarea
+                  rows="2"
+                  value={productForm.shortDescription}
+                  onChange={(e) => setProductForm({ ...productForm, shortDescription: e.target.value })}
+                  placeholder="Short tagline or summary for product cards..."
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.9rem' }}
                 />
               </div>
 
