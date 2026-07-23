@@ -1,12 +1,13 @@
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
+import { useModule } from '../context/ModuleContext';
 import { resolveAssetUrl } from '../utils/url';
 import { useCompanyBrand } from '../context/CompanyBrandContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { sfaApi, ordersApi, shippingApi, productsApi, customersApi } from '../api';
-import { menuStructure } from './menuConfig';
+import { menuStructure, websiteMenuStructure } from './menuConfig';
 
 const badgeStyle = {
   fontSize: '0.7rem',
@@ -24,15 +25,19 @@ export default function Sidebar({ collapsed, open, onClose }) {
   const { logoUrl } = useCompanyBrand();
   const { user } = useAuth();
   const { settings } = useSettings();
+  const { activeModule } = useModule();
   const location = useLocation();
 
   const userRole = user?.role || '';
   const isUserAdmin = userRole === 'admin' || userRole === 'Super Admin';
 
+  const isWebsite = activeModule === 'website';
+  const currentMenu = isWebsite ? websiteMenuStructure : menuStructure;
+
   useEffect(() => {
     console.log('=== AO CORE ERP MENU CONFIGURATION AUDIT ===');
-    console.log('User Role:', userRole);
-    const desktopItems = menuStructure.map(item => {
+    console.log('User Role:', userRole, 'Module:', activeModule);
+    const desktopItems = currentMenu.map(item => {
       const allowed = hasAccess(item);
       return {
         Label: item.label,
@@ -42,7 +47,7 @@ export default function Sidebar({ collapsed, open, onClose }) {
       };
     });
     console.table(desktopItems);
-  }, [userRole]);
+  }, [userRole, activeModule]);
 
   const [expandedMenus, setExpandedMenus] = useState(() => {
     const saved = localStorage.getItem('sidebar_expanded_menus');
@@ -141,13 +146,15 @@ export default function Sidebar({ collapsed, open, onClose }) {
       style={{ overflowX: 'hidden' }}
     >
       <Link 
-        to="/" 
+        to={isWebsite ? '/website' : '/'} 
         className={`sidebar-brand-card ${collapsed ? 'collapsed' : ''}`}
         onClick={onClose}
         style={{
-          background: settings?.brandColor ? `linear-gradient(135deg, ${settings.brandColor}, #401e07)` : 'linear-gradient(135deg, #5a2d0c, #401e07)',
+          background: isWebsite 
+            ? 'linear-gradient(135deg, #1e1b4b, #311b92)' 
+            : (settings?.brandColor ? `linear-gradient(135deg, ${settings.brandColor}, #401e07)` : 'linear-gradient(135deg, #5a2d0c, #401e07)'),
           boxShadow: 'none',
-          borderLeft: '4px solid #ffffff'
+          borderLeft: isWebsite ? '4px solid #818cf8' : '4px solid #ffffff'
         }}
       >
         <div className="brand-header-flex">
@@ -161,7 +168,9 @@ export default function Sidebar({ collapsed, open, onClose }) {
           {!collapsed && (
             <div className="brand-info">
               <h1 className="brand-name">{settings?.companyName || 'Amudhasurabiy Organics'}</h1>
-              <div className="brand-subtitle">Manufacturing ERP</div>
+              <div className="brand-subtitle" style={{ color: isWebsite ? '#c7d2fe' : 'rgba(255,255,255,0.75)', fontWeight: 700 }}>
+                {isWebsite ? '🌐 Blovit eCommerce' : '🏭 Manufacturing ERP'}
+              </div>
             </div>
           )}
         </div>
@@ -174,7 +183,7 @@ export default function Sidebar({ collapsed, open, onClose }) {
         )}
       </Link>
 
-      {!collapsed && (
+      {!collapsed && !isWebsite && (
         <div className="sidebar-quick-stats">
           <div className="stat-card">
             <span className="stat-value">{stats.products}</span>
@@ -191,20 +200,43 @@ export default function Sidebar({ collapsed, open, onClose }) {
         </div>
       )}
 
+      {isWebsite && !collapsed && (
+        <div style={{
+          padding: '0.65rem 0.85rem',
+          margin: '0.5rem 0.75rem',
+          background: 'rgba(99, 102, 241, 0.12)',
+          border: '1px solid rgba(129, 140, 248, 0.25)',
+          borderRadius: '8px',
+          color: '#a5b4fc',
+          fontSize: '0.78rem',
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <span>🌐</span>
+          <span>Blovit Storefront Admin</span>
+        </div>
+      )}
+
       <nav className="sidebar-nav" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        {menuStructure.filter(hasAccess).map((item) => {
+        {currentMenu.filter(hasAccess).map((item) => {
           const IconComponent = item.icon;
           if (item.type === 'link') {
-            const isLinkActive = location.pathname === item.to.split('?')[0];
+            const isLinkActive = item.tabId 
+              ? (location.pathname === '/website' && (location.search === `?tab=${item.tabId}` || (!location.search && item.tabId === 'api-key')))
+              : (location.pathname === item.to.split('?')[0]);
+
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.end}
-                id={`tour-${item.label.toLowerCase()}`}
+                id={`tour-${item.label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
                 className={() => `nav-item ${isLinkActive ? 'active' : ''}`}
                 onClick={onClose}
                 data-tooltip={item.label}
+                style={isLinkActive && isWebsite ? { backgroundColor: '#4338ca', color: '#ffffff' } : {}}
               >
                 <span className="nav-icon">
                   <IconComponent size={18} />

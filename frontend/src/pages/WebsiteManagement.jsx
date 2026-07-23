@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Globe,
   Key,
@@ -25,12 +26,25 @@ import {
   Sparkles,
   AlertCircle
 } from 'lucide-react';
-import axios from 'axios';
+import client from '../api/client';
 
 const API_BASE = '/api/website-admin';
 
 export default function WebsiteManagement() {
-  const [activeTab, setActiveTab] = useState('api-key');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'api-key';
+  const [activeTab, setActiveTabState] = useState(initialTab);
+
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') || 'api-key';
+    setActiveTabState(tabFromUrl);
+  }, [searchParams]);
+
+  const setActiveTab = (tabId) => {
+    setActiveTabState(tabId);
+    setSearchParams({ tab: tabId });
+  };
+
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ type: '', text: '' });
 
@@ -107,32 +121,32 @@ export default function WebsiteManagement() {
     setMsg({ type: '', text: '' });
     try {
       if (tab === 'api-key') {
-        const res = await axios.get(`${API_BASE}/api-key`);
+        const res = await client.get(`${API_BASE}/api-key`);
         setApiKeyData(res.data.data);
       } else if (tab === 'products') {
-        const res = await axios.get(`${API_BASE}/products`);
+        const res = await client.get(`${API_BASE}/products`);
         setProducts(res.data.data || []);
       } else if (tab === 'orders') {
-        const res = await axios.get(`${API_BASE}/orders`);
+        const res = await client.get(`${API_BASE}/orders`);
         setOrders(res.data.data || []);
       } else if (tab === 'customers') {
-        const res = await axios.get(`${API_BASE}/customers`);
+        const res = await client.get(`${API_BASE}/customers`);
         setCustomers(res.data.data || []);
       } else if (tab === 'reviews') {
-        const resTest = await axios.get(`${API_BASE}/testimonials`);
-        const resRev = await axios.get(`${API_BASE}/reviews`);
+        const resTest = await client.get(`${API_BASE}/testimonials`);
+        const resRev = await client.get(`${API_BASE}/reviews`);
         setTestimonials(resTest.data.data || []);
         setReviews(resRev.data.data || []);
       } else if (tab === 'referrals') {
-        const res = await axios.get(`${API_BASE}/referrals`);
+        const res = await client.get(`${API_BASE}/referrals`);
         setReferrals(res.data.data || []);
       } else if (tab === 'shipping') {
-        const resShip = await axios.get(`${API_BASE}/shipping-rules`);
-        const resCoup = await axios.get(`${API_BASE}/coupons`);
+        const resShip = await client.get(`${API_BASE}/shipping-rules`);
+        const resCoup = await client.get(`${API_BASE}/coupons`);
         setShippingRules(resShip.data.data || []);
         setCoupons(resCoup.data.data || []);
       } else if (tab === 'analytics') {
-        const res = await axios.get(`${API_BASE}/analytics`);
+        const res = await client.get(`${API_BASE}/analytics`);
         setAnalytics(res.data.data || null);
       }
     } catch (err) {
@@ -157,7 +171,7 @@ export default function WebsiteManagement() {
     }
     setLoading(true);
     try {
-      const res = await axios.post(`${API_BASE}/api-key/regenerate`);
+      const res = await client.post(`${API_BASE}/api-key/regenerate`);
       setApiKeyData(res.data.data);
       setMsg({ type: 'success', text: 'New API Key generated successfully!' });
     } catch {
@@ -173,10 +187,10 @@ export default function WebsiteManagement() {
     setLoading(true);
     try {
       if (editingProduct) {
-        await axios.put(`${API_BASE}/products/${editingProduct.id}`, productForm);
+        await client.put(`${API_BASE}/products/${editingProduct.id}`, productForm);
         setMsg({ type: 'success', text: 'Product updated successfully!' });
       } else {
-        await axios.post(`${API_BASE}/products`, productForm);
+        await client.post(`${API_BASE}/products`, productForm);
         setMsg({ type: 'success', text: 'New website product created!' });
       }
       setShowProductModal(false);
@@ -191,7 +205,7 @@ export default function WebsiteManagement() {
   const handleDeleteProduct = async (id) => {
     if (!window.confirm('Delete this product from Blovit web store?')) return;
     try {
-      await axios.delete(`${API_BASE}/products/${id}`);
+      await client.delete(`${API_BASE}/products/${id}`);
       setMsg({ type: 'success', text: 'Product removed.' });
       fetchDataForTab('products');
     } catch {
@@ -202,7 +216,7 @@ export default function WebsiteManagement() {
   // Order Actions
   const handleUpdateOrderStatus = async (orderId, status) => {
     try {
-      await axios.put(`${API_BASE}/orders/${orderId}/status`, { status });
+      await client.put(`${API_BASE}/orders/${orderId}/status`, { status });
       setMsg({ type: 'success', text: `Order status updated to ${status}` });
       fetchDataForTab('orders');
       if (selectedOrder) setSelectedOrder((prev) => ({ ...prev, status }));
@@ -214,7 +228,7 @@ export default function WebsiteManagement() {
   const handleRefundOrder = async (orderId) => {
     if (!window.confirm('Trigger Razorpay refund for this order?')) return;
     try {
-      const res = await axios.post(`${API_BASE}/orders/${orderId}/refund`);
+      const res = await client.post(`${API_BASE}/orders/${orderId}/refund`);
       setMsg({ type: 'success', text: res.data.message });
       fetchDataForTab('orders');
     } catch (err) {
@@ -227,7 +241,7 @@ export default function WebsiteManagement() {
     e.preventDefault();
     if (!selectedCustomer || !newPassInput) return;
     try {
-      await axios.post(`${API_BASE}/customers/${selectedCustomer.id}/reset-password`, {
+      await client.post(`${API_BASE}/customers/${selectedCustomer.id}/reset-password`, {
         newPassword: newPassInput,
       });
       setMsg({ type: 'success', text: `Password updated for ${selectedCustomer.fullName}` });
@@ -243,7 +257,7 @@ export default function WebsiteManagement() {
     e.preventDefault();
     if (!selectedReferral) return;
     try {
-      const res = await axios.post(`${API_BASE}/referrals/${selectedReferral.id}/approve`, {
+      const res = await client.post(`${API_BASE}/referrals/${selectedReferral.id}/approve`, {
         discountAmount: Number(referralDiscountInput),
       });
       setMsg({ type: 'success', text: res.data.message });
@@ -257,7 +271,7 @@ export default function WebsiteManagement() {
   const handleRejectReferral = async (id) => {
     if (!window.confirm('Reject this pending referral request?')) return;
     try {
-      await axios.post(`${API_BASE}/referrals/${id}/reject`);
+      await client.post(`${API_BASE}/referrals/${id}/reject`);
       setMsg({ type: 'success', text: 'Referral rejected.' });
       fetchDataForTab('referrals');
     } catch {
@@ -269,7 +283,7 @@ export default function WebsiteManagement() {
   const handleSaveTestimonial = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_BASE}/testimonials`, testimonialForm);
+      await client.post(`${API_BASE}/testimonials`, testimonialForm);
       setMsg({ type: 'success', text: 'Testimonial added!' });
       setShowTestimonialModal(false);
       fetchDataForTab('reviews');
@@ -281,7 +295,7 @@ export default function WebsiteManagement() {
   const handleSaveCoupon = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_BASE}/coupons`, couponForm);
+      await client.post(`${API_BASE}/coupons`, couponForm);
       setMsg({ type: 'success', text: 'Coupon code created!' });
       setShowCouponModal(false);
       fetchDataForTab('shipping');

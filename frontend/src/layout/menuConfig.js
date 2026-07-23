@@ -12,8 +12,95 @@ import {
   MapPinned, 
   ClipboardList, 
   Truck,
-  Globe
+  Key,
+  Star,
+  Gift,
+  Tag,
+  BarChart2
 } from 'lucide-react';
+
+export const websiteMenuStructure = [
+  {
+    id: 'ws-api-key',
+    type: 'link',
+    to: '/website?tab=api-key',
+    tabId: 'api-key',
+    icon: Key,
+    emoji: '🔑',
+    label: 'API Key & Settings',
+    roles: ['Super Admin', 'admin']
+  },
+  {
+    id: 'ws-products',
+    type: 'link',
+    to: '/website?tab=products',
+    tabId: 'products',
+    icon: Package,
+    emoji: '📦',
+    label: 'Products',
+    roles: ['Super Admin', 'admin']
+  },
+  {
+    id: 'ws-orders',
+    type: 'link',
+    to: '/website?tab=orders',
+    tabId: 'orders',
+    icon: ShoppingCart,
+    emoji: '🛒',
+    label: 'Orders',
+    roles: ['Super Admin', 'admin']
+  },
+  {
+    id: 'ws-customers',
+    type: 'link',
+    to: '/website?tab=customers',
+    tabId: 'customers',
+    icon: Users,
+    emoji: '👥',
+    label: 'Customers',
+    roles: ['Super Admin', 'admin']
+  },
+  {
+    id: 'ws-reviews',
+    type: 'link',
+    to: '/website?tab=reviews',
+    tabId: 'reviews',
+    icon: Star,
+    emoji: '⭐',
+    label: 'Reviews & Testimonials',
+    roles: ['Super Admin', 'admin']
+  },
+  {
+    id: 'ws-referrals',
+    type: 'link',
+    to: '/website?tab=referrals',
+    tabId: 'referrals',
+    icon: Gift,
+    emoji: '🎁',
+    label: 'Referrals',
+    roles: ['Super Admin', 'admin']
+  },
+  {
+    id: 'ws-shipping',
+    type: 'link',
+    to: '/website?tab=shipping',
+    tabId: 'shipping',
+    icon: Tag,
+    emoji: '🏷️',
+    label: 'Shipping & Coupons',
+    roles: ['Super Admin', 'admin']
+  },
+  {
+    id: 'ws-analytics',
+    type: 'link',
+    to: '/website?tab=analytics',
+    tabId: 'analytics',
+    icon: BarChart2,
+    emoji: '📊',
+    label: 'CRM & Analytics',
+    roles: ['Super Admin', 'admin']
+  }
+];
 
 export const menuStructure = [
   {
@@ -180,16 +267,6 @@ export const menuStructure = [
     icon: Users,
     emoji: '🔐',
     label: 'Users',
-    roles: ['Super Admin', 'admin'],
-    showOnMobileDrawer: true
-  },
-  {
-    id: 'website',
-    type: 'link',
-    to: '/website',
-    icon: Globe,
-    emoji: '🌐',
-    label: 'Website (Blovit)',
     roles: ['Super Admin', 'admin'],
     showOnMobileDrawer: true
   },

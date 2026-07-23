@@ -80,6 +80,8 @@ if ('serviceWorker' in navigator) {
   }
 }
 
+import { ModuleProvider } from './context/ModuleContext';
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
@@ -90,7 +92,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               <AuthProvider>
                 <ToastProvider>
                   <PWAProvider>
-                    <App />
+                    <ModuleProvider>
+                      <App />
+                    </ModuleProvider>
                   </PWAProvider>
                 </ToastProvider>
               </AuthProvider>
