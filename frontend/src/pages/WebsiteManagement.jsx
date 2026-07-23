@@ -71,6 +71,10 @@ export default function WebsiteManagement() {
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [showImagePickerModal, setShowImagePickerModal] = useState(false);
+  const [frontendImages, setFrontendImages] = useState([]);
+  const [customImageUrl, setCustomImageUrl] = useState('');
+  const [imageSearchQuery, setImageSearchQuery] = useState('');
   const [productForm, setProductForm] = useState({
     name: '',
     slug: '',
@@ -1161,45 +1165,62 @@ export default function WebsiteManagement() {
                 </div>
               </div>
 
-              {/* PRODUCT PHOTOS UPLOAD & GALLERY */}
+              {/* PRODUCT PHOTOS & FRONTEND IMAGE PICKER */}
               <div style={{ marginBottom: '1.25rem', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '1rem', background: '#FAFAFA' }}>
                 <label style={{ fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
-                  <ImageIcon size={18} style={{ color: 'var(--primary-color)' }} /> Product Photos (Multiple Images)
+                  <ImageIcon size={18} style={{ color: 'var(--primary-color)' }} /> Product Photos (Frontend Website Assets)
                 </label>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                  Upload product gallery photos (JPG, PNG, WEBP, max 5MB each). The first image will be set as the <strong>Cover / Primary Image</strong>.
+                  Select existing images owned by the Blovit Website or enter direct image URLs. No local <code>/uploads</code> are stored.
                 </p>
 
-                {/* FILE INPUT / UPLOAD ZONE */}
-                <div style={{ marginBottom: '1rem' }}>
-                  <label
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justify: 'center',
-                      padding: '1rem',
-                      border: '2px dashed var(--border-color)',
-                      borderRadius: '8px',
-                      cursor: uploadingImage ? 'not-allowed' : 'pointer',
-                      background: '#FFF',
-                      transition: 'border-color 0.2s',
+                {/* IMAGE INPUT & PICKER ACTION BUTTONS */}
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={async () => {
+                      try {
+                        const res = await client.get('/frontend/images');
+                        if (res.data.success && res.data.data) {
+                          setFrontendImages(res.data.data);
+                        }
+                      } catch {
+                        // Fallback assets
+                        setFrontendImages([
+                          { id: '1', name: 'Sprouted Ragi Malt', url: 'https://demo.amudhasurabiy.com/images/products/sprouted-ragi-malt.webp', tags: ['ragi', 'malt'] },
+                          { id: '2', name: 'Multi-Grain Drink', url: 'https://demo.amudhasurabiy.com/images/products/multi-grain-health-drink.webp', tags: ['multigrain'] },
+                          { id: '3', name: 'Millet Energy Mix', url: 'https://demo.amudhasurabiy.com/images/products/millet-energy-mix.webp', tags: ['millet'] },
+                        ]);
+                      }
+                      setShowImagePickerModal(true);
                     }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#FFF', border: '1px solid var(--primary-color)', color: 'var(--primary-color)', fontWeight: 600 }}
                   >
-                    <Upload size={24} style={{ color: 'var(--primary-color)', marginBottom: '0.4rem' }} />
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {uploadingImage ? 'Uploading Photos...' : 'Click or Drag images to upload'}
-                    </span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Supports JPG, PNG, WEBP (Max 5MB per file)</span>
+                    <Search size={16} /> Choose Existing Website Image
+                  </button>
+
+                  <div style={{ display: 'flex', gap: '0.4rem', flex: 1, minWidth: '240px' }}>
                     <input
-                      type="file"
-                      multiple
-                      accept="image/jpeg,image/png,image/webp,image/jpg"
-                      disabled={uploadingImage}
-                      onChange={handleImageUpload}
-                      style={{ display: 'none' }}
+                      type="url"
+                      placeholder="Paste Image URL (e.g. https://demo.amudhasurabiy.com/images/prod.webp)"
+                      value={customImageUrl}
+                      onChange={(e) => setCustomImageUrl(e.target.value)}
+                      style={{ flex: 1, padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.85rem' }}
                     />
-                  </label>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => {
+                        if (!customImageUrl.trim()) return;
+                        setProductForm((prev) => ({ ...prev, images: [...(prev.images || []), customImageUrl.trim()] }));
+                        setCustomImageUrl('');
+                      }}
+                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                    >
+                      Add URL
+                    </button>
+                  </div>
                 </div>
 
                 {/* THUMBNAIL GALLERY GRID */}
@@ -1448,6 +1469,87 @@ export default function WebsiteManagement() {
                 <button type="submit" className="btn btn-primary">Update Password</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CHOOSE EXISTING WEBSITE IMAGE */}
+      {showImagePickerModal && (
+        <div className="modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
+          <div className="card" style={{ width: '100%', maxWidth: '640px', maxHeight: '85vh', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <ImageIcon size={20} style={{ color: 'var(--primary-color)' }} /> Choose Existing Website Image
+              </h3>
+              <button className="btn btn-secondary" style={{ padding: '0.3rem 0.5rem' }} onClick={() => setShowImagePickerModal(false)}>
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* SEARCH INPUT */}
+            <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="text"
+                placeholder="Search images by name or tag (e.g. ragi, malt, multigrain)..."
+                value={imageSearchQuery}
+                onChange={async (e) => {
+                  const q = e.target.value;
+                  setImageSearchQuery(q);
+                  try {
+                    const res = await client.get(`/frontend/image/search?q=${encodeURIComponent(q)}`);
+                    if (res.data.success && res.data.data) {
+                      setFrontendImages(res.data.data);
+                    }
+                  } catch {}
+                }}
+                style={{ flex: 1, padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.9rem' }}
+              />
+            </div>
+
+            {/* IMAGE GRID */}
+            <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.75rem', paddingRight: '4px' }}>
+              {frontendImages.map((img) => (
+                <div
+                  key={img.id || img.url}
+                  onClick={() => {
+                    setProductForm((prev) => ({ ...prev, images: [...(prev.images || []), img.url] }));
+                    setShowImagePickerModal(false);
+                    setMsg({ type: 'success', text: `Selected image "${img.name}"!` });
+                  }}
+                  style={{
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    padding: '6px',
+                    cursor: 'pointer',
+                    background: '#FFF',
+                    transition: 'all 0.2s',
+                    textAlign: 'center',
+                  }}
+                >
+                  <img
+                    src={resolveAssetUrl(img.url)}
+                    alt={img.name}
+                    style={{ width: '100%', height: '90px', objectFit: 'cover', borderRadius: '6px', marginBottom: '4px' }}
+                  />
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {img.name}
+                  </div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                    {img.tags ? img.tags.slice(0, 2).join(', ') : 'website'}
+                  </div>
+                </div>
+              ))}
+
+              {frontendImages.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                  No matching website images found.
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setShowImagePickerModal(false)}>Close</button>
+            </div>
           </div>
         </div>
       )}

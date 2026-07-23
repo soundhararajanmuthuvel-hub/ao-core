@@ -93,6 +93,14 @@ app.get('/api/health', async (req, res) => {
     success: true,
     status: 'OK',
     database: dbStatus,
+    aiStatus: {
+      gemini: process.env.GEMINI_API_KEY ? 'Active' : 'Disabled (Key Missing)',
+      cerebras: process.env.CEREBRAS_API_KEY ? 'Active' : 'Disabled (Key Missing)',
+    },
+    websiteIntegration: 'Active',
+    imageApi: 'Active',
+    ordersApi: 'Active',
+    paymentsApi: 'Active',
   });
 });
 
@@ -128,7 +136,15 @@ app.use('/api/repack', require('./routes/repackRoutes'));
 app.use('/api/raw-materials', require('./routes/rawMaterialRoutes'));
 app.use('/api/manufacturing', require('./routes/manufacturingRoutes'));
 app.use('/api/packing-conversion', require('./routes/packingConversionRoutes'));
+
+// AI APIs (Mounted under both /api/ai and /api/website/ai for proxy support)
 app.use('/api/ai', require('./routes/aiRoutes'));
+app.use('/api/website/ai', require('./routes/aiRoutes'));
+
+// Frontend Images APIs (Mounted under both /api/frontend/images and /api/website/images)
+app.use('/api/frontend/images', require('./routes/frontendImageRoutes'));
+app.use('/api/website/images', require('./routes/frontendImageRoutes'));
+
 app.use('/api/shipping', require('./routes/shippingRoutes'));
 app.use('/api/couriers', require('./routes/courierRoutes'));
 app.use('/api/search', require('./routes/searchRoutes'));

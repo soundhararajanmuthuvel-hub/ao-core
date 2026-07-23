@@ -1593,3 +1593,363 @@ exports.getCrmInsights = async (req, res, next) => {
   }
 };
 
+/* ==================================================
+   AI SHOPPING ASSISTANT APIs (BLOVIT STOREFRONT)
+   ================================================== */
+const WebsiteProduct = require('../models/WebsiteProduct');
+const WebsiteCustomer = require('../models/WebsiteCustomer');
+const WebsiteOrder = require('../models/WebsiteOrder');
+const WebsiteShippingRule = require('../models/WebsiteShippingRule');
+const { validateImageUrl, DEFAULT_PLACEHOLDER_IMAGE } = require('./frontendImageController');
+
+// POST /api/ai/chat or /api/website/ai/chat
+exports.aiShoppingChat = async (req, res, next) => {
+  try {
+    const { message, prompt: clientPrompt } = req.body;
+    const queryText = (message || clientPrompt || '').toString().trim();
+
+    if (!queryText) {
+      return res.status(400).json({ success: false, message: 'Message parameter is required.' });
+    }
+
+    // Fetch active Website Products for ground-truth LLM context
+    const products = await WebsiteProduct.findAll({
+      where: { isActive: true },
+      attributes: ['id', 'name', 'slug', 'price', 'stock', 'images', 'category', 'description', 'shortDescription', 'isBestseller'],
+    });
+
+    const catalog = products.map((p) => {
+      let imgs = [];
+      try { imgs = JSON.parse(p.images || '[]'); } catch { imgs = p.images ? [p.images] : []; }
+      const primaryImg = validateImageUrl(imgs[0]);
+      return {
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        price: Number(p.price || 0),
+        stock: Number(p.stock || 0),
+        category: p.category || 'General',
+        imageUrl: primaryImg,
+        shortDescription: p.shortDescription || p.description || '',
+        isBestseller: !!p.isBestseller,
+      };
+    });
+
+    // LLM Grounding Prompt
+    const prompt = `
+      You are Blovit's AI Shopping Assistant for Amudhasurabiy Organics.
+      User Message: "${queryText}"
+
+      Here is our complete active product catalog from the ERP database:
+      ${JSON.stringify(catalog)}
+
+      Instructions:
+      1. Answer the user's inquiry naturally, helpfully, and concisely in Markdown.
+      2. NEVER hallucinate products, prices, or stock quantities. Use ONLY items from the catalog above.
+      3. If user asks for recommendations or specific items, identify matching products from the catalog.
+      4. For matched products, suggest a recommended quantity (default 1).
+      5. If no items match, suggest active bestsellers or alternatives.
+
+      Return ONLY a valid JSON object matching this schema:
+      {
+        "reply": "Your friendly markdown answer to the customer",
+        "products": [
+          {
+            "id": 5,
+            "name": "Sprouted Ragi Malt 500g",
+            "slug": "sprouted-ragi-malt-500g",
+            "price": 250,
+            "stock": 48,
+            "imageUrl": "https://demo.amudhasurabiy.com/images/products/sprouted-ragi-malt.webp",
+            "suggestedQty": 1
+          }
+        ]
+      }
+      Do not include any text outside of the JSON object.
+    `;
+
+    const rawReply = await callGemini(prompt, 'aiShoppingChat');
+    const parsed = parseJSONFromLLM(rawReply);
+
+    if (parsed && parsed.reply) {
+      // Validate imageUrls in parsed response
+      if (Array.isArray(parsed.products)) {
+        parsed.products = parsed.products.map((p) => ({
+          ...p,
+          imageUrl: validateImageUrl(p.imageUrl),
+        }));
+      }
+      return res.json({ success: true, ...parsed });
+    }
+
+    // Fallback response if LLM returned non-JSON
+    const matchedProducts = catalog.filter((p) =>
+      p.name.toLowerCase().includes(queryText.toLowerCase()) ||
+      p.category.toLowerCase().includes(queryText.toLowerCase())
+    );
+    const resultProducts = matchedProducts.length > 0 ? matchedProducts.slice(0, 3) : catalog.slice(0, 3);
+
+    res.json({
+      success: true,
+      reply: rawReply || "Here are our top organic products from Blovit:",
+      products: resultProducts.map((p) => ({
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        price: p.price,
+        stock: p.stock,
+        imageUrl: validateImageUrl(p.imageUrl),
+        suggestedQty: 1,
+      })),
+    });
+  } catch (err) {
+    console.error('AI Shopping Chat Error:', err);
+    res.status(500).json({ success: false, message: 'AI Shopping Assistant failed to respond' });
+  }
+};
+
+// POST /api/ai/cart or /api/website/ai/cart
+exports.aiValidateCart = async (req, res, next) => {
+  try {
+    const { items } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'Cart items array is required.' });
+    }
+
+    const verifiedItems = [];
+    let subtotal = 0;
+
+    for (const item of items) {
+      const prodId = item.productId || item.id;
+      const qty = Math.max(1, parseInt(item.qty || item.quantity) || 1);
+      const product = await WebsiteProduct.findByPk(prodId);
+
+      if (product && product.isActive) {
+        let imgs = [];
+        try { imgs = JSON.parse(product.images || '[]'); } catch { imgs = product.images ? [product.images] : []; }
+        const price = Number(product.price || 0);
+        const itemTotal = price * qty;
+        subtotal += itemTotal;
+
+        verifiedItems.push({
+          productId: product.id,
+          name: product.name,
+          slug: product.slug,
+          price,
+          qty,
+          availableStock: product.stock,
+          isAvailable: product.stock >= qty,
+          imageUrl: validateImageUrl(imgs[0]),
+          itemTotal,
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      subtotal,
+      itemsCount: verifiedItems.length,
+      items: verifiedItems,
+      allAvailable: verifiedItems.every((i) => i.isAvailable),
+    });
+  } catch (err) {
+    console.error('AI Validate Cart Error:', err);
+    res.status(500).json({ success: false, message: 'Cart validation failed' });
+  }
+};
+
+// POST /api/ai/address or /api/website/ai/address
+exports.aiValidateAddress = async (req, res, next) => {
+  try {
+    const { pincode, address, city, state } = req.body;
+    const cleanPincode = (pincode || '').toString().trim();
+
+    if (!cleanPincode || cleanPincode.length < 6) {
+      return res.status(400).json({ success: false, message: 'Valid 6-digit Pincode is required.' });
+    }
+
+    // Lookup shipping rule for pincode or general rate
+    let shippingCost = 50; // Default flat rate shipping
+    const rules = await WebsiteShippingRule.findAll({ where: { isActive: true } });
+    if (rules.length > 0) {
+      const matched = rules.find((r) => r.pincodes && r.pincodes.includes(cleanPincode));
+      if (matched) shippingCost = Number(matched.rate || 0);
+    }
+
+    res.json({
+      success: true,
+      serviceable: true,
+      pincode: cleanPincode,
+      shippingCost,
+      estimatedDeliveryDays: 3,
+      estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      }),
+    });
+  } catch (err) {
+    console.error('AI Validate Address Error:', err);
+    res.status(500).json({ success: false, message: 'Address validation failed' });
+  }
+};
+
+// POST /api/ai/order or /api/website/ai/order
+exports.aiCreateOrder = async (req, res, next) => {
+  try {
+    const { items, customerDetails, shippingAddress, couponCode } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'Items are required for order creation.' });
+    }
+
+    let websiteCustomerId = req.websiteCustomer?.id || null;
+    const guestName = customerDetails?.fullName || customerDetails?.name || 'Valued Customer';
+    const guestMobile = customerDetails?.mobile || customerDetails?.phone || '9999999999';
+    const guestEmail = customerDetails?.email || 'customer@blovit.com';
+
+    // Auto-create website customer if not logged in
+    if (!websiteCustomerId && guestEmail) {
+      let customer = await WebsiteCustomer.findOne({ where: { email: guestEmail } });
+      if (!customer) {
+        customer = await WebsiteCustomer.create({
+          fullName: guestName,
+          mobile: guestMobile,
+          email: guestEmail,
+          status: 'Active',
+        }).catch(() => null);
+      }
+      if (customer) websiteCustomerId = customer.id;
+    }
+
+    // Compute order costs
+    let subtotal = 0;
+    const verifiedItems = [];
+
+    for (const item of items) {
+      const prod = await WebsiteProduct.findByPk(item.productId || item.id);
+      if (prod) {
+        const qty = Math.max(1, parseInt(item.qty || item.quantity) || 1);
+        const price = Number(prod.price || 0);
+        subtotal += price * qty;
+        verifiedItems.push({
+          productId: prod.id,
+          name: prod.name,
+          price,
+          qty,
+        });
+      }
+    }
+
+    const shippingCost = subtotal > 500 ? 0 : 50; // Free shipping over ₹500
+    const totalAmount = Math.max(0, subtotal + shippingCost);
+    const orderNumber = `BLO-AI-${Date.now().toString().slice(-6)}`;
+
+    const newOrder = await WebsiteOrder.create({
+      orderNumber,
+      websiteCustomerId,
+      guestName,
+      guestMobile,
+      guestEmail,
+      shippingAddress: JSON.stringify(shippingAddress || {}),
+      subtotal,
+      shippingCost,
+      totalAmount,
+      status: 'Pending',
+      paymentStatus: 'Pending',
+      items: JSON.stringify(verifiedItems),
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Order created via AI Shopping Assistant.',
+      orderId: newOrder.id,
+      orderNumber: newOrder.orderNumber,
+      subtotal,
+      shippingCost,
+      totalAmount,
+    });
+  } catch (err) {
+    console.error('AI Create Order Error:', err);
+    res.status(500).json({ success: false, message: 'AI order creation failed' });
+  }
+};
+
+// POST /api/ai/payment or /api/website/ai/payment
+exports.aiGeneratePayment = async (req, res, next) => {
+  try {
+    const { orderId, orderNumber } = req.body;
+    let order = null;
+
+    if (orderId) {
+      order = await WebsiteOrder.findByPk(orderId);
+    } else if (orderNumber) {
+      order = await WebsiteOrder.findOne({ where: { orderNumber } });
+    }
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found.' });
+    }
+
+    const clientUrl = process.env.CLIENT_URL || 'https://demo.amudhasurabiy.com';
+    const paymentUrl = `${clientUrl.replace(/\/$/, '')}/checkout/pay?orderNumber=${order.orderNumber}`;
+
+    const estDeliveryDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+
+    res.json({
+      success: true,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      paymentUrl,
+      summary: `Order #${order.orderNumber} for ₹${order.totalAmount} is ready for payment.`,
+      estimatedDelivery: estDeliveryDate,
+    });
+  } catch (err) {
+    console.error('AI Generate Payment Error:', err);
+    res.status(500).json({ success: false, message: 'Payment URL generation failed' });
+  }
+};
+
+// GET /api/ai/order-status or /api/website/ai/order-status
+exports.aiGetOrderStatus = async (req, res, next) => {
+  try {
+    const { orderNumber, orderId, mobile } = req.query;
+    let where = {};
+
+    if (orderNumber) where.orderNumber = orderNumber;
+    else if (orderId) where.id = orderId;
+    else if (mobile) where.guestMobile = mobile;
+    else {
+      return res.status(400).json({ success: false, message: 'orderNumber, orderId, or mobile is required.' });
+    }
+
+    const order = await WebsiteOrder.findOne({ where });
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found.' });
+    }
+
+    const estDeliveryDate = new Date(new Date(order.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+
+    res.json({
+      success: true,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      totalAmount: order.totalAmount,
+      createdAt: order.createdAt,
+      estimatedDelivery: estDeliveryDate,
+    });
+  } catch (err) {
+    console.error('AI Order Status Error:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch order status' });
+  }
+};
+
