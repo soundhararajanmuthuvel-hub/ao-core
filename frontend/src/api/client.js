@@ -116,7 +116,15 @@ client.interceptors.response.use(
       }
     }
     
-    if (err.response?.status === 401 && !err.config?.url?.includes('/auth/login')) {
+    // Audit Axios interceptor: ONLY redirect to /login if 401 is explicitly returned by an ERP User Authentication endpoint or contains explicit auth error payload
+    const url = err.config?.url || '';
+    const isAuthEndpoint = url.includes('/auth/') || url.includes('/users/me');
+    const isUploadEndpoint = url.includes('/upload') || (typeof FormData !== 'undefined' && err.config?.data instanceof FormData);
+    const resMsg = err.response?.data?.message || err.response?.data?.error || '';
+    const isAuthFailureMsg = resMsg === 'Not authorized' || resMsg === 'User not found or inactive' || resMsg === 'Invalid token';
+
+    if (err.response?.status === 401 && !isUploadEndpoint && (isAuthEndpoint || isAuthFailureMsg)) {
+      console.warn('[Axios Interceptor] ERP User Session Expired (401). Redirecting to /login');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       if (window.location.pathname !== '/login') {
@@ -126,5 +134,6 @@ client.interceptors.response.use(
     return Promise.reject(err);
   }
 );
+
 
 export default client;

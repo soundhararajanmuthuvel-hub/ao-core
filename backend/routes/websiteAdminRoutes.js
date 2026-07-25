@@ -104,7 +104,8 @@ router.post('/upload-image', (req, res, next) => {
       });
     } catch (error) {
       console.error('[Cloudinary Upload Route Error]', error);
-      const status = error.httpStatus || 500;
+      // NEVER return 401 for an external Cloudinary service error, as 401 is interpreted as ERP User session expiration
+      const status = (error.httpStatus === 401 || !error.httpStatus) ? 500 : error.httpStatus;
       res.status(status).json({
         success: false,
         error: 'Cloudinary Upload Failed',
@@ -113,6 +114,7 @@ router.post('/upload-image', (req, res, next) => {
         suggestion: error.suggestion || 'Please verify Cloudinary configuration in Cloudinary Settings.',
       });
     }
+
   });
 });
 
