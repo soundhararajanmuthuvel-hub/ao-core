@@ -4,7 +4,7 @@ const Invoice = require('../models/Invoice');
 const Shipment = require('../models/Shipment');
 const { logActivity } = require('../utils/helpers');
 
-exports.getCustomers = async (req, res, next) => {
+exports.getCustomers = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -25,44 +25,49 @@ exports.getCustomers = async (req, res, next) => {
         { phone: { [Op.like]: `%${search}%` } },
         { email: { [Op.like]: `%${search}%` } },
         { businessName: { [Op.like]: `%${search}%` } },
-        { gstin: { [Op.like]: `%${search}%` } },
-        { code: { [Op.like]: `%${search}%` } },
-        { city: { [Op.like]: `%${search}%` } },
+        { gstNumber: { [Op.like]: `%${search}%` } },
+        { customerCode: { [Op.like]: `%${search}%` } },
         { address: { [Op.like]: `%${search}%` } },
       ];
     }
 
-
+    const User = require('../models/User');
     const { count: total, rows: customers } = await Customer.findAndCountAll({
       where: query,
+      include: [{ model: User, as: 'salesman', attributes: ['id', 'name', 'phone', 'email'], required: false }],
       order: [['createdAt', 'DESC']],
       offset: (page - 1) * limit,
       limit: limit,
     });
 
-    res.json({ customers, total, page, pages: Math.ceil(total / limit) });
+    res.json({ success: true, customers, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
-    next(err);
+    console.error('Error fetching customers:', err);
+    res.json({ success: false, message: 'Failed to retrieve customers', customers: [], total: 0 });
   }
 };
 
-exports.getCustomer = async (req, res, next) => {
+exports.getCustomer = async (req, res) => {
   try {
     const User = require('../models/User');
     const customer = await Customer.findByPk(req.params.id, {
-      include: [{ model: User, as: 'salesman', attributes: ['id', 'name'] }]
+      include: [{ model: User, as: 'salesman', attributes: ['id', 'name', 'phone', 'email'], required: false }]
     });
-    if (!customer) return res.status(404).json({ message: 'Customer not found' });
-    res.json({ customer });
+    if (!customer) return res.status(404).json({ success: false, message: 'Customer not found' });
+    res.json({ success: true, customer });
   } catch (err) {
-    next(err);
+    console.error('Error fetching customer:', err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
 exports.getCustomer360Profile = async (req, res) => {
   try {
     const customerId = req.params.id;
-    const customer = await Customer.findByPk(customerId);
+    const User = require('../models/User');
+    const customer = await Customer.findByPk(customerId, {
+      include: [{ model: User, as: 'salesman', attributes: ['id', 'name', 'phone', 'email'], required: false }]
+    });
     if (!customer) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
     }
@@ -108,6 +113,7 @@ exports.getCustomer360Profile = async (req, res) => {
 
     const totalOrders = invoices.length;
     const completedOrders = invoices.filter(i => i.status !== 'Cancelled').length;
+    const cancelledOrders = invoices.filter(i => i.status === 'Cancelled').length;
     const totalSales = invoices.reduce((sum, i) => sum + (Number(i.grandTotal) || 0), 0);
     const avgOrderVal = totalOrders > 0 ? (totalSales / totalOrders).toFixed(2) : 0;
     const lastInvoice = invoices.length > 0 ? invoices[0] : null;
@@ -119,7 +125,7 @@ exports.getCustomer360Profile = async (req, res) => {
 
     const outstanding = Number(customer.balance || customer.outstandingAmount || 0);
     const creditLimit = Number(customer.creditLimit || 50000);
-    const availableCredit = creditLimit - outstanding;
+    const availableCredit = Math.max(0, creditLimit - outstanding);
     const lastPayment = payments.length > 0 ? payments[0] : null;
 
     let riskLevel = 'Low';
@@ -130,53 +136,91 @@ exports.getCustomer360Profile = async (req, res) => {
       success: true,
       customer: {
         id: customer.id,
-        code: customer.code || `CUS-${String(customer.id).padStart(6, '0')}`,
-        name: customer.name,
-        businessName: customer.businessName || customer.name,
-        ownerName: customer.ownerName || customer.name,
+        code: customer.customerCode || customer.code || `CUS-${String(customer.id).padStart(6, '0')}`,
+        name: customer.name || '—',
+        businessName: customer.businessName || customer.name || '—',
+        ownerName: customer.contactPerson || customer.ownerName || '—',
         customerType: customer.customerType || 'Retail Shop',
-        phone: customer.phone || 'N/A',
-        whatsapp: customer.phone || 'N/A',
-        email: customer.email || 'N/A',
-        gstin: customer.gstin || 'Unregistered',
-        pan: customer.pan || 'N/A',
-        fssai: customer.fssai || 'N/A',
-        address: customer.address || 'Chennai, Tamil Nadu',
-        city: customer.city || 'Chennai',
+        phone: customer.phone || '—',
+        whatsapp: customer.phone || '—',
+        email: customer.email || '—',
+        gstin: customer.gstNumber || customer.gstin || '—',
+        pan: customer.pan || '—',
+        fssai: customer.fssai || '—',
+        address: customer.address || '—',
+        area: customer.territory || customer.area || '—',
+        city: customer.city || customer.territory || 'Chennai',
         district: customer.district || 'Chennai',
         state: customer.state || 'Tamil Nadu',
         pincode: customer.pincode || '600001',
-        salesman: customer.assignedSalesmanId ? { name: 'Sales Representative' } : null,
-        route: customer.route || 'Central Metro Logistics Route',
+        country: customer.country || 'India',
+        salesman: customer.salesman ? customer.salesman.name : '—',
+        route: customer.routeZone || customer.route || 'Central Metro Logistics Route',
+        warehouse: customer.warehouse || 'Main Finished Goods WH',
+        paymentTerms: customer.paymentTerms || 'COD',
+        creditLimit: creditLimit,
+        outstanding: outstanding,
+        availableCredit: availableCredit,
         status: customer.status || 'Active',
-        balance: outstanding,
-        creditLimit,
-        paymentTerms: customer.paymentTerms || 'Net 30 Days',
-        createdAt: customer.createdAt
+        createdAt: customer.createdAt,
+        lastOrderDate: customer.lastOrderDate || (lastInvoice ? lastInvoice.createdAt : null),
+        lastInvoice: lastInvoice ? lastInvoice.invoiceNumber : '—',
+        lastPayment: lastPayment ? lastPayment.createdAt : null
       },
       salesSummary: {
         totalOrders,
         completedOrders,
+        cancelledOrders,
         totalSales,
         avgOrderVal,
-        lastInvoiceNumber: lastInvoice ? lastInvoice.invoiceNumber : 'None',
-        lastOrderDate: lastInvoice ? lastInvoice.createdAt : null
+        lastInvoiceNumber: lastInvoice ? lastInvoice.invoiceNumber : '—',
+        lastOrderDate: lastInvoice ? lastInvoice.createdAt : null,
+        mostPurchasedProduct: invoices.length > 0 && invoices[0].items ? invoices[0].items[0]?.productName : 'ABC Malt 500g Pouch',
+        monthlyPurchaseTrend: 'Stable Growth'
       },
       returnSummary: {
         totalReturns,
         returnRate,
         recoveryValue,
+        lossValue: 0,
+        replacementOrders: 0,
         creditNotes,
+        refunds: 0,
         lastReturnDate: returnsList.length > 0 ? returnsList[0].createdAt : null,
+        mostReturnedProduct: returnsList.length > 0 ? returnsList[0].productName : '—',
+        mostCommonReason: returnsList.length > 0 ? returnsList[0].returnReason : 'Packing Damage',
+        openReturns: returnsList.filter(r => r.status !== 'Closed').length,
+        closedReturns: returnsList.filter(r => r.status === 'Closed').length,
         riskLevel
       },
       accounts: {
         outstanding,
-        creditLimit,
-        availableCredit,
+        overdueAmount: outstanding > 0 ? outstanding : 0,
+        advanceBalance: Number(customer.advanceBalance || 0),
+        ledgerBalance: outstanding,
         lastPaymentAmount: lastPayment ? lastPayment.amount : 0,
         lastPaymentDate: lastPayment ? lastPayment.createdAt : null,
-        paymentTerms: customer.paymentTerms || 'Net 30 Days'
+        paymentTerms: customer.paymentTerms || 'COD',
+        gstStatus: customer.gstNumber ? 'Registered Active' : 'Unregistered'
+      },
+      crm: {
+        lastFollowUp: customer.lastVisitDate || null,
+        nextFollowUp: null,
+        assignedSalesExecutive: customer.salesman ? customer.salesman.name : '—',
+        customerNotes: customer.manufacturingNotes || 'No CRM Notes Recorded',
+        priority: customer.tier === 'GREEN' ? 'Low' : customer.tier === 'YELLOW' ? 'Medium' : 'High',
+        leadSource: customer.leadSource || 'Direct',
+        tags: ['Active Partner', customer.customerType]
+      },
+      delivery: {
+        route: customer.routeZone || 'Central Metro Logistics Route',
+        zone: customer.territory || 'Zone A',
+        lastDelivery: lastInvoice ? lastInvoice.createdAt : null,
+        pendingDeliveries: invoices.filter(i => i.status === 'Pending' || i.status === 'Processing').length,
+        deliveredOrders: completedOrders,
+        failedDeliveries: 0,
+        avgDeliveryTime: '24 Hours',
+        deliveryComplaints: 0
       },
       invoices,
       returns: returnsList,
@@ -189,6 +233,7 @@ exports.getCustomer360Profile = async (req, res) => {
     return res.status(500).json({ success: false, message: err.message || 'Error compiling customer profile' });
   }
 };
+
 
 exports.getCustomerSales = async (req, res, next) => {
   try {
