@@ -60,7 +60,7 @@ import {
   CreditCard,
   History
 } from 'lucide-react';
-import { customersApi, salesApi } from '../api';
+import { customersApi, salesApi, productsApi } from '../api';
 import CustomerPicker from '../components/CustomerPicker';
 
 export default function ReturnRecoveryModule() {
@@ -90,6 +90,13 @@ export default function ReturnRecoveryModule() {
   const [selectedCustInvoices, setSelectedCustInvoices] = useState([]);
   const [selectedCustHistory, setSelectedCustHistory] = useState(null);
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('');
+
+  // Live Product Search Dropdown States for Step 3
+  const suppressNextProdSearchRef = useRef(false);
+  const [prodSearchResults, setProdSearchResults] = useState([]);
+  const [isProdSearching, setIsProdSearching] = useState(false);
+  const [showProdDropdown, setShowProdDropdown] = useState(false);
+
 
   // Quick Create Customer Modal State
   const [showQuickCustModal, setShowQuickCustModal] = useState(false);
@@ -283,7 +290,38 @@ export default function ReturnRecoveryModule() {
     }
   };
 
-  // Select Customer from Autocomplete
+  // Debounced Product Search Effect for Step 3 (300ms)
+  useEffect(() => {
+    if (suppressNextProdSearchRef.current) {
+      suppressNextProdSearchRef.current = false;
+      return;
+    }
+
+    if (!formData.productName || formData.productName.trim().length < 1) {
+      setProdSearchResults([]);
+      setShowProdDropdown(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsProdSearching(true);
+      try {
+        const { data } = await productsApi.list({ search: formData.productName.trim(), limit: 10 });
+        const list = data.products || data.data || [];
+        setProdSearchResults(list);
+        setShowProdDropdown(true);
+      } catch (e) {
+        console.error('Error searching products catalog:', e);
+        setProdSearchResults([]);
+      } finally {
+        setIsProdSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [formData.productName]);
+
+  // Select Customer from Autocomplete / Picker
   const handleSelectCustomer = async (cust) => {
     setSelectedCustomerObj(cust);
     setShowCustDropdown(false);
@@ -301,8 +339,8 @@ export default function ReturnRecoveryModule() {
 
     // Fetch Customer's Invoices & History
     try {
-      const salesRes = await salesApi.list({ customerId: cust.id, limit: 20 });
-      const invoices = salesRes.data.invoices || [];
+      const salesRes = await salesApi.list({ customerId: cust.id, includeItems: true, limit: 50 });
+      const invoices = salesRes.data.sales || salesRes.data.invoices || [];
       setSelectedCustInvoices(invoices);
 
       // Compute Customer Return History Summary
@@ -330,6 +368,7 @@ export default function ReturnRecoveryModule() {
       });
     }
   };
+
 
   // Quick Create New Customer
   const handleQuickCreateCustomer = async (e) => {
@@ -883,12 +922,15 @@ export default function ReturnRecoveryModule() {
                                 <button
                                   type="button"
                                   onClick={() => {
+                                    const firstItem = inv.items && inv.items.length > 0 ? inv.items[0] : null;
+                                    suppressNextProdSearchRef.current = true;
                                     setFormData(prev => ({
                                       ...prev,
                                       invoiceNumber: inv.invoiceNumber,
-                                      productName: inv.items ? inv.items[0]?.productName : 'ABC Malt 500g Pouch',
-                                      batchNumber: inv.items ? inv.items[0]?.batchNumber : 'BATCH-2026-01',
-                                      unitPrice: inv.items ? inv.items[0]?.price : 250
+                                      productName: firstItem?.product?.name || firstItem?.productName || firstItem?.name || '',
+                                      productId: firstItem?.productId || firstItem?.product?.id || null,
+                                      unitPrice: Number(firstItem?.unitPrice || firstItem?.price || firstItem?.product?.sellingPrice || 0),
+                                      batchNumber: ''
                                     }));
                                     setWizardStep(3);
                                   }}
@@ -914,16 +956,62 @@ export default function ReturnRecoveryModule() {
               {/* STEP 3: QUANTITIES & REASON */}
               {wizardStep === 3 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Product Name</label>
+                  <div style={{ position: 'relative' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>
+                      Product Name (Catalog Live Search)
+                    </label>
                     <input
                       type="text"
-                      placeholder="Enter Product Name..."
+                      placeholder="Type to search product catalog by name or SKU..."
                       value={formData.productName}
                       onChange={e => setFormData({ ...formData, productName: e.target.value })}
+                      onFocus={() => {
+                        if (prodSearchResults.length > 0 && formData.productName) setShowProdDropdown(true);
+                      }}
                       style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
                     />
+
+                    {/* LIVE PRODUCT SEARCH DROPDOWN */}
+                    {showProdDropdown && (
+                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', zIndex: 1100, maxHeight: '200px', overflowY: 'auto', marginTop: '4px' }}>
+                        {isProdSearching ? (
+                          <div style={{ padding: '0.75rem', fontSize: '0.78rem', color: '#64748b', textAlign: 'center' }}>Searching catalog...</div>
+                        ) : prodSearchResults.length > 0 ? (
+                          prodSearchResults.map(p => (
+                            <div
+                              key={p.id}
+                              onClick={() => {
+                                suppressNextProdSearchRef.current = true;
+                                setFormData(prev => ({
+                                  ...prev,
+                                  productName: p.name,
+                                  productId: p.id,
+                                  unitPrice: Number(p.sellingPrice || p.mrp || 0)
+                                }));
+                                setShowProdDropdown(false);
+                              }}
+                              style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                              onMouseLeave={e => e.currentTarget.style.backgroundColor = '#ffffff'}
+                            >
+                              <div>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{p.name}</div>
+                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>SKU: {p.sku || 'N/A'} • Unit: {p.unit || 'Pk'}</div>
+                              </div>
+                              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#10b981' }}>
+                                ₹{Number(p.sellingPrice || p.mrp || 0).toLocaleString('en-IN')}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ padding: '0.75rem', fontSize: '0.75rem', color: '#64748b', textAlign: 'center' }}>
+                            No catalog product matches. You can continue typing to specify a custom/legacy product name.
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
+
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                     <div>
                       <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Batch Number</label>
