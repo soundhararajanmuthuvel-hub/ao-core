@@ -259,11 +259,47 @@ exports.createReturnRequest = async (req, res) => {
       }
     }
 
+    // Process Return Type Specific Financial, Invoice & Customer Ledger Workflows
+    if (invoiceId) {
+      try {
+        const inv = await Invoice.findByPk(invoiceId);
+        if (inv) {
+          if (returnType === 'Full Return' || totalVal >= Number(inv.grandTotal || 0)) {
+            inv.balance = 0;
+            inv.paymentStatus = 'Refunded';
+            inv.status = 'Refunded';
+            await inv.save();
+          } else if (returnType === 'Partial Return' || returnType === 'Credit Note' || returnType === 'Cash Refund') {
+            const currentBal = Number(inv.balance !== undefined && inv.balance !== null ? inv.balance : inv.grandTotal || 0);
+            inv.balance = Math.max(0, currentBal - totalVal);
+            inv.paymentStatus = inv.balance <= 0 ? (returnType === 'Cash Refund' ? 'Refunded' : 'Paid') : 'Partially Paid';
+            await inv.save();
+          }
+        }
+      } catch (err) {
+        console.error('Invoice balance update notice:', err.message);
+      }
+    }
+
+    if (customerId) {
+      try {
+        const cust = await Customer.findByPk(customerId);
+        if (cust && (returnType === 'Credit Note' || returnType === 'Cash Refund' || returnType === 'Full Return' || returnType === 'Partial Return')) {
+          const currentCustBal = Number(cust.balance || 0);
+          cust.balance = Math.max(0, currentCustBal - totalVal);
+          await cust.save();
+        }
+      } catch (err) {
+        console.error('Customer balance update notice:', err.message);
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: `Return Authorization (${rmaNumber}) created successfully`,
       data: returnReq
     });
+
   } catch (error) {
     console.error('Create Return Request error:', error);
     res.status(500).json({ success: false, message: error.message });

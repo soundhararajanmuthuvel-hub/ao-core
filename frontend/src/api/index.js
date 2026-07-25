@@ -405,5 +405,16 @@ export const developerApi = {
   getCrmInsights: () => client.get('/ai/crm-insights'),
 };
 
+export const returnsApi = {
+  list: (params) => client.get('/returns', { params }),
+  create: (data) => client.post('/returns', data),
+  get: (id) => client.get(`/returns/${id}`),
+  approve: (id) => client.put(`/returns/${id}/approve`),
+  qcInspect: (id, data) => client.post(`/returns/${id}/qc-inspect`, data),
+  close: (id) => client.put(`/returns/${id}/close`),
+  scanLookup: (barcode) => client.post('/returns/scan-lookup', { barcode }),
+};
+
+
 
 

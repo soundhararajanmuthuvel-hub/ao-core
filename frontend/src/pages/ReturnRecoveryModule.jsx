@@ -421,36 +421,36 @@ export default function ReturnRecoveryModule() {
       return;
     }
     try {
-      const res = await fetch('/api/returns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          items: [
-            {
-              productName: formData.productName,
-              batchNumber: formData.batchNumber,
-              quantity: formData.quantity,
-              unitPrice: formData.unitPrice,
-              originalImageUrl: formData.originalImageUrl,
-              returnedImageUrl: formData.returnedImageUrl
-            }
-          ]
-        })
+      const res = await returnsApi.create({
+        ...formData,
+        items: [
+          {
+            productName: formData.productName,
+            productId: formData.productId,
+            batchNumber: formData.batchNumber,
+            quantity: Number(formData.quantity || 1),
+            unitPrice: Number(formData.unitPrice || 0),
+            originalImageUrl: formData.originalImageUrl,
+            returnedImageUrl: formData.returnedImageUrl
+          }
+        ]
       });
-      const d = await res.json();
-      if (d.success) {
-        alert(`Return Authorization (${d.data.rmaNumber}) Created Successfully!`);
+      if (res.data && res.data.success) {
+        const rmaNo = res.data.data?.rmaNumber || 'RMA';
+        alert(`Return Authorization (${rmaNo}) Created Successfully!`);
         setShowCreateModal(false);
         setWizardStep(1);
         fetchData();
       } else {
-        alert(d.message || 'Failed to create return request.');
+        alert(res.data?.message || 'Failed to create return request.');
       }
     } catch (e) {
-      alert('Error connecting to backend server.');
+      console.error('Error submitting RMA:', e);
+      const backendErrMsg = e.response?.data?.message || e.response?.data?.error || e.message || 'Unable to create Return Request.';
+      alert(`Unable to create Return Request.\nReason: ${backendErrMsg}`);
     }
   };
+
 
   const handleQCSubmit = async (disposition) => {
     if (!selectedReturn) return;
@@ -1049,9 +1049,9 @@ export default function ReturnRecoveryModule() {
                 </div>
               )}
 
-              {/* STEP 5: RECEIPT-STYLE COST RECOVERY REVIEW */}
+              {/* STEP 5: RECEIPT-STYLE COST RECOVERY REVIEW & MANDATORY RETURN TYPE SELECTION */}
               {wizardStep === 5 && (
-                <div style={{ backgroundColor: '#F5EFE6', padding: '1.25rem', borderRadius: '12px', border: '1px solid #C9A25D', boxShadow: '0 8px 20px -4px rgba(43, 29, 20, 0.08)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ backgroundColor: '#F5EFE6', padding: '1.25rem', borderRadius: '12px', border: '1px solid #C9A25D', boxShadow: '0 8px 20px -4px rgba(43, 29, 20, 0.08)', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.6rem', borderBottom: '1px solid #C9A25D' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#8A734C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       🧾 Official Cost Recovery Review
@@ -1095,11 +1095,35 @@ export default function ReturnRecoveryModule() {
                     </div>
                   </div>
 
+                  {/* MANDATORY RETURN TYPE SELECTION */}
+                  <div style={{ marginTop: '0.35rem' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2B1D14', display: 'block', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Mandatory Return Type Selection *
+                    </label>
+                    <select
+                      value={formData.returnType || 'Partial Return'}
+                      onChange={e => setFormData({ ...formData, returnType: e.target.value })}
+                      style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '2px solid #C9A25D', fontSize: '0.85rem', fontWeight: 800, color: '#2B1D14', backgroundColor: '#FEF3C7', cursor: 'pointer' }}
+                    >
+                      <option value="Replacement">1. Replacement (Issue replacement item; no cash refund/deduction)</option>
+                      <option value="Credit Note">2. Credit Note (Issue Credit Note & reduce customer balance)</option>
+                      <option value="Cash Refund">3. Cash Refund (Create refund voucher & reduce invoice balance)</option>
+                      <option value="Partial Return">4. Partial Return (Deduct returned qty value only; keep invoice active)</option>
+                      <option value="Full Return">5. Full Return (Reverse entire invoice & close invoice)</option>
+                      <option value="Repacking">6. Repacking (Product good, package damaged; route to repacking)</option>
+                      <option value="Near Expiry Transfer">7. Near Expiry Transfer (Transfer stock to fast-selling store)</option>
+                      <option value="Employee Sale">8. Employee Sale (Transfer to internal employee discounted sale)</option>
+                      <option value="Sample">9. Sample (Move to promotional sample stock; no finance charge)</option>
+                      <option value="Destroy">10. Destroy (Move to destroyed stock; record loss write-off)</option>
+                      <option value="Scrap">11. Scrap (Move to scrap inventory & record scrap salvage)</option>
+                      <option value="Return to Supplier">12. Return to Supplier (Generate Supplier Return & Debit Note)</option>
+                    </select>
+                  </div>
 
                   {/* PROMINENT TOTAL VALUE BANNER */}
-                  <div style={{ marginTop: '0.5rem', padding: '0.85rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg, #2B1D14 0%, #1A120B 100%)', border: '1px solid #C9A25D', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ marginTop: '0.25rem', padding: '0.85rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg, #2B1D14 0%, #1A120B 100%)', border: '1px solid #C9A25D', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#E8C97A', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Estimated Cost Recovery Value
+                      Estimated Return Value
                     </span>
                     <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#E8C97A' }}>
                       ₹{Number((formData.quantity || 0) * (formData.unitPrice || 0)).toLocaleString('en-IN')}
@@ -1108,14 +1132,95 @@ export default function ReturnRecoveryModule() {
                 </div>
               )}
 
-              {/* STEP 6: SUBMIT */}
+              {/* STEP 6: FINAL CONFIRMATION & FINANCIAL/INVENTORY/GST IMPACT SUMMARY */}
               {wizardStep === 6 && (
-                <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
-                  <CheckCircle2 size={52} style={{ color: '#10b981', margin: '0 auto 0.75rem auto' }} />
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#2B1D14', fontFamily: "'Playfair Display', 'Georgia', serif" }}>Ready to Issue Return Authorization</h3>
-                  <p style={{ fontSize: '0.825rem', color: '#64748b', marginTop: '0.35rem' }}>Clicking submit will generate the official RMA number and notify warehouse gate staff.</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <CheckCircle2 size={44} style={{ color: '#10b981', margin: '0 auto 0.35rem auto' }} />
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#2B1D14', fontFamily: "'Playfair Display', 'Georgia', serif", margin: 0 }}>
+                      Confirm Return Authorization (RMA)
+                    </h3>
+                    <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
+                      Please review the financial, inventory, and GST impact before generating the official RMA.
+                    </p>
+                  </div>
+
+                  {/* 4-PANEL IMPACT PREVIEW GRID */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div style={{ padding: '0.85rem', backgroundColor: '#F5EFE6', borderRadius: '10px', border: '1px solid #C9A25D' }}>
+                      <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#8A734C', textTransform: 'uppercase' }}>Customer & Invoice</div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#2B1D14', marginTop: '0.2rem' }}>{formData.customerName || 'Customer'}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Invoice: {formData.invoiceNumber || 'Manual Entry'}</div>
+                    </div>
+
+                    <div style={{ padding: '0.85rem', backgroundColor: '#F5EFE6', borderRadius: '10px', border: '1px solid #C9A25D' }}>
+                      <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#8A734C', textTransform: 'uppercase' }}>Product & Return Qty</div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#2B1D14', marginTop: '0.2rem' }}>{formData.productName || 'Product'}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Qty: {formData.quantity} Pks @ ₹{formData.unitPrice}/Pk</div>
+                    </div>
+
+                    <div style={{ padding: '0.85rem', backgroundColor: '#FEF3C7', borderRadius: '10px', border: '1px solid #b45309' }}>
+                      <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Selected Return Type</div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 900, color: '#2B1D14', marginTop: '0.2rem' }}>{formData.returnType || 'Partial Return'}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#78350f', fontWeight: 700 }}>
+                        Total Value: ₹{Number((formData.quantity || 0) * (formData.unitPrice || 0)).toLocaleString('en-IN')}
+                      </div>
+                    </div>
+
+                    <div style={{ padding: '0.85rem', backgroundColor: '#ecfdf5', borderRadius: '10px', border: '1px solid #10b981' }}>
+                      <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#047857', textTransform: 'uppercase' }}>GST & Tax Reversal</div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#047857', marginTop: '0.2rem' }}>
+                        ₹{Number((formData.quantity || 0) * (formData.unitPrice || 0) * 0.18).toFixed(2)}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#065f46' }}>18% GST Adjustment</div>
+                    </div>
+                  </div>
+
+                  {/* WORKFLOW IMPACT DESCRIPTION BOX */}
+                  <div style={{ padding: '0.85rem 1rem', backgroundColor: '#2B1D14', color: '#E8C97A', borderRadius: '10px', border: '1px solid #C9A25D', fontSize: '0.78rem' }}>
+                    <div style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em', color: '#C9A25D', marginBottom: '0.35rem' }}>
+                      ⚡ System Workflow & Ledger Actions
+                    </div>
+                    {formData.returnType === 'Replacement' && (
+                      <div>• <strong>Financial:</strong> No cash refund or invoice deduction. Replacement delivery order generated.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks), Saleable Stock (-{formData.quantity} Pks).</div>
+                    )}
+                    {formData.returnType === 'Credit Note' && (
+                      <div>• <strong>Financial:</strong> Credit Note of ₹{((formData.quantity || 0) * (formData.unitPrice || 0)).toFixed(2)} issued. Customer balance reduced.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks).</div>
+                    )}
+                    {formData.returnType === 'Cash Refund' && (
+                      <div>• <strong>Financial:</strong> Refund Voucher created. Invoice balance reduced by ₹{((formData.quantity || 0) * (formData.unitPrice || 0)).toFixed(2)}.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks).</div>
+                    )}
+                    {(formData.returnType === 'Partial Return' || !formData.returnType) && (
+                      <div>• <strong>Financial:</strong> Partial return ₹{((formData.quantity || 0) * (formData.unitPrice || 0)).toFixed(2)} deducted from invoice balance. Invoice remains active.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks).</div>
+                    )}
+                    {formData.returnType === 'Full Return' && (
+                      <div>• <strong>Financial:</strong> Full Return processed. Entire invoice closed and marked Refunded.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks), Revenue reversed.</div>
+                    )}
+                    {formData.returnType === 'Repacking' && (
+                      <div>• <strong>Financial:</strong> Packaging material cost estimated.<br />• <strong>Inventory:</strong> Stock routed to Repacking Zone (Saleable -&gt; Repacking).</div>
+                    )}
+                    {formData.returnType === 'Near Expiry Transfer' && (
+                      <div>• <strong>Financial:</strong> Transfer Order generated for secondary store. No customer refund.<br />• <strong>Inventory:</strong> Stock transferred to secondary store.</div>
+                    )}
+                    {formData.returnType === 'Employee Sale' && (
+                      <div>• <strong>Financial:</strong> Discounted employee sale invoice generated.<br />• <strong>Inventory:</strong> Stock moved to Employee Sale inventory.</div>
+                    )}
+                    {formData.returnType === 'Sample' && (
+                      <div>• <strong>Financial:</strong> Allocated as promotional sample. No financial charge.<br />• <strong>Inventory:</strong> Stock moved to Sample inventory.</div>
+                    )}
+                    {formData.returnType === 'Destroy' && (
+                      <div>• <strong>Financial:</strong> Inventory Write-off Loss Journal entry ₹{((formData.quantity || 0) * (formData.unitPrice || 0)).toFixed(2)} recorded.<br />• <strong>Inventory:</strong> Stock moved to Destroyed Inventory.</div>
+                    )}
+                    {formData.returnType === 'Scrap' && (
+                      <div>• <strong>Financial:</strong> Scrap Salvage entry ₹{((formData.quantity || 0) * (formData.unitPrice || 0) * 0.1).toFixed(2)} recorded.<br />• <strong>Inventory:</strong> Stock moved to Scrap Inventory.</div>
+                    )}
+                    {formData.returnType === 'Return to Supplier' && (
+                      <div>• <strong>Financial:</strong> Supplier Debit Note ₹{((formData.quantity || 0) * (formData.unitPrice || 0)).toFixed(2)} generated.<br />• <strong>Inventory:</strong> Returned to Supplier (-{formData.quantity} Pks).</div>
+                    )}
+                  </div>
                 </div>
               )}
+
             </div>
 
             {/* AO AURUM FOOTER BUTTONS */}
