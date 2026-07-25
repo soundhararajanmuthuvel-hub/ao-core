@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   ResponsiveContainer,
@@ -53,8 +53,14 @@ import {
   FileSpreadsheet,
   RefreshCw,
   Inbox,
-  AlertCircle
+  AlertCircle,
+  X,
+  UserPlus,
+  Store,
+  CreditCard,
+  History
 } from 'lucide-react';
+import { customersApi, salesApi } from '../api';
 
 export default function ReturnRecoveryModule() {
   const location = useLocation();
@@ -72,7 +78,28 @@ export default function ReturnRecoveryModule() {
   // Wizard Step State for Create Return (Steps 1 to 6)
   const [wizardStep, setWizardStep] = useState(1);
 
-  // Production Real States (Initialized to 0 / Empty)
+  // Customer Autocomplete & Selection States
+  const [custQuery, setCustQuery] = useState('');
+  const [custSearchResults, setCustSearchResults] = useState([]);
+  const [isCustSearching, setIsCustSearching] = useState(false);
+  const [showCustDropdown, setShowCustDropdown] = useState(false);
+  const [highlightedCustIndex, setHighlightedCustIndex] = useState(-1);
+  const [selectedCustomerObj, setSelectedCustomerObj] = useState(null);
+  const [selectedCustInvoices, setSelectedCustInvoices] = useState([]);
+  const [selectedCustHistory, setSelectedCustHistory] = useState(null);
+  const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('');
+
+  // Quick Create Customer Modal State
+  const [showQuickCustModal, setShowQuickCustModal] = useState(false);
+  const [quickCustForm, setQuickCustForm] = useState({
+    name: '',
+    phone: '',
+    customerType: 'Retail Shop',
+    city: 'Chennai',
+    gstin: ''
+  });
+
+  // Production Real States
   const [returnsList, setReturnsList] = useState([]);
   const [repackOrders, setRepackOrders] = useState([]);
   const [ncrs, setNcrs] = useState([]);
@@ -99,15 +126,18 @@ export default function ReturnRecoveryModule() {
   const [selectedReturn, setSelectedReturn] = useState(null);
   const [scanQuery, setScanQuery] = useState('');
 
-  // Create Return Form Data (Initialized Clean)
+  // Create Return Form Data
   const [formData, setFormData] = useState({
     category: 'External',
     source: 'Retail Shop',
+    customerId: null,
+    customerCode: '',
     customerName: '',
     customerType: 'Retail Shop',
     returnType: 'Customer Return',
     returnReason: 'Damaged Packing',
     rootCause: 'Transport',
+    invoiceNumber: '',
     courierName: '',
     trackingNumber: '',
     productName: '',
@@ -144,16 +174,30 @@ export default function ReturnRecoveryModule() {
     }
   }, [location.search]);
 
-  const parseJsonSafe = async (res) => {
-    if (!res || !res.ok) return null;
-    const contentType = res.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) return null;
-    try {
-      return await res.json();
-    } catch (e) {
-      return null;
+  // Debounced Live Customer Search (300ms)
+  useEffect(() => {
+    if (!custQuery || custQuery.trim().length < 2) {
+      setCustSearchResults([]);
+      setShowCustDropdown(false);
+      return;
     }
-  };
+
+    const timer = setTimeout(async () => {
+      setIsCustSearching(true);
+      try {
+        const { data } = await customersApi.list({ search: custQuery.trim(), limit: 10 });
+        setCustSearchResults(data.customers || []);
+        setShowCustDropdown(true);
+        setHighlightedCustIndex(-1);
+      } catch (e) {
+        console.error('Error searching customers:', e);
+      } finally {
+        setIsCustSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [custQuery]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -179,6 +223,17 @@ export default function ReturnRecoveryModule() {
         fetch('/api/returns/ncrs'),
         fetch('/api/returns/batch-recalls')
       ]);
+
+      const parseJsonSafe = async (res) => {
+        if (!res || !res.ok) return null;
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) return null;
+        try {
+          return await res.json();
+        } catch (e) {
+          return null;
+        }
+      };
 
       if (resReturns.status === 'fulfilled') {
         const d = await parseJsonSafe(resReturns.value);
@@ -226,6 +281,71 @@ export default function ReturnRecoveryModule() {
     }
   };
 
+  // Select Customer from Autocomplete
+  const handleSelectCustomer = async (cust) => {
+    setSelectedCustomerObj(cust);
+    setShowCustDropdown(false);
+    setCustQuery('');
+    setFormData(prev => ({
+      ...prev,
+      customerId: cust.id,
+      customerCode: cust.code || `CUS-${String(cust.id).padStart(6, '0')}`,
+      customerName: cust.name,
+      customerType: cust.customerType || 'Retail Shop',
+      phone: cust.phone || '',
+      gstin: cust.gstin || '',
+      address: cust.address || ''
+    }));
+
+    // Fetch Customer's Invoices & History
+    try {
+      const salesRes = await salesApi.list({ customerId: cust.id, limit: 20 });
+      const invoices = salesRes.data.invoices || [];
+      setSelectedCustInvoices(invoices);
+
+      // Compute Customer Return History Summary
+      const custReturns = returnsList.filter(r => r.customerId === cust.id || r.customerName === cust.name);
+      const totalReturnedValue = custReturns.reduce((sum, r) => sum + (Number(r.totalValue) || 0), 0);
+      
+      setSelectedCustHistory({
+        totalOrders: invoices.length,
+        totalReturns: custReturns.length,
+        returnRate: invoices.length > 0 ? ((custReturns.length / invoices.length) * 100).toFixed(1) : '0.0',
+        lastReturnDate: custReturns.length > 0 ? new Date(custReturns[0].createdAt).toLocaleDateString('en-IN') : 'None',
+        creditNotesCount: custReturns.filter(r => r.status === 'Closed').length,
+        recoveryValue: totalReturnedValue
+      });
+    } catch (e) {
+      console.error('Error fetching customer invoices/history:', e);
+      setSelectedCustInvoices([]);
+      setSelectedCustHistory({
+        totalOrders: 0,
+        totalReturns: 0,
+        returnRate: '0.0',
+        lastReturnDate: 'None',
+        creditNotesCount: 0,
+        recoveryValue: 0
+      });
+    }
+  };
+
+  // Quick Create New Customer
+  const handleQuickCreateCustomer = async (e) => {
+    e.preventDefault();
+    if (!quickCustForm.name || !quickCustForm.phone) {
+      alert('Please provide Customer Name and Phone Number.');
+      return;
+    }
+    try {
+      const res = await customersApi.create(quickCustForm);
+      const newCust = res.data.customer || res.data;
+      alert(`Customer "${newCust.name}" created successfully!`);
+      setShowQuickCustModal(false);
+      handleSelectCustomer(newCust);
+    } catch (e) {
+      alert('Failed to create customer. Please check fields.');
+    }
+  };
 
   const handleScanLookup = async () => {
     if (!scanQuery) return;
@@ -256,7 +376,7 @@ export default function ReturnRecoveryModule() {
   const handleCreateRma = async (e) => {
     if (e) e.preventDefault();
     if (!formData.productName || !formData.customerName) {
-      alert('Please fill in required customer and product details.');
+      alert('Please select a customer and specify product details.');
       return;
     }
     try {
@@ -416,25 +536,6 @@ export default function ReturnRecoveryModule() {
           </div>
         </div>
       </div>
-
-      {/* ERROR STATE CARD */}
-      {errorState && (
-        <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <AlertCircle size={24} style={{ color: '#ef4444' }} />
-            <div>
-              <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#991b1b', margin: 0 }}>Service Connection Error</h3>
-              <p style={{ fontSize: '0.8rem', color: '#b91c1c', margin: '0.2rem 0 0 0' }}>{errorMessage}</p>
-            </div>
-          </div>
-          <button
-            onClick={fetchData}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', borderRadius: '8px', backgroundColor: '#ef4444', color: '#fff', fontSize: '0.8rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
-          >
-            <RefreshCw size={14} /> Retry Connection
-          </button>
-        </div>
-      )}
 
       {/* 12 EQUAL-HEIGHT ENTERPRISE KPI CARDS BAR */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
@@ -698,203 +799,20 @@ export default function ReturnRecoveryModule() {
         </div>
       )}
 
-      {/* TAB 3: QC INSPECTION PAGE */}
-      {activeTab === 'qc' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1.25rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <CheckSquare size={18} style={{ color: '#d97706' }} /> Split-View Quality Inspection & Mandatory Disposition Hub
-          </h2>
-
-          {selectedReturn ? (
-            <div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-                <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                  <h3 style={{ fontSize: '0.825rem', fontWeight: 800, color: '#334155', margin: '0 0 0.85rem 0' }}>
-                    📸 Return Details: {selectedReturn.rmaNumber}
-                  </h3>
-                  <div style={{ fontSize: '0.8rem', lineHeight: 1.6 }}>
-                    <div><strong>Customer:</strong> {selectedReturn.customerName}</div>
-                    <div><strong>Reason:</strong> {selectedReturn.returnReason}</div>
-                    <div><strong>Quantity:</strong> {selectedReturn.totalQty} Pks</div>
-                    <div><strong>Value:</strong> ₹{selectedReturn.totalValue}</div>
-                  </div>
-                </div>
-
-                <div style={{ backgroundColor: '#f8fafc', padding: '1.25rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                  <h3 style={{ fontSize: '0.825rem', fontWeight: 800, color: '#334155', margin: '0 0 0.85rem 0' }}>
-                    📋 QC Remarks
-                  </h3>
-                  <textarea
-                    value={formData.qcRemarks}
-                    onChange={e => setFormData({ ...formData, qcRemarks: e.target.value })}
-                    placeholder="Enter inspection findings..."
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', height: '80px' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem' }}>
-                <h3 style={{ fontSize: '0.825rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.85rem 0', textTransform: 'uppercase' }}>
-                  Assign Mandatory Final Item Disposition:
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
-                  {[
-                    { label: 'Return Stock', color: '#10b981', bg: '#ecfdf5' },
-                    { label: 'Repack Order', color: '#06b6d4', bg: '#ecfeff' },
-                    { label: 'Fast Selling Transfer', color: '#3b82f6', bg: '#eff6ff' },
-                    { label: 'Employee Sale', color: '#8b5cf6', bg: '#f5f3ff' },
-                    { label: 'Replacement Sent', color: '#f59e0b', bg: '#fffbeb' },
-                    { label: 'Credit Note Issue', color: '#10b981', bg: '#ecfdf5' },
-                    { label: 'Scrap / Destroy', color: '#ef4444', bg: '#fef2f2' },
-                  ].map((btn, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleQCSubmit(btn.label)}
-                      style={{
-                        padding: '0.85rem 0.5rem',
-                        borderRadius: '8px',
-                        backgroundColor: btn.bg,
-                        color: btn.color,
-                        border: `1px solid ${btn.color}`,
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        textAlign: 'center'
-                      }}
-                    >
-                      {btn.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '3.5rem 2rem' }}>
-              <CheckSquare size={48} style={{ color: '#cbd5e1', marginBottom: '0.75rem' }} />
-              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>No Return Item Selected for QC</h3>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.35rem', marginBottom: '1.25rem' }}>
-                Select a return item from the Return Register tab to perform quality inspection and assign mandatory item disposition.
-              </p>
-              <button
-                onClick={() => setActiveTab('register')}
-                style={{ padding: '0.65rem 1.25rem', borderRadius: '8px', backgroundColor: '#3f1d07', color: '#ffffff', fontSize: '0.8rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
-              >
-                Go to Return Register
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 4: REPACK WORK ORDERS */}
-      {activeTab === 'repack' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1.25rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Factory size={18} style={{ color: '#06b6d4' }} /> Repack Work Orders Kanban (RP-2026-XXXXX)
-          </h2>
-
-          {repackOrders.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-              {['Pending', 'In Progress', 'QC Review', 'Completed'].map((col, idx) => (
-                <div key={idx} style={{ backgroundColor: '#f8fafc', padding: '0.85rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '0.75rem', paddingBottom: '0.4rem', borderBottom: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{col}</span>
-                    <span style={{ backgroundColor: '#e2e8f0', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
-                      {repackOrders.filter(o => o.status === col).length}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                    {repackOrders.filter(o => o.status === col).map(wo => (
-                      <div key={wo.id} style={{ backgroundColor: '#ffffff', padding: '0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                        <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: 800, color: '#3f1d07' }}>{wo.workOrderNumber}</div>
-                        <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#0f172a', margin: '0.2rem 0' }}>Qty: {wo.quantity} Pks</div>
-                        {wo.status !== 'Completed' && (
-                          <button
-                            onClick={() => handleCompleteRepack(wo.id)}
-                            style={{ marginTop: '0.6rem', width: '100%', padding: '0.4rem', backgroundColor: '#10b981', color: '#ffffff', borderRadius: '6px', fontSize: '0.725rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
-                          >
-                            Complete Repack
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '3.5rem 2rem' }}>
-              <Factory size={48} style={{ color: '#cbd5e1', marginBottom: '0.75rem' }} />
-              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>No Active Repack Work Orders</h3>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.35rem' }}>
-                Repack work orders will automatically be generated here when warehouse QC assigns a "Repack" disposition to returned items.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 5: NEAR EXPIRY ENGINE */}
-      {activeTab === 'expiry' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          
-          <div style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-            <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#10b981', margin: '0 0 0.85rem 0', textTransform: 'uppercase' }}>
-              Fast-Selling Shop Recommendations (Ranked by Sales Velocity)
-            </h3>
-            
-            {fastSellingShops.length > 0 ? (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 800 }}>
-                      <th style={{ padding: '0.65rem 0.85rem' }}>Rank</th>
-                      <th style={{ padding: '0.65rem 0.85rem' }}>Store Name</th>
-                      <th style={{ padding: '0.65rem 0.85rem' }}>Type</th>
-                      <th style={{ padding: '0.65rem 0.85rem' }}>Monthly Velocity</th>
-                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {fastSellingShops.map((s, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#10b981' }}>#{s.rank || i + 1}</td>
-                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{s.customerName}</td>
-                        <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>{s.customerType}</td>
-                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#10b981' }}>{s.salesVolumeMonthly} Pks</td>
-                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>
-                          <button style={{ padding: '0.35rem 0.75rem', borderRadius: '6px', backgroundColor: '#10b981', color: '#ffffff', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-                            Transfer Stock
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '3rem 2rem' }}>
-                <Clock size={48} style={{ color: '#cbd5e1', marginBottom: '0.75rem' }} />
-                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>No Near Expiry Recommendations Available</h3>
-                <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.35rem' }}>
-                  All finished goods stock is within safe shelf-life parameters. No immediate stock transfers required.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* CREATE RETURN 6-STEP WIZARD MODAL */}
       {showCreateModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 1000 }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #cbd5e1', maxWidth: '640px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #cbd5e1', maxWidth: '680px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
             
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}>
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem 0' }}>
-                Create Return Authorization (RMA) Wizard
-              </h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  Create Return Authorization (RMA) Wizard
+                </h2>
+                <button onClick={() => setShowCreateModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                  <X size={20} />
+                </button>
+              </div>
               
               <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.75rem' }}>
                 {[1, 2, 3, 4, 5, 6].map(st => (
@@ -914,9 +832,9 @@ export default function ReturnRecoveryModule() {
               </div>
               <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', marginTop: '0.35rem', display: 'block' }}>
                 Step {wizardStep} of 6: {
-                  wizardStep === 1 ? 'Customer Details' :
-                  wizardStep === 2 ? 'Invoice Lookup' :
-                  wizardStep === 3 ? 'Products & Quantities' :
+                  wizardStep === 1 ? 'Customer Selection' :
+                  wizardStep === 2 ? 'Invoice & Product Lookup' :
+                  wizardStep === 3 ? 'Quantities & Reason' :
                   wizardStep === 4 ? 'Photos & Video Upload' :
                   wizardStep === 5 ? 'Cost Recovery Review' : 'Submit & Generate RMA'
                 }
@@ -924,64 +842,205 @@ export default function ReturnRecoveryModule() {
             </div>
 
             <div style={{ padding: '1.5rem' }}>
+              
+              {/* STEP 1: ENTERPRISE SEARCHABLE CUSTOMER SELECTOR */}
               {wizardStep === 1 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Customer Name / Store</label>
-                    <input
-                      type="text"
-                      placeholder="Enter Customer or Store Name..."
-                      value={formData.customerName}
-                      onChange={e => setFormData({ ...formData, customerName: e.target.value })}
-                      style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
-                    />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  
+                  {/* SEARCHABLE AUTOCOMPLETE INPUT */}
+                  <div style={{ position: 'relative' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a', display: 'block', marginBottom: '0.4rem' }}>
+                      🔍 Search Customer / Store (Name, Phone, GST, Code, City)
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <Search size={18} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
+                      <input
+                        type="text"
+                        placeholder="Type 2+ characters to search customer database..."
+                        value={custQuery || formData.customerName}
+                        onChange={e => {
+                          setCustQuery(e.target.value);
+                          setFormData(prev => ({ ...prev, customerName: e.target.value }));
+                        }}
+                        onFocus={() => { if (custSearchResults.length > 0) setShowCustDropdown(true); }}
+                        style={{ width: '100%', padding: '0.65rem 0.75rem 0.65rem 2.4rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.875rem', fontWeight: 600, outline: 'none', backgroundColor: '#ffffff' }}
+                      />
+                      {isCustSearching && (
+                        <div style={{ position: 'absolute', right: '12px', top: '12px', fontSize: '0.75rem', color: '#94a3b8' }}>
+                          Searching...
+                        </div>
+                      )}
+                    </div>
+
+                    {/* LIVE SEARCH RESULTS DROPDOWN */}
+                    {showCustDropdown && (
+                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', zIndex: 50, maxHeight: '260px', overflowY: 'auto', marginTop: '4px' }}>
+                        {custSearchResults.length > 0 ? (
+                          custSearchResults.map((c, i) => (
+                            <div
+                              key={c.id}
+                              onClick={() => handleSelectCustomer(c)}
+                              style={{
+                                padding: '0.75rem 1rem',
+                                borderBottom: '1px solid #f1f5f9',
+                                cursor: 'pointer',
+                                backgroundColor: highlightedCustIndex === i ? '#fef3c7' : '#ffffff',
+                                transition: 'background-color 0.15s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#f1f5f9', color: '#3f1d07', fontWeight: 800, fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  {c.name ? c.name.charAt(0).toUpperCase() : 'C'}
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0f172a' }}>{c.name}</div>
+                                  <div style={{ fontSize: '0.725rem', color: '#64748b' }}>
+                                    {c.code || `CUS-${c.id}`} • {c.phone || 'No Phone'} {c.city ? `• ${c.city}` : ''}
+                                  </div>
+                                </div>
+                              </div>
+                              <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.2rem 0.5rem', borderRadius: '4px', backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>
+                                {c.customerType || 'Retail Shop'}
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ padding: '1.25rem', textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.5rem' }}>No customer found matching "{custQuery}"</div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setQuickCustForm(prev => ({ ...prev, name: custQuery }));
+                                setShowQuickCustModal(true);
+                              }}
+                              style={{ padding: '0.4rem 0.85rem', borderRadius: '6px', backgroundColor: '#3f1d07', color: '#ffffff', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                            >
+                              <UserPlus size={14} style={{ display: 'inline', marginRight: '4px' }} /> Quick Create Customer
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Customer Type</label>
-                    <select
-                      value={formData.customerType}
-                      onChange={e => setFormData({ ...formData, customerType: e.target.value })}
-                      style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
-                    >
-                      <option value="Retail Shop">Retail Shop</option>
-                      <option value="Supermarket">Supermarket</option>
-                      <option value="Wholesale">Wholesale</option>
-                      <option value="D2C">D2C Customer</option>
-                      <option value="Private Label">Private Label</option>
-                      <option value="Distributor">Distributor</option>
-                    </select>
-                  </div>
+
+                  {/* SELECTED CUSTOMER PROFILE & RETURN HISTORY SUMMARY PANEL */}
+                  {formData.customerName && (
+                    <div style={{ backgroundColor: '#f8fafc', padding: '1.25rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                        <div>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#3f1d07', textTransform: 'uppercase' }}>Selected Customer Profile</span>
+                          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: '0.1rem 0' }}>{formData.customerName}</h3>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                            Type: <strong>{formData.customerType}</strong> • Code: <strong>{formData.customerCode || 'CUS-001'}</strong>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, customerName: '', customerId: null }));
+                            setSelectedCustomerObj(null);
+                            setSelectedCustHistory(null);
+                          }}
+                          style={{ fontSize: '0.725rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}
+                        >
+                          Change Customer
+                        </button>
+                      </div>
+
+                      {/* RETURN HISTORY METRICS PANEL */}
+                      {selectedCustHistory && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginTop: '0.85rem', borderTop: '1px solid #cbd5e1', paddingTop: '0.85rem', textAlign: 'center' }}>
+                          <div style={{ backgroundColor: '#ffffff', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                            <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Total Invoices</div>
+                            <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{selectedCustHistory.totalOrders}</strong>
+                          </div>
+                          <div style={{ backgroundColor: '#ffffff', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                            <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Total Returns</div>
+                            <strong style={{ fontSize: '0.9rem', color: '#b45309' }}>{selectedCustHistory.totalReturns}</strong>
+                          </div>
+                          <div style={{ backgroundColor: '#ffffff', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                            <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Return Rate</div>
+                            <strong style={{ fontSize: '0.9rem', color: Number(selectedCustHistory.returnRate) > 10 ? '#ef4444' : '#10b981' }}>{selectedCustHistory.returnRate}%</strong>
+                          </div>
+                          <div style={{ backgroundColor: '#ffffff', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                            <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Returned Value</div>
+                            <strong style={{ fontSize: '0.9rem', color: '#10b981' }}>₹{selectedCustHistory.recoveryValue}</strong>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                 </div>
               )}
 
+              {/* STEP 2: INVOICE & PRODUCT LOOKUP */}
               {wizardStep === 2 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <input
-                      type="text"
-                      placeholder="Scan Barcode / Enter Invoice Number..."
-                      value={scanQuery}
-                      onChange={e => setScanQuery(e.target.value)}
-                      style={{ flex: 1, padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleScanLookup}
-                      style={{ padding: '0.55rem 1rem', borderRadius: '8px', backgroundColor: '#3f1d07', color: '#fff', fontSize: '0.8rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
-                    >
-                      Lookup
-                    </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
+                    Select Invoice for {formData.customerName || 'Customer'}
                   </div>
+
+                  {selectedCustInvoices.length > 0 ? (
+                    <div style={{ maxHeight: '220px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#f1f5f9', textAlign: 'left' }}>
+                            <th style={{ padding: '0.5rem 0.75rem' }}>Invoice #</th>
+                            <th style={{ padding: '0.5rem 0.75rem' }}>Date</th>
+                            <th style={{ padding: '0.5rem 0.75rem' }}>Amount</th>
+                            <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>Select</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedCustInvoices.map(inv => (
+                            <tr key={inv.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                              <td style={{ padding: '0.5rem 0.75rem', fontWeight: 800, fontFamily: 'monospace', color: '#3f1d07' }}>{inv.invoiceNumber}</td>
+                              <td style={{ padding: '0.5rem 0.75rem' }}>{new Date(inv.date || inv.createdAt).toLocaleDateString('en-IN')}</td>
+                              <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700, color: '#10b981' }}>₹{inv.grandTotal}</td>
+                              <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      invoiceNumber: inv.invoiceNumber,
+                                      productName: inv.items ? inv.items[0]?.productName : 'ABC Malt 500g Pouch',
+                                      batchNumber: inv.items ? inv.items[0]?.batchNumber : 'BATCH-2026-01',
+                                      unitPrice: inv.items ? inv.items[0]?.price : 250
+                                    }));
+                                    setWizardStep(3);
+                                  }}
+                                  style={{ padding: '0.3rem 0.6rem', borderRadius: '4px', backgroundColor: '#3f1d07', color: '#fff', fontSize: '0.725rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                                >
+                                  Select Invoice
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <FileText size={32} style={{ color: '#cbd5e1', marginBottom: '0.5rem' }} />
+                      <div style={{ fontSize: '0.8rem', color: '#64748b' }}>No invoices found for this customer. You can enter product & batch details directly in Step 3.</div>
+                    </div>
+                  )}
                 </div>
               )}
 
+              {/* STEP 3: QUANTITIES & REASON */}
               {wizardStep === 3 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div>
                     <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Product Name</label>
                     <input
                       type="text"
-                      placeholder="Enter Product Name (e.g. ABC Malt 500g)..."
+                      placeholder="Enter Product Name..."
                       value={formData.productName}
                       onChange={e => setFormData({ ...formData, productName: e.target.value })}
                       style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
@@ -1011,6 +1070,7 @@ export default function ReturnRecoveryModule() {
                 </div>
               )}
 
+              {/* STEP 4: PHOTOS */}
               {wizardStep === 4 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ border: '2px dashed #cbd5e1', padding: '2rem', borderRadius: '10px', textAlign: 'center', backgroundColor: '#f8fafc' }}>
@@ -1021,6 +1081,7 @@ export default function ReturnRecoveryModule() {
                 </div>
               )}
 
+              {/* STEP 5: REVIEW */}
               {wizardStep === 5 && (
                 <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div><strong>Customer:</strong> {formData.customerName || 'Not specified'}</div>
@@ -1031,6 +1092,7 @@ export default function ReturnRecoveryModule() {
                 </div>
               )}
 
+              {/* STEP 6: SUBMIT */}
               {wizardStep === 6 && (
                 <div style={{ textAlign: 'center', padding: '1rem 0' }}>
                   <CheckCircle2 size={48} style={{ color: '#10b981', margin: '0 auto 0.5rem auto' }} />
@@ -1069,6 +1131,101 @@ export default function ReturnRecoveryModule() {
               )}
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* QUICK CREATE CUSTOMER MODAL */}
+      {showQuickCustModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 1100 }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', maxWidth: '480px', width: '100%', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <UserPlus size={18} style={{ color: '#3f1d07' }} /> Quick Create Customer
+              </h3>
+              <button onClick={() => setShowQuickCustModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickCreateCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>Customer / Store Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={quickCustForm.name}
+                  onChange={e => setQuickCustForm({ ...quickCustForm, name: e.target.value })}
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>Phone Number *</label>
+                  <input
+                    type="text"
+                    required
+                    value={quickCustForm.phone}
+                    onChange={e => setQuickCustForm({ ...quickCustForm, phone: e.target.value })}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>Customer Type</label>
+                  <select
+                    value={quickCustForm.customerType}
+                    onChange={e => setQuickCustForm({ ...quickCustForm, customerType: e.target.value })}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+                  >
+                    <option value="Retail Shop">Retail Shop</option>
+                    <option value="Supermarket">Supermarket</option>
+                    <option value="Wholesale">Wholesale</option>
+                    <option value="Distributor">Distributor</option>
+                    <option value="D2C Customer">D2C Customer</option>
+                    <option value="Private Label">Private Label</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>City</label>
+                  <input
+                    type="text"
+                    value={quickCustForm.city}
+                    onChange={e => setQuickCustForm({ ...quickCustForm, city: e.target.value })}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>GSTIN Number</label>
+                  <input
+                    type="text"
+                    placeholder="33ABCDE1234F1Z5"
+                    value={quickCustForm.gstin}
+                    onChange={e => setQuickCustForm({ ...quickCustForm, gstin: e.target.value })}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowQuickCustModal(false)}
+                  style={{ padding: '0.45rem 0.85rem', borderRadius: '6px', backgroundColor: '#e2e8f0', color: '#475569', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ padding: '0.45rem 1rem', borderRadius: '6px', backgroundColor: '#10b981', color: '#ffffff', fontSize: '0.75rem', fontWeight: 800, border: 'none', cursor: 'pointer' }}
+                >
+                  Save & Select Customer
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

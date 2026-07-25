@@ -25,8 +25,13 @@ exports.getCustomers = async (req, res, next) => {
         { phone: { [Op.like]: `%${search}%` } },
         { email: { [Op.like]: `%${search}%` } },
         { businessName: { [Op.like]: `%${search}%` } },
+        { gstin: { [Op.like]: `%${search}%` } },
+        { code: { [Op.like]: `%${search}%` } },
+        { city: { [Op.like]: `%${search}%` } },
+        { address: { [Op.like]: `%${search}%` } },
       ];
     }
+
 
     const { count: total, rows: customers } = await Customer.findAndCountAll({
       where: query,
