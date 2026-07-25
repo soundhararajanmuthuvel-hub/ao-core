@@ -775,54 +775,71 @@ export default function ReturnRecoveryModule() {
                   <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', borderBottom: '1px solid #e2e8f0', textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.04em' }}>
                     <th style={{ padding: '0.75rem 1rem' }}>RMA Number</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Customer / Source</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>Reason & Cause</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Invoice & Product Line</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Return Type & Cause</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Qty & Value</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>Approval Level</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Approval</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Status</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredReturns.map(item => (
-                    <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.15s ease' }}>
-                      <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: 800, color: '#3f1d07' }}>
-                        {item.rmaNumber}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
-                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.customerName || item.customerType}</div>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{item.category} • {item.source}</span>
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
-                        <div style={{ fontWeight: 600, color: '#334155' }}>{item.returnReason}</div>
-                        <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Root Cause: {item.rootCause}</span>
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
-                        <div style={{ fontWeight: 800, color: '#0f172a' }}>{item.totalQty} Pks</div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#10b981' }}>₹{item.totalValue}</div>
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
-                        <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
-                          {item.approvalLevel}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
-                        <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: item.status === 'Closed' ? '#ecfdf5' : '#fffbeb', color: item.status === 'Closed' ? '#047857' : '#b45309', border: '1px solid currentColor' }}>
-                          {item.status}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                        <button
-                          onClick={() => { setSelectedReturn(item); setShowQcModal(true); }}
-                          style={{ padding: '0.35rem 0.75rem', borderRadius: '6px', backgroundColor: '#3f1d07', color: '#ffffff', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
-                        >
-                          QC Inspection
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredReturns.map(item => {
+                    const custName = item.customer?.name || item.customerName || item.customerType || 'Customer';
+                    const invNo = item.invoice?.invoiceNumber || item.invoiceNumber || 'Manual Entry';
+                    const firstIt = item.items && item.items.length > 0 ? item.items[0] : null;
+                    const prodName = firstIt?.product?.name || firstIt?.productName || 'Product';
+                    const batchNo = firstIt?.batchNumber || 'N/A';
+
+                    return (
+                      <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.15s ease' }}>
+                        <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: 800, color: '#3f1d07' }}>
+                          {item.rmaNumber}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <div style={{ fontWeight: 800, color: '#0f172a' }}>{custName}</div>
+                          <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{item.category} • {item.source}</span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <div style={{ fontWeight: 700, color: '#3f1d07', fontFamily: 'monospace' }}>{invNo}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>{prodName}</div>
+                          <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontFamily: 'monospace' }}>Batch: {batchNo}</div>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <span style={{ padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', display: 'inline-block', marginBottom: '0.2rem' }}>
+                            {item.returnType || 'Partial Return'}
+                          </span>
+                          <div style={{ fontSize: '0.725rem', color: '#475569', fontWeight: 600 }}>{item.returnReason}</div>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <div style={{ fontWeight: 800, color: '#0f172a' }}>{item.totalQty} Pks</div>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981' }}>₹{Number(item.totalValue || 0).toLocaleString('en-IN')}</div>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                            {item.approvalLevel || 'Manager'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: item.status === 'Closed' || item.status === 'Approved' ? '#ecfdf5' : '#fffbeb', color: item.status === 'Closed' || item.status === 'Approved' ? '#047857' : '#b45309', border: '1px solid currentColor' }}>
+                            {item.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                          <button
+                            onClick={() => { setSelectedReturn(item); setShowQcModal(true); }}
+                            style={{ padding: '0.35rem 0.75rem', borderRadius: '6px', backgroundColor: '#3f1d07', color: '#ffffff', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                          >
+                            QC Inspection
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
+
           ) : (
             <div style={{ textAlign: 'center', padding: '3.5rem 2rem' }}>
               <Inbox size={48} style={{ color: '#cbd5e1', marginBottom: '0.75rem' }} />

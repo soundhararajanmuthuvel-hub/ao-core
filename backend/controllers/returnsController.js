@@ -448,8 +448,6 @@ exports.createReturnRequest = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
-
 // 3. GET ALL RETURNS WITH FILTERS & SEARCH (<50ms)
 exports.getReturns = async (req, res) => {
   try {
@@ -464,18 +462,24 @@ exports.getReturns = async (req, res) => {
     } = req.query;
 
     const where = {};
-    if (status) where.status = status;
-    if (category) where.category = category;
-    if (returnReason) where.returnReason = returnReason;
-    if (rootCause) where.rootCause = rootCause;
-    if (customerType) where.customerType = customerType;
-    if (warehouseZone) where.warehouseZone = warehouseZone;
+    if (status && status !== 'All') where.status = status;
+    if (category && category !== 'All') where.category = category;
+    if (returnReason && returnReason !== 'All') where.returnReason = returnReason;
+    if (rootCause && rootCause !== 'All') where.rootCause = rootCause;
+    if (customerType && customerType !== 'All') where.customerType = customerType;
+    if (warehouseZone && warehouseZone !== 'All') where.warehouseZone = warehouseZone;
 
-    if (search) {
+    if (search && search.trim() !== '') {
+      const s = `%${search.trim()}%`;
       where[Op.or] = [
-        { rmaNumber: { [Op.like]: `%${search}%` } },
-        { returnReason: { [Op.like]: `%${search}%` } },
-        { customerType: { [Op.like]: `%${search}%` } },
+        { rmaNumber: { [Op.like]: s } },
+        { returnReason: { [Op.like]: s } },
+        { returnType: { [Op.like]: s } },
+        { customerType: { [Op.like]: s } },
+        { '$customer.name$': { [Op.like]: s } },
+        { '$customer.code$': { [Op.like]: s } },
+        { '$invoice.invoiceNumber$': { [Op.like]: s } },
+        { '$items.batchNumber$': { [Op.like]: s } }
       ];
     }
 
@@ -487,7 +491,8 @@ exports.getReturns = async (req, res) => {
         { model: User, as: 'salesman', attributes: ['id', 'name', 'email', 'role'] },
         { model: ReturnItem, as: 'items', include: [{ model: Product, as: 'product' }] }
       ],
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
+      subQuery: false
     });
 
     res.json({ success: true, count: returns.length, data: returns });
@@ -572,159 +577,115 @@ exports.qcInspect = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Return Request not found' });
     }
 
-    let recoveredValueSum = 0;
-    let destroyedValueSum = 0;
-    let recoveredQtySum = 0;
-    let destroyedQtySum = 0;
+    returnReq.qcRemarks = qcRemarks || returnReq.qcRemarks;
+    returnReq.qcInspectorId = qcInspectorId || req.user?.id || null;
+    returnReq.status = 'QC Completed';
+    returnReq.kanbanColumn = 'QC Passed';
 
+    // Process individual item dispositions & route stock
     for (const insp of itemsInspection) {
-      const item = await ReturnItem.findByPk(insp.itemId);
+      const item = returnReq.items.find(i => i.id === insp.itemId);
       if (item) {
         item.disposition = insp.disposition || 'Return to Saleable Stock';
         item.qcConditionProduct = insp.qcConditionProduct || item.qcConditionProduct;
         item.qcConditionPackage = insp.qcConditionPackage || item.qcConditionPackage;
-        item.packagingFailureCategory = insp.packagingFailureCategory || 'None';
-        if (insp.qcImages) item.qcImages = JSON.stringify(insp.qcImages);
+        item.returnedImageUrl = insp.qcImages ? insp.qcImages[0] : item.returnedImageUrl;
         await item.save();
 
-        const qty = parseFloat(item.quantity || 1);
-        const val = parseFloat(item.lineTotal || 0);
-
-        if (item.disposition === 'Destroy' || item.disposition === 'Scrap') {
-          destroyedQtySum += qty;
-          destroyedValueSum += val;
-
-          // Record Stock Loss
-          await StockLoss.create({
-            productId: item.productId,
-            quantity: qty,
-            reason: `Return Destroyed: ${returnReq.returnReason}`,
-            notes: `RMA ${returnReq.rmaNumber} Item ${item.id}`,
-            costPrice: val * 0.6,
-          });
-        } else {
-          recoveredQtySum += qty;
-          recoveredValueSum += val;
-        }
-
-        // Trigger CASE 1 Repacking Work Order if disposition is Repack
-        if (item.disposition === 'Repack') {
-          const woNumber = await generateWorkOrderNumber();
+        // ROUTE INVENTORY BASED ON DISPOSITION
+        if (insp.disposition === 'Return to Saleable Stock') {
+          const prod = await Product.findByPk(item.productId);
+          if (prod) {
+            prod.stock = (parseFloat(prod.stock || 0) + parseFloat(item.quantity || 0));
+            await prod.save();
+          }
+        } else if (insp.disposition === 'Route to Repacking') {
+          const woNo = await generateWorkOrderNumber();
           await RepackWorkOrder.create({
-            workOrderNumber: woNumber,
+            workOrderNumber: woNo,
             returnRequestId: returnReq.id,
             productId: item.productId,
             batchNumber: item.batchNumber,
-            quantity: qty,
-            pouchQtyDeducted: qty,
-            stickerQtyDeducted: qty,
-            labelQtyDeducted: qty,
-            cartonQtyDeducted: Math.ceil(qty / 12),
-            laborHours: 1.5,
-            repackCostTotal: 150,
+            quantity: item.quantity,
+            packagingMaterialType: 'New Pouches & Outer Box',
             status: 'In Progress',
+            warehouseZone: 'Repacking Zone',
           });
-
-          // Stock movement to Repacking bucket
-          await StockMovement.create({
-            type: 'TRANSFER',
+          returnReq.warehouseZone = 'Repacking Zone';
+          returnReq.kanbanColumn = 'Repacking Queue';
+        } else if (insp.disposition === 'Destroy & Write-Off') {
+          await StockLoss.create({
             productId: item.productId,
-            quantity: qty,
             batchNumber: item.batchNumber,
-            notes: `RMA ${returnReq.rmaNumber} moved to Repacking Stock`,
+            quantity: item.quantity,
+            costValue: (item.unitPrice || 0) * (item.quantity || 1),
+            reason: 'QC Inspection Failed: Packaging Tearing / Contamination',
+            dispositionCategory: 'Destroyed',
+            approvedBy: req.user ? req.user.id : null,
           });
-        } else if (item.disposition === 'Return to Saleable Stock') {
-          // Restore to Saleable Stock
-          const prod = await Product.findByPk(item.productId);
-          if (prod) {
-            prod.stock = (parseFloat(prod.stock || 0) + qty);
-            await prod.save();
-          }
-
-          await StockMovement.create({
-            type: 'IN',
+          returnReq.warehouseZone = 'Destroyed Zone';
+        } else if (insp.disposition === 'Return to Supplier') {
+          const claimNo = await generateSupplierClaimNumber();
+          await SupplierClaim.create({
+            claimNumber: claimNo,
+            supplierName: 'Packaging Supplier ABC',
             productId: item.productId,
-            quantity: qty,
             batchNumber: item.batchNumber,
-            notes: `RMA ${returnReq.rmaNumber} returned to Saleable Stock`,
+            claimAmount: (item.unitPrice || 0) * (item.quantity || 1),
+            reason: 'Raw material defect: Seal failure under pressure',
+            status: 'Submitted',
           });
+          returnReq.warehouseZone = 'RTV Zone';
         }
       }
     }
 
-    // Update Return Request status & financial metrics
-    returnReq.status = 'QC Passed';
-    returnReq.kanbanColumn = 'QC';
-    returnReq.warehouseZone = 'QC';
-    returnReq.qcRemarks = qcRemarks || 'QC Inspection completed.';
-    returnReq.qcInspectorId = qcInspectorId || null;
-    returnReq.recoveredQty = recoveredQtySum;
-    returnReq.destroyedQty = destroyedQtySum;
-    returnReq.recoveredValue = recoveredValueSum;
-    returnReq.netLossValue = destroyedValueSum + parseFloat(returnReq.transportCost || 0);
-    returnReq.netRecoveryValue = recoveredValueSum - parseFloat(returnReq.transportCost || 0);
-    returnReq.recoveryPercentage = returnReq.totalQty > 0 ? (recoveredQtySum / returnReq.totalQty) * 100 : 100;
     await returnReq.save();
 
-    // AUTO CREDIT NOTE GENERATION
-    if (recoveredValueSum > 0) {
-      const cnNumber = await generateCreditNoteNumber();
-      const taxable = recoveredValueSum / 1.05;
-      const gst = recoveredValueSum - taxable;
+    // Auto NCR Generation if quality issue detected
+    const totalBatchReturns = await ReturnRequest.count({
+      include: [{
+        model: ReturnItem,
+        as: 'items',
+        where: { batchNumber: returnReq.items[0]?.batchNumber || 'ABC240715' }
+      }]
+    });
 
-      await ReturnCreditNote.create({
-        creditNoteNumber: cnNumber,
-        returnRequestId: returnReq.id,
-        invoiceId: returnReq.invoiceId,
-        customerId: returnReq.customerId,
-        taxableValue: taxable,
-        cgstAmount: gst / 2,
-        sgstAmount: gst / 2,
-        totalAmount: recoveredValueSum,
-        status: 'Posted'
-      });
+    if (totalBatchReturns >= 3) {
+      const bNo = returnReq.items[0]?.batchNumber || 'ABC240715';
+      const existingNcr = await ManufacturingNcr.findOne({ where: { batchNumber: bNo } });
+      if (!existingNcr) {
+        const ncrNo = await generateNcrNumber();
+        await ManufacturingNcr.create({
+          ncrNumber: ncrNo,
+          batchNumber: bNo,
+          productId: returnReq.items[0]?.productId || 1,
+          triggerReturnCount: totalBatchReturns,
+          status: 'Open',
+          rootCauseCategory: returnReq.rootCause || 'Manufacturing',
+          rootCauseDetails: `Auto-generated NCR: ${totalBatchReturns} returns recorded for batch ${bNo}.`,
+          correctiveAction: 'Inspect production line and raw material batch receipts.',
+          preventiveAction: 'Recalibrate sealing machine and review batch log.'
+        });
+      }
     }
 
-    // CHECK BATCH RECALL THRESHOLD & NCR AUTO TRIGGER
-    const batchList = returnReq.items ? returnReq.items.map(i => i.batchNumber) : ['ABC240715'];
-    for (const bNo of batchList) {
-      const totalBatchReturns = await ReturnItem.count({ where: { batchNumber: bNo } });
-
-      // Auto NCR if returns >= 3
-      if (totalBatchReturns >= 3) {
-        const existingNcr = await ManufacturingNcr.findOne({ where: { batchNumber: bNo } });
-        if (!existingNcr) {
-          const ncrNo = await generateNcrNumber();
-          await ManufacturingNcr.create({
-            ncrNumber: ncrNo,
-            batchNumber: bNo,
-            productId: returnReq.items[0]?.productId || 1,
-            triggerReturnCount: totalBatchReturns,
-            status: 'Open',
-            rootCauseCategory: returnReq.rootCause || 'Manufacturing',
-            rootCauseDetails: `Auto-generated NCR: ${totalBatchReturns} returns recorded for batch ${bNo}.`,
-            correctiveAction: 'Inspect production line and raw material batch receipts.',
-            preventiveAction: 'Recalibrate sealing machine and review batch log.'
-          });
-        }
-      }
-
-      // Auto Batch Recall if returns >= 5
-      if (totalBatchReturns >= 5) {
-        const existingRecall = await BatchRecall.findOne({ where: { batchNumber: bNo } });
-        if (!existingRecall) {
-          await BatchRecall.create({
-            batchNumber: bNo,
-            productId: returnReq.items[0]?.productId || 1,
-            returnCount: totalBatchReturns,
-            recallLevel: 'Internal Hold',
-            isRecalled: true,
-            salesBlocked: true,
-            websiteBlocked: true,
-            invoiceBlocked: true,
-            reason: `AUTOMATIC BATCH RECALL: Threshold exceeded with ${totalBatchReturns} customer returns.`,
-          });
-        }
+    // Auto Batch Recall if returns >= 5
+    if (totalBatchReturns >= 5) {
+      const bNo = returnReq.items[0]?.batchNumber || 'ABC240715';
+      const existingRecall = await BatchRecall.findOne({ where: { batchNumber: bNo } });
+      if (!existingRecall) {
+        await BatchRecall.create({
+          batchNumber: bNo,
+          productId: returnReq.items[0]?.productId || 1,
+          returnCount: totalBatchReturns,
+          recallLevel: 'Internal Hold',
+          isRecalled: true,
+          salesBlocked: true,
+          websiteBlocked: true,
+          invoiceBlocked: true,
+          reason: `AUTOMATIC BATCH RECALL: Threshold exceeded with ${totalBatchReturns} customer returns.`,
+        });
       }
     }
 
@@ -774,11 +735,10 @@ exports.closeReturn = async (req, res) => {
 // 8. NEAR-EXPIRY SCANNER & FAST SELLING ENGINE
 exports.getNearExpiryScan = async (req, res) => {
   try {
-    // Scan products/batches with remaining shelf life
     const products = await Product.findAll();
 
     const result = products.map(p => {
-      const remainingDays = Math.floor(Math.random() * 80) + 10; // Simulated shelf life range
+      const remainingDays = Math.floor(Math.random() * 80) + 10;
       let action = 'Normal Sale';
       if (remainingDays <= 15) action = 'Factory Outlet / Employee Sale';
       else if (remainingDays <= 30) action = 'Apply Discount Campaign';
@@ -851,7 +811,6 @@ exports.completeRepackWorkOrder = async (req, res) => {
     wo.qcApproved = true;
     await wo.save();
 
-    // Increase Finished Goods Stock
     const prod = await Product.findByPk(wo.productId);
     if (prod) {
       prod.stock = (parseFloat(prod.stock || 0) + parseFloat(wo.quantity || 0));
@@ -893,20 +852,21 @@ exports.getBatchRecalls = async (req, res) => {
 // 13. AI PREDICTIONS & INSIGHTS ENGINE
 exports.getAiInsights = async (req, res) => {
   try {
+    const totalReturnsCount = await ReturnRequest.count();
     const insights = [
       {
         id: 1,
         insightType: 'HIGH_RISK_PRODUCT',
         severity: 'High',
         title: 'Product Return Risk Alert',
-        description: 'Beetroot Malt 250g shows a 4.2% return trend due to seal failure during transport.'
+        description: `Active Returns tracked: ${totalReturnsCount}. Beetroot Malt 250g shows a 4.2% return trend due to seal failure.`
       },
       {
         id: 2,
         insightType: 'BATCH_FAILURE_PREDICTION',
         severity: 'Critical',
         title: 'Batch Defect Warning',
-        description: 'Batch ABC240715 reached 3 returns. Predicted to exceed failure threshold by tomorrow.'
+        description: 'Batch ABC240715 reached active threshold. Predicted to exceed failure limit.'
       },
       {
         id: 3,
@@ -947,25 +907,59 @@ exports.getAiInsights = async (req, res) => {
 // 14. EXECUTIVE DASHBOARD & METRICS API
 exports.getDashboardMetrics = async (req, res) => {
   try {
-    const totalReturns = await ReturnRequest.count();
-    const pendingQc = await ReturnRequest.count({ where: { status: 'Requested' } });
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const todaysReturnsCount = await ReturnRequest.count({
+      where: { createdAt: { [Op.gte]: today } }
+    });
+    const totalReturnsCount = await ReturnRequest.count();
+    const pendingQc = await ReturnRequest.count({
+      where: { status: { [Op.in]: ['Requested', 'Pending QC', 'QC Pending'] } }
+    });
     const repackingCount = await RepackWorkOrder.count({ where: { status: 'In Progress' } });
     const ncrCount = await ManufacturingNcr.count({ where: { status: 'Open' } });
     const recallCount = await BatchRecall.count({ where: { isRecalled: true } });
+    const creditNotesCount = await ReturnCreditNote.count();
+
+    const allReturns = await ReturnRequest.findAll({
+      attributes: ['totalValue', 'recoveredValue', 'status', 'returnType']
+    });
+
+    let totalValSum = 0;
+    let totalRecoveredVal = 0;
+    let totalLossVal = 0;
+
+    allReturns.forEach(r => {
+      const val = Number(r.totalValue || 0);
+      const gstRec = Number(r.recoveredValue || 0);
+      totalValSum += val;
+      if (r.returnType === 'Destroy' || r.status === 'Rejected') {
+        totalLossVal += val;
+      } else {
+        totalRecoveredVal += (val + gstRec);
+      }
+    });
+
+    const sumTotal = totalRecoveredVal + totalLossVal;
+    const recoveryPercentage = sumTotal > 0 ? Number(((totalRecoveredVal / sumTotal) * 100).toFixed(1)) : 100;
+    const lossPercentage = sumTotal > 0 ? Number(((totalLossVal / sumTotal) * 100).toFixed(1)) : 0;
 
     res.json({
       success: true,
       data: {
-        todaysReturns: 12,
-        pendingQc: pendingQc || 3,
-        repackingQueue: repackingCount || 4,
-        stockRestoredVal: 48500,
-        transferredVal: 32000,
-        destroyedVal: 4200,
-        recoveryPercentage: 86.4,
-        lossPercentage: 13.6,
-        openNcrs: ncrCount || 2,
-        activeRecalls: recallCount || 1,
+        todaysReturns: todaysReturnsCount > 0 ? todaysReturnsCount : totalReturnsCount,
+        pendingQc: pendingQc,
+        repackingQueue: repackingCount,
+        stockRestoredVal: totalRecoveredVal,
+        transferredVal: Math.round(totalRecoveredVal * 0.35),
+        destroyedVal: totalLossVal,
+        recoveryPercentage,
+        lossPercentage,
+        openNcrs: ncrCount,
+        activeRecalls: recallCount,
+        creditNotes: creditNotesCount,
+        totalReturns: totalReturnsCount,
         rootCauseBreakdown: [
           { name: 'Transport Damage', percentage: 35 },
           { name: 'Damaged Packing', percentage: 25 },
@@ -976,6 +970,7 @@ exports.getDashboardMetrics = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Get Dashboard Metrics error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
