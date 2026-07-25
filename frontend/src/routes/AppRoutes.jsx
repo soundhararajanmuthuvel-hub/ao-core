@@ -56,8 +56,9 @@ const FieldOrdering = lazy(() => import('../pages/FieldOrdering'));
 const DeliveryTracking = lazy(() => import('../pages/DeliveryTracking'));
 const ReviewPortal = lazy(() => import('../pages/ReviewPortal'));
 const IntegrationsMarketplace = lazy(() => import('../pages/IntegrationsMarketplace'));
-const DeveloperCenter = lazy(() => import('../pages/DeveloperCenter'));
 const WebsiteManagement = lazy(() => import('../pages/WebsiteManagement'));
+const ReturnRecoveryModule = lazy(() => import('../pages/ReturnRecoveryModule'));
+
 
 // CRM Pages
 const CrmDashboard = lazy(() => import('../pages/CrmDashboard'));
@@ -291,6 +292,15 @@ export default function AppRoutes() {
             </RoleRoute>
           }
         />
+        <Route
+          path="returns"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager', 'Sales Manager', 'Billing Executive']}>
+              <ReturnRecoveryModule />
+            </RoleRoute>
+          }
+        />
+
         <Route
           path="customers"
           element={

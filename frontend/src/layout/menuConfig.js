@@ -16,8 +16,10 @@ import {
   Star,
   Gift,
   Tag,
-  BarChart2
+  BarChart2,
+  RotateCcw
 } from 'lucide-react';
+
 
 export const websiteMenuStructure = [
   {
@@ -194,9 +196,21 @@ export const menuStructure = [
       { to: '/products/catalog-center', label: 'Catalog Center', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
       { to: '/products?tab=raw-materials', label: 'Raw Materials', roles: ['Super Admin', 'admin', 'Manufacturing Manager', 'Store Keeper'] },
       { to: '/inventory', label: 'Stock', roles: ['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager'] },
+      { to: '/returns', label: 'Return & Recovery', roles: ['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager', 'Sales Manager'] },
       { to: '/suppliers', label: 'Suppliers', roles: ['Super Admin', 'admin', 'Manufacturing Manager', 'Store Keeper'] }
     ]
   },
+  {
+    id: 'returns',
+    type: 'link',
+    to: '/returns',
+    icon: RotateCcw,
+    emoji: '🛡️',
+    label: 'Return & Recovery',
+    roles: ['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager', 'Sales Manager', 'Billing Executive'],
+    showOnMobileDrawer: true
+  },
+
   {
     id: 'sales',
     type: 'group',

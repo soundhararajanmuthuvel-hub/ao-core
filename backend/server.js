@@ -136,6 +136,8 @@ app.use('/api/repack', require('./routes/repackRoutes'));
 app.use('/api/raw-materials', require('./routes/rawMaterialRoutes'));
 app.use('/api/manufacturing', require('./routes/manufacturingRoutes'));
 app.use('/api/packing-conversion', require('./routes/packingConversionRoutes'));
+app.use('/api/returns', require('./routes/returnsRoutes'));
+
 
 // AI APIs (Mounted under both /api/ai and /api/website/ai for proxy support)
 app.use('/api/ai', require('./routes/aiRoutes'));
