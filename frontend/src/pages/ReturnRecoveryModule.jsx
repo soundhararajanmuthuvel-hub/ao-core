@@ -61,8 +61,10 @@ import {
   History
 } from 'lucide-react';
 import { customersApi, salesApi } from '../api';
+import CustomerPicker from '../components/CustomerPicker';
 
 export default function ReturnRecoveryModule() {
+
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -843,139 +845,15 @@ export default function ReturnRecoveryModule() {
 
             <div style={{ padding: '1.5rem' }}>
               
-              {/* STEP 1: ENTERPRISE SEARCHABLE CUSTOMER SELECTOR */}
+              {/* STEP 1: REUSABLE ENTERPRISE CUSTOMER PICKER */}
               {wizardStep === 1 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                  
-                  {/* SEARCHABLE AUTOCOMPLETE INPUT */}
-                  <div style={{ position: 'relative' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a', display: 'block', marginBottom: '0.4rem' }}>
-                      🔍 Search Customer / Store (Name, Phone, GST, Code, City)
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <Search size={18} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
-                      <input
-                        type="text"
-                        placeholder="Type 2+ characters to search customer database..."
-                        value={custQuery || formData.customerName}
-                        onChange={e => {
-                          setCustQuery(e.target.value);
-                          setFormData(prev => ({ ...prev, customerName: e.target.value }));
-                        }}
-                        onFocus={() => { if (custSearchResults.length > 0) setShowCustDropdown(true); }}
-                        style={{ width: '100%', padding: '0.65rem 0.75rem 0.65rem 2.4rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.875rem', fontWeight: 600, outline: 'none', backgroundColor: '#ffffff' }}
-                      />
-                      {isCustSearching && (
-                        <div style={{ position: 'absolute', right: '12px', top: '12px', fontSize: '0.75rem', color: '#94a3b8' }}>
-                          Searching...
-                        </div>
-                      )}
-                    </div>
-
-                    {/* LIVE SEARCH RESULTS DROPDOWN */}
-                    {showCustDropdown && (
-                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', zIndex: 50, maxHeight: '260px', overflowY: 'auto', marginTop: '4px' }}>
-                        {custSearchResults.length > 0 ? (
-                          custSearchResults.map((c, i) => (
-                            <div
-                              key={c.id}
-                              onClick={() => handleSelectCustomer(c)}
-                              style={{
-                                padding: '0.75rem 1rem',
-                                borderBottom: '1px solid #f1f5f9',
-                                cursor: 'pointer',
-                                backgroundColor: highlightedCustIndex === i ? '#fef3c7' : '#ffffff',
-                                transition: 'background-color 0.15s ease',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between'
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#f1f5f9', color: '#3f1d07', fontWeight: 800, fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  {c.name ? c.name.charAt(0).toUpperCase() : 'C'}
-                                </div>
-                                <div>
-                                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0f172a' }}>{c.name}</div>
-                                  <div style={{ fontSize: '0.725rem', color: '#64748b' }}>
-                                    {c.code || `CUS-${c.id}`} • {c.phone || 'No Phone'} {c.city ? `• ${c.city}` : ''}
-                                  </div>
-                                </div>
-                              </div>
-                              <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.2rem 0.5rem', borderRadius: '4px', backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>
-                                {c.customerType || 'Retail Shop'}
-                              </span>
-                            </div>
-                          ))
-                        ) : (
-                          <div style={{ padding: '1.25rem', textAlign: 'center' }}>
-                            <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.5rem' }}>No customer found matching "{custQuery}"</div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setQuickCustForm(prev => ({ ...prev, name: custQuery }));
-                                setShowQuickCustModal(true);
-                              }}
-                              style={{ padding: '0.4rem 0.85rem', borderRadius: '6px', backgroundColor: '#3f1d07', color: '#ffffff', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
-                            >
-                              <UserPlus size={14} style={{ display: 'inline', marginRight: '4px' }} /> Quick Create Customer
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* SELECTED CUSTOMER PROFILE & RETURN HISTORY SUMMARY PANEL */}
-                  {formData.customerName && (
-                    <div style={{ backgroundColor: '#f8fafc', padding: '1.25rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                        <div>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#3f1d07', textTransform: 'uppercase' }}>Selected Customer Profile</span>
-                          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: '0.1rem 0' }}>{formData.customerName}</h3>
-                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                            Type: <strong>{formData.customerType}</strong> • Code: <strong>{formData.customerCode || 'CUS-001'}</strong>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFormData(prev => ({ ...prev, customerName: '', customerId: null }));
-                            setSelectedCustomerObj(null);
-                            setSelectedCustHistory(null);
-                          }}
-                          style={{ fontSize: '0.725rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}
-                        >
-                          Change Customer
-                        </button>
-                      </div>
-
-                      {/* RETURN HISTORY METRICS PANEL */}
-                      {selectedCustHistory && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginTop: '0.85rem', borderTop: '1px solid #cbd5e1', paddingTop: '0.85rem', textAlign: 'center' }}>
-                          <div style={{ backgroundColor: '#ffffff', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                            <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Total Invoices</div>
-                            <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{selectedCustHistory.totalOrders}</strong>
-                          </div>
-                          <div style={{ backgroundColor: '#ffffff', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                            <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Total Returns</div>
-                            <strong style={{ fontSize: '0.9rem', color: '#b45309' }}>{selectedCustHistory.totalReturns}</strong>
-                          </div>
-                          <div style={{ backgroundColor: '#ffffff', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                            <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Return Rate</div>
-                            <strong style={{ fontSize: '0.9rem', color: Number(selectedCustHistory.returnRate) > 10 ? '#ef4444' : '#10b981' }}>{selectedCustHistory.returnRate}%</strong>
-                          </div>
-                          <div style={{ backgroundColor: '#ffffff', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                            <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Returned Value</div>
-                            <strong style={{ fontSize: '0.9rem', color: '#10b981' }}>₹{selectedCustHistory.recoveryValue}</strong>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                </div>
+                <CustomerPicker
+                  selectedCustomer={selectedCustomerObj}
+                  onSelectCustomer={handleSelectCustomer}
+                  onConfirmCustomer={() => setWizardStep(2)}
+                />
               )}
+
 
               {/* STEP 2: INVOICE & PRODUCT LOOKUP */}
               {wizardStep === 2 && (
