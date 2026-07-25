@@ -1,7 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
-  ShieldAlert,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend
+} from 'recharts';
+import {
   RotateCcw,
   Package,
   CheckCircle2,
@@ -16,20 +30,25 @@ import {
   QrCode,
   Camera,
   MapPin,
-  PenTool,
   Clock,
   ArrowRight,
   TrendingUp,
   TrendingDown,
-  Layers,
   Factory,
   Building,
-  UserCheck,
   CheckSquare,
   Flame,
   AlertOctagon,
-  RefreshCw,
-  Printer
+  Download,
+  Calendar,
+  ChevronRight,
+  User,
+  ShieldCheck,
+  Award,
+  Layers,
+  Settings,
+  BarChart2,
+  FileSpreadsheet
 } from 'lucide-react';
 
 export default function ReturnRecoveryModule() {
@@ -38,9 +57,12 @@ export default function ReturnRecoveryModule() {
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateRange, setDateRange] = useState('This Month');
 
+  // Wizard Step State for Create Return (Steps 1 to 6)
+  const [wizardStep, setWizardStep] = useState(1);
 
-  // Sample data states
+  // States
   const [returnsList, setReturnsList] = useState([]);
   const [repackOrders, setRepackOrders] = useState([]);
   const [ncrs, setNcrs] = useState([]);
@@ -61,16 +83,17 @@ export default function ReturnRecoveryModule() {
     activeRecalls: 1
   });
 
-  // Modal / Form States
+  // Modal / Selection States
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showQcModal, setShowQcModal] = useState(false);
   const [selectedReturn, setSelectedReturn] = useState(null);
   const [scanQuery, setScanQuery] = useState('');
 
-  // Create Form State
+  // Create Return Form Data
   const [formData, setFormData] = useState({
     category: 'External',
     source: 'Retail Shop',
+    customerName: 'Annapoorna Retail Store',
     customerType: 'Retail Shop',
     returnType: 'Customer Return',
     returnReason: 'Damaged Packing',
@@ -83,6 +106,7 @@ export default function ReturnRecoveryModule() {
     unitPrice: 250,
     originalImageUrl: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300',
     returnedImageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=300',
+    qcRemarks: 'Packaging torn during transit; product contents perfect.'
   });
 
   useEffect(() => {
@@ -98,6 +122,7 @@ export default function ReturnRecoveryModule() {
     if (inv || cust || prod) {
       setFormData(prev => ({
         ...prev,
+        customerName: cust || prev.customerName,
         productName: prod || prev.productName,
         batchNumber: batch || prev.batchNumber,
         quantity: qty ? parseFloat(qty) : prev.quantity,
@@ -108,7 +133,6 @@ export default function ReturnRecoveryModule() {
       setActiveTab('register');
     }
   }, [location.search]);
-
 
   const fetchData = async () => {
     try {
@@ -154,13 +178,13 @@ export default function ReturnRecoveryModule() {
       }
     } catch (e) {
       console.log('Using sample fallback data:', e);
-      // Fallback sample data if backend endpoint loading
       setReturnsList([
         {
           id: 1,
           rmaNumber: 'RMA-2026-000145',
           category: 'External',
           source: 'Retail Shop',
+          customerName: 'Annapoorna Stores',
           customerType: 'Retail Shop',
           returnReason: 'Damaged Packing',
           rootCause: 'Transport',
@@ -175,6 +199,7 @@ export default function ReturnRecoveryModule() {
           rmaNumber: 'RMA-2026-000144',
           category: 'Internal',
           source: 'Production',
+          customerName: 'Internal Factory',
           customerType: 'Internal Factory',
           returnReason: 'Seal Failure',
           rootCause: 'Packing',
@@ -188,7 +213,6 @@ export default function ReturnRecoveryModule() {
     }
   };
 
-  // Barcode / QR Scan simulator
   const handleScanLookup = async () => {
     if (!scanQuery) return;
     try {
@@ -208,12 +232,12 @@ export default function ReturnRecoveryModule() {
         alert(`Scanned: ${data.data.productName} (Batch: ${data.data.batchNumber})`);
       }
     } catch (e) {
-      alert('Barcode auto-filled successfully');
+      alert('Barcode scanned successfully');
     }
   };
 
   const handleCreateRma = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     try {
       const res = await fetch('/api/returns', {
         method: 'POST',
@@ -234,13 +258,15 @@ export default function ReturnRecoveryModule() {
       });
       const d = await res.json();
       if (d.success) {
-        alert(`RMA Created: ${d.data.rmaNumber}`);
+        alert(`Return Authorization (${d.data.rmaNumber}) Created Successfully!`);
         setShowCreateModal(false);
+        setWizardStep(1);
         fetchData();
       }
     } catch (e) {
-      alert('RMA Created successfully');
+      alert('RMA Created successfully!');
       setShowCreateModal(false);
+      setWizardStep(1);
     }
   };
 
@@ -251,7 +277,7 @@ export default function ReturnRecoveryModule() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          qcRemarks: 'Warehouse QC inspection completed.',
+          qcRemarks: formData.qcRemarks || 'Warehouse QC inspection completed.',
           itemsInspection: [
             {
               itemId: selectedReturn.items ? selectedReturn.items[0]?.id : 1,
@@ -287,259 +313,324 @@ export default function ReturnRecoveryModule() {
     }
   };
 
+  // Chart Mock Data
+  const monthlyData = [
+    { month: 'Jan', returns: 45, recoveryVal: 38000 },
+    { month: 'Feb', returns: 38, recoveryVal: 42000 },
+    { month: 'Mar', returns: 52, recoveryVal: 35000 },
+    { month: 'Apr', returns: 29, recoveryVal: 49000 },
+    { month: 'May', returns: 41, recoveryVal: 46000 },
+    { month: 'Jun', returns: 32, recoveryVal: 51000 },
+    { month: 'Jul', returns: 24, recoveryVal: 48500 }
+  ];
+
+  const rootCauseData = [
+    { name: 'Transport Damage', value: 35, color: '#10b981' },
+    { name: 'Damaged Packing', value: 25, color: '#3b82f6' },
+    { name: 'Label Error', value: 15, color: '#06b6d4' },
+    { name: 'Near Expiry', value: 15, color: '#f59e0b' },
+    { name: 'Mfg Defect', value: 10, color: '#ef4444' }
+  ];
+
+  const packagingFailureData = [
+    { name: 'Torn Pouch', value: 42, color: '#10b981' },
+    { name: 'Seal Failure', value: 28, color: '#f59e0b' },
+    { name: 'Label Error', value: 18, color: '#06b6d4' },
+    { name: 'Carton Damage', value: 12, color: '#ef4444' }
+  ];
+
+  const warehouseZonesData = [
+    { zone: 'Receiving', count: 12 },
+    { zone: 'QC Hold', count: 8 },
+    { zone: 'Repacking', count: 15 },
+    { zone: 'Saleable Stock', count: 120 },
+    { zone: 'Near Expiry', count: 42 },
+    { zone: 'Scrap/Destroy', count: 5 }
+  ];
+
   return (
-    <div className="p-6 bg-slate-900 text-slate-100 min-h-screen font-sans">
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400">
-              <RotateCcw className="w-6 h-6" />
+    <div style={{ padding: '1.5rem', fontFamily: 'Inter, sans-serif', backgroundColor: '#f8fafc', color: '#1e293b', minHeight: '100vh' }}>
+      
+      {/* ENTERPRISE HEADER BAR */}
+      <div style={{ backgroundColor: '#ffffff', padding: '1.25rem 1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '10px', backgroundColor: '#3f1d07', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
+              <RotateCcw size={26} />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                Return & Recovery Management System
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/40">
-                  AO Core V5.5
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
+                  Return & Recovery Management
+                </h1>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '20px', backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>
+                  AO Core ERP V5.5
                 </span>
-              </h1>
-              <p className="text-xs text-slate-400">
-                Amudhasurabiy Organics • Food Manufacturing Recovery, QC, Batch Recall & AI Insights
+              </div>
+              <p style={{ fontSize: '0.825rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
+                Amudhasurabiy Organics • Enterprise Manufacturing Quality, Repacking, Batch Recall & AI Insights
               </p>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-lg shadow-emerald-900/30 transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Create Return / RMA
-          </button>
-        </div>
-      </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={16} style={{ position: 'absolute', left: '10px', top: '10px', color: '#94a3b8' }} />
+              <input
+                type="text"
+                placeholder="Search RMA, Batch, Customer..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                style={{ padding: '0.5rem 0.75rem 0.5rem 2.2rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.8rem', width: '220px', outline: 'none', backgroundColor: '#f8fafc' }}
+              />
+            </div>
 
-      {/* KPI METRICS CARDS BAR */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
-        <div className="bg-slate-800/80 border border-slate-700/60 p-3 rounded-xl">
-          <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Recovery %</span>
-          <div className="text-lg font-extrabold text-emerald-400 mt-1 flex items-center gap-1">
-            <TrendingUp className="w-4 h-4" /> {metrics.recoveryPercentage}%
+            <select
+              value={dateRange}
+              onChange={e => setDateRange(e.target.value)}
+              style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.8rem', backgroundColor: '#ffffff', color: '#334155', fontWeight: 600 }}
+            >
+              <option>Today</option>
+              <option>This Week</option>
+              <option>This Month</option>
+              <option>Financial Year</option>
+            </select>
+
+            <button
+              onClick={() => alert('Exporting Return Register Report to CSV...')}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#334155', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+            >
+              <Download size={14} /> Export
+            </button>
+
+            <button
+              onClick={() => { setShowCreateModal(true); setWizardStep(1); }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 1.1rem', borderRadius: '8px', backgroundColor: '#3f1d07', color: '#ffffff', fontSize: '0.8rem', fontWeight: 700, border: 'none', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(63,29,7,0.2)' }}
+            >
+              <Plus size={16} /> Create Return / RMA
+            </button>
           </div>
         </div>
-        <div className="bg-slate-800/80 border border-slate-700/60 p-3 rounded-xl">
-          <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Today's Returns</span>
-          <div className="text-lg font-extrabold text-white mt-1">{metrics.todaysReturns} Pks</div>
-        </div>
-        <div className="bg-slate-800/80 border border-slate-700/60 p-3 rounded-xl">
-          <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">QC Pending</span>
-          <div className="text-lg font-extrabold text-amber-400 mt-1">{metrics.pendingQc}</div>
-        </div>
-        <div className="bg-slate-800/80 border border-slate-700/60 p-3 rounded-xl">
-          <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Repacking Queue</span>
-          <div className="text-lg font-extrabold text-cyan-400 mt-1">{metrics.repackingQueue}</div>
-        </div>
-        <div className="bg-slate-800/80 border border-slate-700/60 p-3 rounded-xl">
-          <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Restored Value</span>
-          <div className="text-lg font-extrabold text-emerald-300 mt-1">₹{metrics.stockRestoredVal.toLocaleString()}</div>
-        </div>
-        <div className="bg-slate-800/80 border border-slate-700/60 p-3 rounded-xl">
-          <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Near-Expiry Saved</span>
-          <div className="text-lg font-extrabold text-blue-400 mt-1">₹{metrics.transferredVal.toLocaleString()}</div>
-        </div>
-        <div className="bg-slate-800/80 border border-slate-700/60 p-3 rounded-xl">
-          <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Open NCRs</span>
-          <div className="text-lg font-extrabold text-rose-400 mt-1">{metrics.openNcrs}</div>
-        </div>
-        <div className="bg-slate-800/80 border border-slate-700/60 p-3 rounded-xl">
-          <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Active Recalls</span>
-          <div className="text-lg font-extrabold text-red-500 mt-1">{metrics.activeRecalls}</div>
-        </div>
       </div>
 
-      {/* NAVIGATION TABS */}
-      <div className="flex border-b border-slate-800 mb-6 overflow-x-auto gap-1">
+      {/* 12 EQUAL-HEIGHT ENTERPRISE KPI CARDS BAR */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
         {[
-          { id: 'dashboard', label: '📊 Dashboard & AI Insights' },
-          { id: 'kanban', label: '📌 Warehouse Kanban' },
-          { id: 'register', label: '📋 RMA Register' },
-          { id: 'qc', label: '🔍 Warehouse QC Inspection' },
-          { id: 'expiry', label: '⏳ Smart Near-Expiry AI' },
-          { id: 'repack', label: '🏭 Repacking Work Orders' },
-          { id: 'ncr', label: '🛡️ Quality NCR & CAPA' },
-          { id: 'recalls', label: '🚨 Batch Recalls' },
-          { id: 'finance', label: '💰 Finance & Net Recovery' },
-        ].map(t => (
-          <button
-            key={t.id}
-            onClick={() => setActiveTab(t.id)}
-            className={`px-4 py-2.5 text-xs font-bold rounded-t-lg transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === t.id
-                ? 'bg-slate-800 text-emerald-400 border-t-2 border-emerald-400'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+          { label: 'Returns Today', val: `${metrics.todaysReturns} Pks`, trend: '▲ +2 today', color: '#3b82f6', bg: '#eff6ff', icon: RotateCcw },
+          { label: 'Recovery %', val: `${metrics.recoveryPercentage}%`, trend: '▲ +3.2%', color: '#10b981', bg: '#ecfdf5', icon: TrendingUp },
+          { label: 'Pending QC', val: `${metrics.pendingQc}`, trend: 'Awaiting Inspect', color: '#f59e0b', bg: '#fffbeb', icon: CheckSquare },
+          { label: 'Repacking Queue', val: `${metrics.repackingQueue}`, trend: 'Case 1 Active', color: '#06b6d4', bg: '#ecfeff', icon: Factory },
+          { label: 'Near Expiry', val: '42 Units', trend: 'Fast Selling Target', color: '#8b5cf6', bg: '#f5f3ff', icon: Clock },
+          { label: 'Credit Notes', val: '₹48,500', trend: 'Posted to Accounts', color: '#10b981', bg: '#ecfdf5', icon: DollarSign },
+          { label: 'Loss Value', val: '₹4,200', trend: 'Scrap / Destroyed', color: '#ef4444', bg: '#fef2f2', icon: AlertTriangle },
+          { label: 'Recovered Value', val: '₹48,500', trend: 'Restored Stock', color: '#10b981', bg: '#ecfdf5', icon: ShieldCheck },
+          { label: 'Active Recalls', val: `${metrics.activeRecalls}`, trend: 'Internal Hold', color: '#dc2626', bg: '#fef2f2', icon: AlertOctagon },
+          { label: 'Open NCRs', val: `${metrics.openNcrs}`, trend: 'QA Investigating', color: '#f59e0b', bg: '#fffbeb', icon: ShieldAlert },
+          { label: 'Open CAPAs', val: '2 Open', trend: 'Preventive Action', color: '#3b82f6', bg: '#eff6ff', icon: UserCheck },
+          { label: 'Transfer Orders', val: '5 Orders', trend: 'Fast Selling Target', color: '#059669', bg: '#ecfdf5', icon: Truck },
+        ].map((kpi, idx) => {
+          const IconComp = kpi.icon;
+          return (
+            <div
+              key={idx}
+              style={{
+                backgroundColor: '#ffffff',
+                padding: '0.85rem 1rem',
+                borderRadius: '10px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                display: 'flex',
+                flexDirection: 'column',
+                justify: 'space-between',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ display: 'flex', items: 'center', justify: 'space-between', marginBottom: '0.35rem' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  {kpi.label}
+                </span>
+                <div style={{ width: '26px', height: '26px', borderRadius: '6px', backgroundColor: kpi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: kpi.color }}>
+                  <IconComp size={14} />
+                </div>
+              </div>
+              <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>{kpi.val}</div>
+              <span style={{ fontSize: '0.65rem', fontWeight: 700, color: kpi.color, marginTop: '0.2rem' }}>{kpi.trend}</span>
+            </div>
+          );
+        })}
       </div>
 
-      {/* TAB 1: EXECUTIVE DASHBOARD & AI INSIGHTS */}
+      {/* PROFESSIONAL ENTERPRISE TABS BAR */}
+      <div style={{ backgroundColor: '#ffffff', padding: '0.35rem 0.5rem', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '1.5rem', display: 'flex', gap: '0.25rem', overflowX: 'auto', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+        {[
+          { id: 'dashboard', label: 'Dashboard', icon: BarChart2 },
+          { id: 'register', label: 'Returns Register', icon: RotateCcw },
+          { id: 'qc', label: 'QC Inspection', icon: CheckSquare },
+          { id: 'repack', label: 'Repack Orders', icon: Factory },
+          { id: 'expiry', label: 'Near Expiry Engine', icon: Clock },
+          { id: 'recalls', label: 'Batch Recalls', icon: AlertOctagon },
+          { id: 'ncr', label: 'NCR & CAPA', icon: ShieldAlert },
+          { id: 'finance', label: 'Finance & Recovery', icon: DollarSign },
+          { id: 'reports', label: 'Reports', icon: FileSpreadsheet },
+          { id: 'settings', label: 'Settings', icon: Settings },
+        ].map(t => {
+          const TabIcon = t.icon;
+          const isActive = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.55rem 0.95rem',
+                borderRadius: '8px',
+                fontSize: '0.78rem',
+                fontWeight: isActive ? 800 : 600,
+                color: isActive ? '#3f1d07' : '#64748b',
+                backgroundColor: isActive ? '#fef3c7' : 'transparent',
+                border: isActive ? '1px solid #fde68a' : '1px solid transparent',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <TabIcon size={14} style={{ color: isActive ? '#b45309' : '#94a3b8' }} /> {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* TAB 1: EXECUTIVE DASHBOARD */}
       {activeTab === 'dashboard' && (
-        <div className="space-y-6">
-          {/* AI PREDICTIVE INSIGHTS PANEL */}
-          <div className="bg-slate-800/60 border border-emerald-500/30 p-4 rounded-xl">
-            <h2 className="text-sm font-bold text-emerald-400 mb-3 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-emerald-400" /> AI Predictive Analytics & Quality Alerts
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          {/* AI PREDICTIVE INSIGHTS BANNER */}
+          <div style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <h2 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#b45309', margin: '0 0 0.85rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Sparkles size={18} style={{ color: '#d97706' }} /> AI Predictive Analytics & Quality Alerts Engine
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.85rem' }}>
               {aiInsights.map((ins, idx) => (
-                <div key={idx} className="bg-slate-900/80 border border-slate-700/80 p-3 rounded-lg flex flex-col justify-between">
+                <div key={idx} style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.85rem', borderRadius: '8px', display: 'flex', flexDirection: 'column', justify: 'space-between' }}>
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded ${
-                        ins.severity === 'Critical' ? 'bg-red-500/20 text-red-400 border border-red-500/40' :
-                        ins.severity === 'High' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40' :
-                        'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                      }`}>
-                        {ins.severity} SEVERITY
+                    <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', padding: '0.15rem 0.4rem', borderRadius: '4px', backgroundColor: ins.severity === 'Critical' ? '#fef2f2' : ins.severity === 'High' ? '#fff1f2' : '#fffbeb', color: ins.severity === 'Critical' ? '#dc2626' : ins.severity === 'High' ? '#e11d48' : '#d97706', border: '1px solid currentColor' }}>
+                        {ins.severity} Severity
                       </span>
-                      <span className="text-[10px] text-slate-400 font-mono">{ins.insightType}</span>
+                      <span style={{ fontSize: '0.65rem', fontFamily: 'monospace', color: '#64748b' }}>{ins.insightType}</span>
                     </div>
-                    <h3 className="text-xs font-bold text-white mb-1">{ins.title}</h3>
-                    <p className="text-xs text-slate-300 leading-relaxed">{ins.description}</p>
+                    <h3 style={{ fontSize: '0.825rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.25rem 0' }}>{ins.title}</h3>
+                    <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, lineHeight: 1.4 }}>{ins.description}</p>
                   </div>
-                  <button className="mt-3 text-[11px] text-emerald-400 hover:underline text-left font-semibold flex items-center gap-1">
-                    Execute Recommended Action <ArrowRight className="w-3 h-3" />
+                  <button style={{ marginTop: '0.6rem', fontSize: '0.75rem', fontWeight: 700, color: '#3f1d07', background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                    Execute Recommendation <ArrowRight size={12} />
                   </button>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* CHARTS & ROOT CAUSES */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-4">
+          {/* CHARTS GRID */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '1.25rem' }}>
+            
+            {/* MONTHLY RETURNS TREND */}
+            <div style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155', margin: '0 0 1rem 0', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                Monthly Returns & Recovery Value Trend
+              </h3>
+              <div style={{ width: '100%', height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} />
+                    <YAxis stroke="#94a3b8" fontSize={11} />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="returns" stroke="#3f1d07" strokeWidth={2.5} name="Returns (Pks)" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* RECOVERY VALUE BAR CHART */}
+            <div style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155', margin: '0 0 1rem 0', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                Monthly Recovered Value (₹)
+              </h3>
+              <div style={{ width: '100%', height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} />
+                    <YAxis stroke="#94a3b8" fontSize={11} />
+                    <Tooltip />
+                    <Bar dataKey="recoveryVal" fill="#10b981" radius={[4, 4, 0, 0]} name="Recovered Value (₹)" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* ROOT CAUSE DONUT CHART */}
+            <div style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155', margin: '0 0 1rem 0', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                 Root Cause Analysis Breakdown %
               </h3>
-              <div className="space-y-3">
-                {[
-                  { name: 'Transport Damage', pct: 35, color: 'bg-emerald-500' },
-                  { name: 'Damaged Packing', pct: 25, color: 'bg-blue-500' },
-                  { name: 'Label / Sticker Error', pct: 15, color: 'bg-cyan-500' },
-                  { name: 'Near Expiry', pct: 15, color: 'bg-amber-500' },
-                  { name: 'Manufacturing Defect', pct: 10, color: 'bg-rose-500' },
-                ].map((rc, i) => (
-                  <div key={i}>
-                    <div className="flex justify-between text-xs font-medium mb-1">
-                      <span className="text-slate-300">{rc.name}</span>
-                      <span className="text-white font-bold">{rc.pct}%</span>
-                    </div>
-                    <div className="w-full bg-slate-900 rounded-full h-2">
-                      <div className={`${rc.color} h-2 rounded-full`} style={{ width: `${rc.pct}%` }}></div>
-                    </div>
-                  </div>
-                ))}
+              <div style={{ width: '100%', height: 220, display: 'flex', alignItems: 'center' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={rootCauseData} innerRadius={50} outerRadius={80} dataKey="value" nameKey="name">
+                      {rootCauseData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: '11px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
             </div>
 
-            <div className="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-4">
-                Packaging Damage Failure Types
+            {/* PACKAGING FAILURE PIE CHART */}
+            <div style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155', margin: '0 0 1rem 0', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                Packaging Failure Categories %
               </h3>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-700/40">
-                  <span className="text-[11px] text-slate-400">Torn Pouch</span>
-                  <div className="text-lg font-bold text-emerald-400">42%</div>
-                  <span className="text-[10px] text-slate-500">Mainly Line 1</span>
-                </div>
-                <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-700/40">
-                  <span className="text-[11px] text-slate-400">Seal Failure</span>
-                  <div className="text-lg font-bold text-amber-400">28%</div>
-                  <span className="text-[10px] text-slate-500">Sealer Machine #2</span>
-                </div>
-                <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-700/40">
-                  <span className="text-[11px] text-slate-400">Label Error</span>
-                  <div className="text-lg font-bold text-cyan-400">18%</div>
-                  <span className="text-[10px] text-slate-500">Sticker Printer</span>
-                </div>
-                <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-700/40">
-                  <span className="text-[11px] text-slate-400">Carton Damage</span>
-                  <div className="text-lg font-bold text-rose-400">12%</div>
-                  <span className="text-[10px] text-slate-500">Courier Transit</span>
-                </div>
+              <div style={{ width: '100%', height: 220, display: 'flex', alignItems: 'center' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={packagingFailureData} outerRadius={80} dataKey="value" nameKey="name">
+                      {packagingFailureData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: '11px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
             </div>
+
           </div>
         </div>
       )}
 
-      {/* TAB 2: WAREHOUSE KANBAN BOARD */}
-      {activeTab === 'kanban' && (
-        <div className="overflow-x-auto pb-4">
-          <div className="flex gap-3 min-w-[1200px]">
-            {['Requested', 'Approved', 'QC', 'Repacking', 'Replacement', 'Transfer', 'Closed'].map((col, idx) => (
-              <div key={idx} className="flex-1 bg-slate-800/40 border border-slate-700/50 rounded-xl p-3">
-                <div className="flex items-center justify-between mb-3 border-b border-slate-700 pb-2">
-                  <h3 className="text-xs font-bold text-slate-200 uppercase">{col}</h3>
-                  <span className="text-xs font-extrabold px-2 py-0.5 bg-slate-700 rounded text-slate-300">
-                    {returnsList.filter(r => r.kanbanColumn === col || r.status === col).length}
-                  </span>
-                </div>
-
-                <div className="space-y-2">
-                  {returnsList.filter(r => r.kanbanColumn === col || r.status === col).map(item => (
-                    <div key={item.id} className="bg-slate-900 border border-slate-700/80 p-3 rounded-lg shadow-sm">
-                      <div className="flex justify-between text-xs font-mono text-emerald-400 mb-1">
-                        <span>{item.rmaNumber}</span>
-                        <span className="text-slate-400">{item.customerType}</span>
-                      </div>
-                      <div className="text-xs font-bold text-white mb-1">{item.returnReason}</div>
-                      <div className="text-[11px] text-slate-400 flex justify-between">
-                        <span>Qty: {item.totalQty} Pks</span>
-                        <span className="text-emerald-300 font-semibold">₹{item.totalValue}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: RMA REGISTER */}
+      {/* TAB 2: RETURNS REGISTER */}
       {activeTab === 'register' && (
-        <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl overflow-hidden">
-          {/* SEARCH & FILTERS */}
-          <div className="p-4 border-b border-slate-700/60 flex flex-col md:flex-row gap-3 justify-between">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search RMA Number, Customer, Product, Batch... (<50ms)"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 pl-9 pr-4 py-2 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
-              />
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+          
+          <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', backgroundColor: '#f8fafc' }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
+              Return Authorization (RMA) Register ({returnsList.length} Entries)
             </div>
-            <div className="flex gap-2">
-              <select
-                value={categoryFilter}
-                onChange={e => setCategoryFilter(e.target.value)}
-                className="bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-xs text-slate-200"
-              >
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.75rem', backgroundColor: '#ffffff' }}>
                 <option value="All">All Categories</option>
-                <option value="External">External (Customers)</option>
-                <option value="Internal">Internal (Production/QC)</option>
+                <option value="External">External (Customer)</option>
+                <option value="Internal">Internal (Factory/QC)</option>
               </select>
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-                className="bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-xs text-slate-200"
-              >
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.75rem', backgroundColor: '#ffffff' }}>
                 <option value="All">All Statuses</option>
                 <option value="Requested">Requested</option>
                 <option value="Approved">Approved</option>
@@ -550,55 +641,53 @@ export default function ReturnRecoveryModule() {
             </div>
           </div>
 
-          {/* TABLE */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
               <thead>
-                <tr className="bg-slate-900/80 text-slate-400 border-b border-slate-700/80 uppercase tracking-wider text-[10px]">
-                  <th className="p-3">RMA Number</th>
-                  <th className="p-3">Category / Source</th>
-                  <th className="p-3">Reason</th>
-                  <th className="p-3">Root Cause</th>
-                  <th className="p-3">Qty & Value</th>
-                  <th className="p-3">Approval Matrix</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 text-right">Actions</th>
+                <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', borderBottom: '1px solid #e2e8f0', textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.04em' }}>
+                  <th style={{ padding: '0.75rem 1rem' }}>RMA Number</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Customer / Source</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Reason & Cause</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Qty & Value</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Approval Level</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Status</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody style={{ divideY: '1px solid #f1f5f9' }}>
                 {returnsList.map(item => (
-                  <tr key={item.id} className="hover:bg-slate-800/40">
-                    <td className="p-3 font-mono font-bold text-emerald-400">{item.rmaNumber}</td>
-                    <td className="p-3">
-                      <span className="font-semibold text-white">{item.category}</span>
-                      <span className="block text-[10px] text-slate-400">{item.source}</span>
+                  <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.15s ease' }}>
+                    <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: 800, color: '#3f1d07' }}>
+                      {item.rmaNumber}
                     </td>
-                    <td className="p-3 text-slate-200">{item.returnReason}</td>
-                    <td className="p-3 text-slate-300">{item.rootCause}</td>
-                    <td className="p-3">
-                      <div className="font-bold text-white">{item.totalQty} Pks</div>
-                      <div className="text-[10px] text-emerald-300 font-semibold">₹{item.totalValue}</div>
+                    <td style={{ padding: '0.75rem 1rem' }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.customerName || item.customerType}</div>
+                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{item.category} • {item.source}</span>
                     </td>
-                    <td className="p-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                    <td style={{ padding: '0.75rem 1rem' }}>
+                      <div style={{ fontWeight: 600, color: '#334155' }}>{item.returnReason}</div>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Root Cause: {item.rootCause}</span>
+                    </td>
+                    <td style={{ padding: '0.75rem 1rem' }}>
+                      <div style={{ fontWeight: 800, color: '#0f172a' }}>{item.totalQty} Pks</div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#10b981' }}>₹{item.totalValue}</div>
+                    </td>
+                    <td style={{ padding: '0.75rem 1rem' }}>
+                      <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
                         {item.approvalLevel}
                       </span>
                     </td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
-                        item.status === 'Closed' ? 'bg-emerald-500/20 text-emerald-400' :
-                        item.status === 'QC Pending' ? 'bg-amber-500/20 text-amber-300' :
-                        'bg-blue-500/20 text-blue-300'
-                      }`}>
+                    <td style={{ padding: '0.75rem 1rem' }}>
+                      <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: item.status === 'Closed' ? '#ecfdf5' : '#fffbeb', color: item.status === 'Closed' ? '#047857' : '#b45309', border: '1px solid currentColor' }}>
                         {item.status}
                       </span>
                     </td>
-                    <td className="p-3 text-right">
+                    <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
                       <button
                         onClick={() => { setSelectedReturn(item); setShowQcModal(true); }}
-                        className="px-3 py-1 bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold rounded-lg"
+                        style={{ padding: '0.35rem 0.75rem', borderRadius: '6px', backgroundColor: '#3f1d07', color: '#ffffff', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
                       >
-                        Inspect QC
+                        QC Inspection
                       </button>
                     </td>
                   </tr>
@@ -609,103 +698,214 @@ export default function ReturnRecoveryModule() {
         </div>
       )}
 
-      {/* TAB 4: WAREHOUSE QC INSPECTION */}
+      {/* TAB 3: QC INSPECTION PAGE (SPLIT LAYOUT) */}
       {activeTab === 'qc' && (
-        <div className="bg-slate-800/60 border border-slate-700/60 p-6 rounded-xl space-y-6">
-          <h2 className="text-sm font-bold text-emerald-400 flex items-center gap-2 uppercase tracking-wider">
-            <CheckSquare className="w-4 h-4" /> Mandatory QC Inspection & Disposition Hub
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1.25rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <CheckSquare size={18} style={{ color: '#d97706' }} /> Split-View Quality Inspection & Mandatory Disposition Hub
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {['Return to Saleable Stock', 'Repack', 'Scrap / Destroy'].map((disp, i) => (
-              <div key={i} className="bg-slate-900 border border-slate-700 p-4 rounded-xl flex flex-col justify-between">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+            
+            {/* LEFT: PRODUCT IMAGES & TIMELINE */}
+            <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <h3 style={{ fontSize: '0.825rem', fontWeight: 800, color: '#334155', margin: '0 0 0.85rem 0' }}>
+                📸 Return Media & Timeline Comparison
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <h3 className="text-xs font-bold text-white mb-2">{disp}</h3>
-                  <p className="text-xs text-slate-400">
-                    {disp === 'Repack' ? 'Case 1: Outer pouch/label torn, product inside perfect. Auto-routes to Repack Work Order.' :
-                     disp === 'Return to Saleable Stock' ? 'Case 2: Customer changed mind, unopened pack. Restores to saleable stock balance.' :
-                     'Case 4: Moisture / fungus / expired. Moves to Waste Register & Financial Loss.'}
-                  </p>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b' }}>Original Master Spec</span>
+                  <img src={formData.originalImageUrl} alt="Original" style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #cbd5e1', marginTop: '0.25rem' }} />
                 </div>
+                <div>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b' }}>Returned Product Image</span>
+                  <img src={formData.returnedImageUrl} alt="Returned" style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #cbd5e1', marginTop: '0.25rem' }} />
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT: INSPECTION FORM */}
+            <div style={{ backgroundColor: '#f8fafc', padding: '1.25rem', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justify: 'space-between' }}>
+              <div>
+                <h3 style={{ fontSize: '0.825rem', fontWeight: 800, color: '#334155', margin: '0 0 0.85rem 0' }}>
+                  📋 Warehouse QC Inspection Checklist
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.78rem' }}>
+                  <div>
+                    <label style={{ fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '0.2rem' }}>Product Condition</label>
+                    <select style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}>
+                      <option>Perfect Inside</option>
+                      <option>Moisture / Contaminated</option>
+                      <option>Leaked</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '0.2rem' }}>Package Condition</label>
+                    <select style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}>
+                      <option>Torn Pouch / Label</option>
+                      <option>Dented Carton</option>
+                      <option>Perfect Outer</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '0.2rem' }}>Seal Verification</label>
+                    <select style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}>
+                      <option>Intact Seal</option>
+                      <option>Broken Seal</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '0.2rem' }}>Verified Weight (Grams)</label>
+                    <input type="number" defaultValue={500} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }} />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '1rem' }}>
+                <label style={{ fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '0.2rem', fontSize: '0.78rem' }}>Inspector Remarks</label>
+                <textarea
+                  value={formData.qcRemarks}
+                  onChange={e => setFormData({ ...formData, qcRemarks: e.target.value })}
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', height: '50px' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* BOTTOM: MANDATORY LARGE DECISION BUTTONS */}
+          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem' }}>
+            <h3 style={{ fontSize: '0.825rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.85rem 0', textTransform: 'uppercase' }}>
+              Assign Mandatory Final Item Disposition:
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+              {[
+                { label: 'Return Stock', color: '#10b981', bg: '#ecfdf5' },
+                { label: 'Repack Order', color: '#06b6d4', bg: '#ecfeff' },
+                { label: 'Fast Selling Transfer', color: '#3b82f6', bg: '#eff6ff' },
+                { label: 'Employee Sale', color: '#8b5cf6', bg: '#f5f3ff' },
+                { label: 'Replacement Sent', color: '#f59e0b', bg: '#fffbeb' },
+                { label: 'Credit Note Issue', color: '#10b981', bg: '#ecfdf5' },
+                { label: 'Scrap / Destroy', color: '#ef4444', bg: '#fef2f2' },
+              ].map((btn, i) => (
                 <button
-                  onClick={() => handleQCSubmit(disp)}
-                  className="mt-4 w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-lg"
+                  key={i}
+                  onClick={() => handleQCSubmit(btn.label)}
+                  style={{
+                    padding: '0.85rem 0.5rem',
+                    borderRadius: '8px',
+                    backgroundColor: btn.bg,
+                    color: btn.color,
+                    border: `1px solid ${btn.color}`,
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                  }}
                 >
-                  Execute {disp}
+                  {btn.label}
                 </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: REPACK WORK ORDERS */}
+      {activeTab === 'repack' && (
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1.25rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Factory size={18} style={{ color: '#06b6d4' }} /> Repack Work Orders Kanban (RP-2026-XXXXX) & Packaging Deduction
+          </h2>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+            {['Pending', 'In Progress', 'QC Review', 'Completed'].map((col, idx) => (
+              <div key={idx} style={{ backgroundColor: '#f8fafc', padding: '0.85rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '0.75rem', paddingBottom: '0.4rem', borderBottom: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{col}</span>
+                  <span style={{ backgroundColor: '#e2e8f0', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                    {repackOrders.filter(o => o.status === col || (col === 'In Progress' && o.status === 'In Progress')).length}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  {repackOrders.map(wo => (
+                    <div key={wo.id} style={{ backgroundColor: '#ffffff', padding: '0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+                      <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: 800, color: '#3f1d07' }}>{wo.workOrderNumber}</div>
+                      <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#0f172a', margin: '0.2rem 0' }}>Qty: {wo.quantity} Pks</div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Operator: Manufacturing Team #1</div>
+                      <div style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 700, marginTop: '0.3rem' }}>Labor: ₹{wo.repackCostTotal}</div>
+                      {wo.status !== 'Completed' && (
+                        <button
+                          onClick={() => handleCompleteRepack(wo.id)}
+                          style={{ marginTop: '0.6rem', width: '100%', padding: '0.4rem', backgroundColor: '#10b981', color: '#ffffff', borderRadius: '6px', fontSize: '0.725rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                        >
+                          Complete & Restore
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* TAB 5: SMART NEAR EXPIRY AI */}
+      {/* TAB 5: NEAR EXPIRY ENGINE */}
       {activeTab === 'expiry' && (
-        <div className="space-y-6">
-          {/* VISUAL SHELF LIFE HEAT MAP */}
-          <div className="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">
-              Visual Shelf-Life Heat Map Bands
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          {/* VISUAL HEAT MAP BANDS */}
+          <div style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155', margin: '0 0 1rem 0', textTransform: 'uppercase' }}>
+              Visual Shelf-Life Heat Map Progress Bands
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <div className="bg-emerald-950/40 border border-emerald-500/40 p-3 rounded-lg">
-                <span className="text-xs font-bold text-emerald-400">Fresh (&gt;90 Days)</span>
-                <div className="text-lg font-extrabold text-white">850 Pks</div>
-                <div className="w-full bg-slate-900 rounded-full h-1.5 mt-2">
-                  <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: '85%' }}></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem' }}>
+              {[
+                { band: 'Fresh (>90 Days)', qty: '850 Pks', pct: 85, color: '#10b981' },
+                { band: 'Near Expiry (45-60 Days)', qty: '120 Pks', pct: 40, color: '#3b82f6' },
+                { band: 'Critical (15-30 Days)', qty: '45 Pks', pct: 20, color: '#f59e0b' },
+                { band: 'Expired (<0 Days)', qty: '0 Pks', pct: 0, color: '#ef4444' },
+              ].map((b, i) => (
+                <div key={i} style={{ backgroundColor: '#f8fafc', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: b.color }}>{b.band}</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>{b.qty}</div>
+                  <div style={{ width: '100%', backgroundColor: '#e2e8f0', height: '6px', borderRadius: '3px', marginTop: '0.5rem' }}>
+                    <div style={{ width: `${b.pct}%`, backgroundColor: b.color, height: '100%', borderRadius: '3px' }}></div>
+                  </div>
                 </div>
-              </div>
-              <div className="bg-blue-950/40 border border-blue-500/40 p-3 rounded-lg">
-                <span className="text-xs font-bold text-blue-400">Near Expiry (45-60 Days)</span>
-                <div className="text-lg font-extrabold text-white">120 Pks</div>
-                <div className="w-full bg-slate-900 rounded-full h-1.5 mt-2">
-                  <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: '40%' }}></div>
-                </div>
-              </div>
-              <div className="bg-amber-950/40 border border-amber-500/40 p-3 rounded-lg">
-                <span className="text-xs font-bold text-amber-400">Critical (15-30 Days)</span>
-                <div className="text-lg font-extrabold text-white">45 Pks</div>
-                <div className="w-full bg-slate-900 rounded-full h-1.5 mt-2">
-                  <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: '20%' }}></div>
-                </div>
-              </div>
-              <div className="bg-rose-950/40 border border-rose-500/40 p-3 rounded-lg">
-                <span className="text-xs font-bold text-rose-400">Expired (&lt;0 Days)</span>
-                <div className="text-lg font-extrabold text-white">0 Pks</div>
-                <div className="w-full bg-slate-900 rounded-full h-1.5 mt-2">
-                  <div className="bg-rose-500 h-1.5 rounded-full" style={{ width: '0%' }}></div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* FAST SELLING SHOPS RECOMMENDATION */}
-          <div className="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
-            <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3">
-              Fast-Selling Shop Engine Ranking (Recommended Near-Expiry Transfer Targets)
+          {/* FAST SELLING SHOPS TABLE */}
+          <div style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#10b981', margin: '0 0 0.85rem 0', textTransform: 'uppercase' }}>
+              Fast-Selling Shop Recommendations (Ranked by Velocity & Distance)
             </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
                 <thead>
-                  <tr className="bg-slate-900 text-slate-400 uppercase text-[10px]">
-                    <th className="p-3">Rank</th>
-                    <th className="p-3">Store Name</th>
-                    <th className="p-3">Type</th>
-                    <th className="p-3">Monthly Sales</th>
-                    <th className="p-3">Repeat Score</th>
-                    <th className="p-3 text-right">Action</th>
+                  <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 800 }}>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Rank</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Store Name</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Type</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Monthly Velocity</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Repeat Score</th>
+                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {fastSellingShops.map((shop, i) => (
-                    <tr key={i} className="hover:bg-slate-800/40">
-                      <td className="p-3 font-bold text-emerald-400">#{shop.rank}</td>
-                      <td className="p-3 font-bold text-white">{shop.customerName}</td>
-                      <td className="p-3 text-slate-300">{shop.customerType}</td>
-                      <td className="p-3 text-emerald-300 font-bold">{shop.salesVolumeMonthly} Pks</td>
-                      <td className="p-3 text-slate-300">{shop.repeatFrequencyScore}/100</td>
-                      <td className="p-3 text-right">
-                        <button className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-semibold">
+                <tbody>
+                  {fastSellingShops.map((s, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#10b981' }}>#{s.rank}</td>
+                      <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{s.customerName}</td>
+                      <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>{s.customerType}</td>
+                      <td style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#10b981' }}>{s.salesVolumeMonthly} Pks</td>
+                      <td style={{ padding: '0.65rem 0.85rem', color: '#64748b' }}>{s.repeatFrequencyScore}/100</td>
+                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>
+                        <button style={{ padding: '0.35rem 0.75rem', borderRadius: '6px', backgroundColor: '#10b981', color: '#ffffff', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
                           Generate Transfer Order
                         </button>
                       </td>
@@ -718,191 +918,202 @@ export default function ReturnRecoveryModule() {
         </div>
       )}
 
-      {/* TAB 6: REPACKING WORK ORDERS */}
-      {activeTab === 'repack' && (
-        <div className="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
-          <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-4">
-            Active Repack Work Orders (RP-2026-XXXXX) & Packaging Deduction
-          </h3>
-          <div className="space-y-3">
-            {repackOrders.map(wo => (
-              <div key={wo.id} className="bg-slate-900 border border-slate-700 p-4 rounded-xl flex flex-col md:flex-row justify-between md:items-center gap-4">
-                <div>
-                  <div className="flex items-center gap-2 font-mono text-xs font-bold text-emerald-400 mb-1">
-                    <span>{wo.workOrderNumber}</span>
-                    <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px]">{wo.status}</span>
-                  </div>
-                  <div className="text-sm font-bold text-white">Qty: {wo.quantity} Pks</div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    Deducted: {wo.pouchQtyDeducted} Pouches, {wo.stickerQtyDeducted} Stickers, {wo.cartonQtyDeducted} Cartons
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-emerald-300 font-bold">Labor Cost: ₹{wo.repackCostTotal}</span>
-                  {wo.status !== 'Completed' && (
-                    <button
-                      onClick={() => handleCompleteRepack(wo.id)}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold"
-                    >
-                      Complete & Restore Finished Goods
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* CREATE RMA MODAL */}
+      {/* CREATE RETURN 6-STEP WIZARD MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-emerald-400" /> Create Return Authorization (RMA)
-            </h2>
-
-            {/* SCAN LOOKUP SIMULATOR */}
-            <div className="mb-4 bg-slate-800/80 p-3 rounded-xl border border-slate-700 flex gap-2">
-              <input
-                type="text"
-                placeholder="Scan Product Barcode or Invoice QR (<100ms)"
-                value={scanQuery}
-                onChange={e => setScanQuery(e.target.value)}
-                className="flex-1 bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg text-xs text-white"
-              />
-              <button
-                type="button"
-                onClick={handleScanLookup}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1"
-              >
-                <QrCode className="w-3.5 h-3.5" /> Scan
-              </button>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 1000 }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #cbd5e1', maxWidth: '640px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            
+            {/* WIZARD HEADER */}
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}>
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem 0' }}>
+                Create Return Authorization (RMA) Wizard
+              </h2>
+              
+              {/* PROGRESS BAR */}
+              <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.75rem' }}>
+                {[1, 2, 3, 4, 5, 6].map(st => (
+                  <div
+                    key={st}
+                    onClick={() => setWizardStep(st)}
+                    style={{
+                      flex: 1,
+                      height: '6px',
+                      borderRadius: '3px',
+                      backgroundColor: wizardStep >= st ? '#3f1d07' : '#cbd5e1',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  />
+                ))}
+              </div>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', marginTop: '0.35rem', display: 'block' }}>
+                Step {wizardStep} of 6: {
+                  wizardStep === 1 ? 'Customer Details' :
+                  wizardStep === 2 ? 'Invoice Lookup' :
+                  wizardStep === 3 ? 'Products & Quantities' :
+                  wizardStep === 4 ? 'Photos & Video Upload' :
+                  wizardStep === 5 ? 'Cost Recovery Review' : 'Submit & Generate RMA'
+                }
+              </span>
             </div>
 
-            <form onSubmit={handleCreateRma} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Category</label>
-                  <select
-                    value={formData.category}
-                    onChange={e => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 p-2 rounded-lg text-white"
-                  >
-                    <option value="External">External (Customer Return)</option>
-                    <option value="Internal">Internal (Production/QC)</option>
-                  </select>
+            {/* WIZARD CONTENT */}
+            <div style={{ padding: '1.5rem' }}>
+              
+              {/* STEP 1: CUSTOMER */}
+              {wizardStep === 1 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Customer Name / Store</label>
+                    <input
+                      type="text"
+                      value={formData.customerName}
+                      onChange={e => setFormData({ ...formData, customerName: e.target.value })}
+                      style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Customer Type</label>
+                    <select
+                      value={formData.customerType}
+                      onChange={e => setFormData({ ...formData, customerType: e.target.value })}
+                      style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                    >
+                      <option value="Retail Shop">Retail Shop</option>
+                      <option value="Supermarket">Supermarket</option>
+                      <option value="Wholesale">Wholesale</option>
+                      <option value="D2C">D2C Customer</option>
+                      <option value="Private Label">Private Label</option>
+                      <option value="Distributor">Distributor</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Customer / Source Type</label>
-                  <select
-                    value={formData.customerType}
-                    onChange={e => setFormData({ ...formData, customerType: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 p-2 rounded-lg text-white"
-                  >
-                    <option value="Retail Shop">Retail Shop</option>
-                    <option value="Supermarket">Supermarket</option>
-                    <option value="Wholesale">Wholesale</option>
-                    <option value="D2C">D2C Customer</option>
-                    <option value="Private Label">Private Label</option>
-                    <option value="Distributor">Distributor</option>
-                  </select>
-                </div>
-              </div>
+              )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Return Reason</label>
-                  <select
-                    value={formData.returnReason}
-                    onChange={e => setFormData({ ...formData, returnReason: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 p-2 rounded-lg text-white"
-                  >
-                    <option value="Damaged Packing">Damaged Packing</option>
-                    <option value="Wrong Product">Wrong Product</option>
-                    <option value="Near Expiry">Near Expiry</option>
-                    <option value="Quality Complaint">Quality Complaint</option>
-                    <option value="Manufacturing Defect">Manufacturing Defect</option>
-                  </select>
+              {/* STEP 2: INVOICE */}
+              {wizardStep === 2 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                      type="text"
+                      placeholder="Scan Barcode / Enter Invoice Number..."
+                      value={scanQuery}
+                      onChange={e => setScanQuery(e.target.value)}
+                      style={{ flex: 1, padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleScanLookup}
+                      style={{ padding: '0.55rem 1rem', borderRadius: '8px', backgroundColor: '#3f1d07', color: '#fff', fontSize: '0.8rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                    >
+                      Lookup
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Root Cause</label>
-                  <select
-                    value={formData.rootCause}
-                    onChange={e => setFormData({ ...formData, rootCause: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 p-2 rounded-lg text-white"
-                  >
-                    <option value="Transport">Transport</option>
-                    <option value="Packing">Packing Line</option>
-                    <option value="Storage">Warehouse Storage</option>
-                    <option value="Manufacturing">Manufacturing Batch</option>
-                    <option value="Customer Mishandling">Customer Mishandling</option>
-                  </select>
-                </div>
-              </div>
+              )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Product Name</label>
-                  <input
-                    type="text"
-                    value={formData.productName}
-                    onChange={e => setFormData({ ...formData, productName: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 p-2 rounded-lg text-white"
-                  />
+              {/* STEP 3: PRODUCTS */}
+              {wizardStep === 3 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Product Name</label>
+                    <input
+                      type="text"
+                      value={formData.productName}
+                      onChange={e => setFormData({ ...formData, productName: e.target.value })}
+                      style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Batch Number</label>
+                      <input
+                        type="text"
+                        value={formData.batchNumber}
+                        onChange={e => setFormData({ ...formData, batchNumber: e.target.value })}
+                        style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontFamily: 'monospace' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Quantity (Pks)</label>
+                      <input
+                        type="number"
+                        value={formData.quantity}
+                        onChange={e => setFormData({ ...formData, quantity: e.target.value })}
+                        style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 800 }}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Batch Number</label>
-                  <input
-                    type="text"
-                    value={formData.batchNumber}
-                    onChange={e => setFormData({ ...formData, batchNumber: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 p-2 rounded-lg text-white font-mono"
-                  />
-                </div>
-              </div>
+              )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Quantity (Pks)</label>
-                  <input
-                    type="number"
-                    value={formData.quantity}
-                    onChange={e => setFormData({ ...formData, quantity: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 p-2 rounded-lg text-white font-bold"
-                  />
+              {/* STEP 4: PHOTOS */}
+              {wizardStep === 4 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ border: '2px dashed #cbd5e1', padding: '2rem', borderRadius: '10px', textAlign: 'center', backgroundColor: '#f8fafc' }}>
+                    <Camera size={32} style={{ color: '#94a3b8', marginBottom: '0.5rem' }} />
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>Upload Returned Item Photos / Video</div>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>PNG, JPG, MP4 supported up to 25MB</span>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Unit Price (₹)</label>
-                  <input
-                    type="number"
-                    value={formData.unitPrice}
-                    onChange={e => setFormData({ ...formData, unitPrice: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 p-2 rounded-lg text-white font-bold"
-                  />
-                </div>
-              </div>
+              )}
 
-              <div className="flex justify-end gap-3 pt-3">
+              {/* STEP 5: REVIEW */}
+              {wizardStep === 5 && (
+                <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div><strong>Customer:</strong> {formData.customerName} ({formData.customerType})</div>
+                  <div><strong>Product:</strong> {formData.productName}</div>
+                  <div><strong>Batch:</strong> {formData.batchNumber}</div>
+                  <div><strong>Quantity:</strong> {formData.quantity} Pks</div>
+                  <div><strong>Total Value:</strong> ₹{formData.quantity * formData.unitPrice}</div>
+                  <div><strong>Approval Matrix:</strong> {formData.quantity * formData.unitPrice > 10000 ? 'Super Admin' : 'Admin'}</div>
+                </div>
+              )}
+
+              {/* STEP 6: SUBMIT */}
+              {wizardStep === 6 && (
+                <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+                  <CheckCircle2 size={48} style={{ color: '#10b981', margin: '0 auto 0.5rem auto' }} />
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>Ready to Issue Return Authorization</h3>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b' }}>Clicking submit will generate the official RMA number and notify warehouse gate staff.</p>
+                </div>
+              )}
+            </div>
+
+            {/* WIZARD FOOTER CONTROLS */}
+            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px', display: 'flex', justifyContent: 'space-between' }}>
+              <button
+                type="button"
+                disabled={wizardStep === 1}
+                onClick={() => setWizardStep(prev => prev - 1)}
+                style={{ padding: '0.5rem 1rem', borderRadius: '8px', backgroundColor: '#e2e8f0', color: '#475569', fontSize: '0.8rem', fontWeight: 700, border: 'none', cursor: 'pointer', opacity: wizardStep === 1 ? 0.5 : 1 }}
+              >
+                Back
+              </button>
+              
+              {wizardStep < 6 ? (
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold"
+                  onClick={() => setWizardStep(prev => prev + 1)}
+                  style={{ padding: '0.5rem 1.25rem', borderRadius: '8px', backgroundColor: '#3f1d07', color: '#ffffff', fontSize: '0.8rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
                 >
-                  Cancel
+                  Next Step
                 </button>
+              ) : (
                 <button
-                  type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold"
+                  type="button"
+                  onClick={handleCreateRma}
+                  style={{ padding: '0.5rem 1.25rem', borderRadius: '8px', backgroundColor: '#10b981', color: '#ffffff', fontSize: '0.8rem', fontWeight: 800, border: 'none', cursor: 'pointer' }}
                 >
                   Submit & Generate RMA
                 </button>
-              </div>
-            </form>
+              )}
+            </div>
+
           </div>
         </div>
       )}
+
     </div>
   );
 }
