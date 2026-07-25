@@ -10,6 +10,10 @@ exports.getCustomers = async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const search = req.query.search || '';
 
+    const { sequelize } = require('../config/db');
+    const isPostgres = sequelize ? sequelize.getDialect() === 'postgres' : false;
+    const matchOp = isPostgres ? Op.iLike : Op.like;
+
     const query = {};
     if (req.query.type && req.query.type !== 'All') {
       let t = req.query.type;
@@ -26,20 +30,29 @@ exports.getCustomers = async (req, res) => {
     }
     if (search) {
       query[Op.or] = [
-        { name: { [Op.like]: `%${search}%` } },
-        { phone: { [Op.like]: `%${search}%` } },
-        { email: { [Op.like]: `%${search}%` } },
-        { businessName: { [Op.like]: `%${search}%` } },
-        { gstNumber: { [Op.like]: `%${search}%` } },
-        { customerCode: { [Op.like]: `%${search}%` } },
-        { address: { [Op.like]: `%${search}%` } },
+        { name: { [matchOp]: `%${search}%` } },
+        { phone: { [matchOp]: `%${search}%` } },
+        { email: { [matchOp]: `%${search}%` } },
+        { businessName: { [matchOp]: `%${search}%` } },
+        { gstNumber: { [matchOp]: `%${search}%` } },
+        { customerCode: { [matchOp]: `%${search}%` } },
+        { address: { [matchOp]: `%${search}%` } },
       ];
     }
 
-    const User = require('../models/User');
+    let includeClause = [];
+    try {
+      const User = require('../models/User');
+      if (User) {
+        includeClause = [{ model: User, as: 'salesman', attributes: ['id', 'name', 'phone', 'email'], required: false }];
+      }
+    } catch (e) {
+      console.warn('Salesman association not bound:', e.message);
+    }
+
     const { count: total, rows: customers } = await Customer.findAndCountAll({
       where: query,
-      include: [{ model: User, as: 'salesman', attributes: ['id', 'name', 'phone', 'email'], required: false }],
+      include: includeClause,
       order: [['createdAt', 'DESC']],
       offset: (page - 1) * limit,
       limit: limit,
@@ -48,9 +61,10 @@ exports.getCustomers = async (req, res) => {
     res.json({ success: true, customers, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     console.error('Error fetching customers:', err);
-    res.json({ success: false, message: 'Failed to retrieve customers', customers: [], total: 0 });
+    res.status(500).json({ success: false, message: 'Failed to retrieve customers: ' + err.message, customers: [], total: 0 });
   }
 };
+
 
 
 exports.getCustomer = async (req, res) => {

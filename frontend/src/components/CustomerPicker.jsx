@@ -80,8 +80,11 @@ export default function CustomerPicker({
     }
   }, [selectedCustomer]);
 
+  const [loadCustomersError, setLoadCustomersError] = useState(null);
+
   const loadCustomers = async () => {
     setLoading(true);
+    setLoadCustomersError(null);
     try {
       const params = {
         page,
@@ -90,15 +93,22 @@ export default function CustomerPicker({
         type: typeFilter === 'All' ? undefined : typeFilter
       };
       const { data } = await customersApi.list(params);
+      if (data && data.success === false) {
+        setLoadCustomersError(data.message || 'Failed to retrieve customers from server.');
+        setCustomers([]);
+        return;
+      }
       const list = (data && data.customers) ? data.customers : (data && data.data) ? data.data : (Array.isArray(data) ? data : []);
       setCustomers(list);
     } catch (e) {
       console.error('Error loading customers:', e);
+      setLoadCustomersError(e.response?.data?.message || 'Could not connect to customer database server.');
       setCustomers([]);
     } finally {
       setLoading(false);
     }
   };
+
 
 
   const loadCustomer360Profile = async (cust) => {
@@ -301,11 +311,29 @@ export default function CustomerPicker({
       </div>
 
       {/* CUSTOMER CARDS GRID WITH FULL INFORMATION */}
-      {loading ? (
+      {loadCustomersError ? (
+        <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#fffbeb', borderRadius: '10px', border: '1px solid #fde68a' }}>
+          <AlertTriangle size={36} style={{ color: '#d97706', marginBottom: '0.5rem', display: 'block', margin: '0 auto 0.5rem auto' }} />
+          <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#b45309' }}>
+            Unable to load customers from server
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#78350f', marginTop: '0.25rem', marginBottom: '0.85rem' }}>
+            {loadCustomersError}
+          </div>
+          <button
+            type="button"
+            onClick={loadCustomers}
+            style={{ padding: '0.45rem 1rem', borderRadius: '6px', backgroundColor: '#3f1d07', color: '#ffffff', fontSize: '0.78rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+          >
+            🔄 Retry Loading Customers
+          </button>
+        </div>
+      ) : loading ? (
         <div style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
           Loading customer database...
         </div>
       ) : customers.length > 0 ? (
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.85rem', maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
           {customers.map(c => {
             const active = isSelected(c);
