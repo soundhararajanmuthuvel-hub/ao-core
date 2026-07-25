@@ -56,8 +56,10 @@ const FieldOrdering = lazy(() => import('../pages/FieldOrdering'));
 const DeliveryTracking = lazy(() => import('../pages/DeliveryTracking'));
 const ReviewPortal = lazy(() => import('../pages/ReviewPortal'));
 const IntegrationsMarketplace = lazy(() => import('../pages/IntegrationsMarketplace'));
+const DeveloperCenter = lazy(() => import('../pages/DeveloperCenter'));
 const WebsiteManagement = lazy(() => import('../pages/WebsiteManagement'));
 const ReturnRecoveryModule = lazy(() => import('../pages/ReturnRecoveryModule'));
+
 
 
 // CRM Pages
