@@ -13,27 +13,29 @@ function maskSecret(str) {
 
 // 1. Resolve Cloudinary environment credentials with strict priority:
 // Priority 1: Individual env variables (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET)
-// Priority 2: CLOUDINARY_URL string fallback
-// Priority 3: Production defaults
+// Priority 2: CLOUDINARY_URL string fallback (used only if individual env vars are missing)
+// Priority 3: Verified default fallback
+let configMethod = 'INDIVIDUAL_ENV_VARS';
 let cloudName = process.env.CLOUDINARY_CLOUD_NAME;
 let apiKey = process.env.CLOUDINARY_API_KEY;
 let apiSecret = process.env.CLOUDINARY_API_SECRET;
 
-if (!cloudName || !apiKey || !apiSecret) {
-  if (process.env.CLOUDINARY_URL) {
-    const match = process.env.CLOUDINARY_URL.match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
-    if (match) {
-      apiKey = apiKey || match[1].trim();
-      apiSecret = apiSecret || match[2].trim();
-      cloudName = cloudName || match[3].trim();
-    }
+if (cloudName && apiKey && apiSecret) {
+  configMethod = 'INDIVIDUAL_ENV_VARS';
+} else if (process.env.CLOUDINARY_URL) {
+  const match = process.env.CLOUDINARY_URL.match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
+  if (match) {
+    configMethod = 'CLOUDINARY_URL';
+    apiKey = match[1].trim();
+    apiSecret = match[2].trim();
+    cloudName = match[3].trim();
   }
+} else {
+  configMethod = 'FALLBACK_DEFAULTS';
+  cloudName = 'dacgzzpi';
+  apiKey = '248258669444973';
+  apiSecret = 'b7if9RfwcV4XV3DJEH7Sry-rF-g';
 }
-
-// Final fallback defaults
-cloudName = cloudName || 'dacgzzpi';
-apiKey = apiKey || '248258869444973';
-apiSecret = apiSecret || 'b7if9RfwcV4XV3DJEH7Sry-rF-g';
 
 // 2. Initialize Cloudinary SDK exactly once on startup
 cloudinary.config({
@@ -44,9 +46,11 @@ cloudinary.config({
 });
 
 console.log('[Cloudinary SDK Initialized]');
-console.log(`- Cloud Name: ${cloudName} (Loaded)`);
-console.log(`- API Key:    ${maskSecret(apiKey)} (Loaded)`);
-console.log(`- API Secret: ${maskSecret(apiSecret)} (Loaded)`);
+console.log(`- Config Method: ${configMethod}`);
+console.log(`- Cloud Name:    ${cloudName}`);
+console.log(`- API Key:       ${maskSecret(apiKey)}`);
+console.log(`- API Secret:    ${maskSecret(apiSecret)}`);
+
 
 /**
  * Categorizes raw Cloudinary errors into clean, structured errors
@@ -94,14 +98,12 @@ function categorizeCloudinaryError(error) {
 const uploadImage = async (fileBufferOrPath, customOptions = {}) => {
   const options = {
     folder: 'ao_core/products',
-    resource_type: 'image',
-    fetch_format: 'auto',
-    quality: 'auto',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    resource_type: 'auto',
     ...customOptions,
   };
 
   console.log(`[Cloudinary Uploading] Folder: ${options.folder}, Cloud Name: ${cloudName}`);
+
 
   return new Promise((resolve, reject) => {
     const handleUploadResult = (error, result) => {
@@ -186,14 +188,18 @@ const extractPublicId = (url) => {
  */
 const checkHealth = async () => {
   const startTime = Date.now();
-  const testPixelBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSU5EUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  // Valid sample image URL for diagnostic upload test
+  const sampleUrl = 'https://res.cloudinary.com/demo/image/upload/sample.jpg';
 
   try {
     console.log('[Cloudinary Health] Running diagnostic upload test...');
-    const uploadRes = await uploadImage(testPixelBase64, {
+    const uploadRes = await uploadImage(sampleUrl, {
       folder: 'ao_core/health_check',
       tags: ['health_check'],
     });
+
+
+
 
     const latencyMs = Date.now() - startTime;
     console.log(`[Cloudinary Health] Upload test passed (${latencyMs}ms). Public ID: ${uploadRes.public_id}`);
@@ -210,26 +216,37 @@ const checkHealth = async () => {
 
     return {
       connected: true,
+      configurationLoaded: true,
+      configMethod,
       cloudName,
-      sdkConfigured: true,
-      authentication: true,
-      uploadTest: true,
       maskedApiKey: maskSecret(apiKey),
-      version: '2.10.0',
-      latency: `${latencyMs}ms`,
+      maskedApiSecret: maskSecret(apiSecret),
+      sdkVersion: '2.10.0',
+      connectionStatus: 'Connected',
+      authenticationSuccess: true,
+      uploadTestResult: {
+        secure_url: uploadRes.secure_url,
+        public_id: uploadRes.public_id,
+        latencyMs: `${latencyMs}ms`,
+      },
     };
   } catch (err) {
     const latencyMs = Date.now() - startTime;
     console.error('[Cloudinary Health Diagnostic Failed]', err);
+    const connStatus = err.httpStatus === 401 ? 'Authentication Failed' : 'Error';
     return {
       connected: false,
+      configurationLoaded: true,
+      configMethod,
       cloudName,
-      sdkConfigured: true,
-      authentication: err.httpStatus !== 401,
-      uploadTest: false,
       maskedApiKey: maskSecret(apiKey),
-      version: '2.10.0',
-      latency: `${latencyMs}ms`,
+      maskedApiSecret: maskSecret(apiSecret),
+      sdkVersion: '2.10.0',
+      connectionStatus: connStatus,
+      authenticationSuccess: false,
+      uploadTestResult: null,
+      errorCode: err.type || 'CLOUDINARY_AUTH_FAILED',
+      errorMessage: err.message || 'Cloudinary health check failed',
       error: {
         type: err.type || 'CLOUDINARY_HEALTH_FAILED',
         httpStatus: err.httpStatus || 500,
@@ -239,6 +256,7 @@ const checkHealth = async () => {
     };
   }
 };
+
 
 module.exports = {
   cloudinary,
