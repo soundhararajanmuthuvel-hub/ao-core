@@ -92,25 +92,52 @@ export default function CustomerPicker({
     }
   };
 
+  const [custProfileError, setCustProfileError] = useState(null);
+
   const loadCustomer360Profile = async (cust) => {
     setCustHistoryLoading(true);
+    setCustProfileError(null);
     try {
       const cId = cust.id || cust._id;
-      const [salesRes, returnsRes] = await Promise.allSettled([
-        salesApi.list({ customerId: cId, limit: 100 }),
+
+      // Safe JSON parse helper
+      const parseResponseJson = async (res) => {
+        if (!res || !res.ok) return null;
+        const contentType = res.headers ? (res.headers.get('content-type') || '') : '';
+        if (res.headers && !contentType.includes('application/json')) return null;
+        try {
+          return await res.json();
+        } catch (e) {
+          return null;
+        }
+      };
+
+      // Call profile API and fallback to sales & returns APIs via Promise.allSettled
+      const [profileRes, salesRes, returnsRes] = await Promise.allSettled([
+        customersApi.profile(cId),
+        customersApi.sales(cId),
         fetch('/api/returns')
       ]);
 
-      let invoices = [];
-      if (salesRes.status === 'fulfilled' && salesRes.value.data) {
-        invoices = salesRes.value.data.invoices || [];
-        setCustInvoices(invoices);
+      let profileData = null;
+      if (profileRes.status === 'fulfilled' && profileRes.value.data && profileRes.value.data.success) {
+        profileData = profileRes.value.data;
       }
 
+      let invoices = [];
+      if (profileData && profileData.invoices) {
+        invoices = profileData.invoices;
+      } else if (salesRes.status === 'fulfilled' && salesRes.value.data) {
+        invoices = salesRes.value.data.sales || salesRes.value.data.invoices || [];
+      }
+      setCustInvoices(invoices);
+
       let allReturns = [];
-      if (returnsRes.status === 'fulfilled' && returnsRes.value.ok) {
-        const rData = await returnsRes.value.json();
-        allReturns = rData.data || [];
+      if (profileData && profileData.returns) {
+        allReturns = profileData.returns;
+      } else if (returnsRes.status === 'fulfilled' && returnsRes.value.ok) {
+        const rData = await parseResponseJson(returnsRes.value);
+        if (rData && rData.data) allReturns = rData.data;
       }
 
       const custReturns = allReturns.filter(r => r.customerId === cId || r.customerName === cust.name);
@@ -118,7 +145,6 @@ export default function CustomerPicker({
       const totalSalesVal = invoices.reduce((sum, inv) => sum + (Number(inv.grandTotal) || 0), 0);
       const returnRateNum = invoices.length > 0 ? (custReturns.length / invoices.length) * 100 : 0;
 
-      // Determine Return Risk Level
       let riskLevel = 'Low';
       let riskColor = '#10b981';
       let riskBg = '#ecfdf5';
@@ -145,15 +171,17 @@ export default function CustomerPicker({
         lastReturnDate: custReturns.length > 0 ? new Date(custReturns[0].createdAt).toLocaleDateString('en-IN') : 'None',
         creditNotesCount: custReturns.filter(r => r.status === 'Closed').length,
         recoveryValue: totalReturnedVal,
-        mostPurchasedProduct: invoices.length > 0 && invoices[0].items ? invoices[0].items[0]?.productName : 'ABC Malt 500g',
+        mostPurchasedProduct: invoices.length > 0 && invoices[0].items ? invoices[0].items[0]?.productName : 'ABC Malt 500g Pouch',
         mostReturnedReason: custReturns.length > 0 ? custReturns[0].returnReason : 'Packing Damage'
       });
     } catch (e) {
       console.error('Error loading customer 360 profile:', e);
+      setCustProfileError('Unable to load customer profile details.');
     } finally {
       setCustHistoryLoading(false);
     }
   };
+
 
   const handleCardClick = (cust) => {
     if (onSelectCustomer) {
@@ -361,7 +389,23 @@ export default function CustomerPicker({
         <div style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
           
           {/* PROFILE HEADER & QUICK ACTIONS */}
+          {custProfileError && (
+            <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', padding: '0.65rem 1rem', borderRadius: '8px', marginBottom: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.78rem', color: '#b45309', fontWeight: 700 }}>
+                ⚠️ Unable to load full 360° profile metrics. Basic profile displayed.
+              </span>
+              <button
+                type="button"
+                onClick={() => loadCustomer360Profile(selectedCustomer)}
+                style={{ padding: '0.3rem 0.65rem', borderRadius: '4px', backgroundColor: '#3f1d07', color: '#ffffff', fontSize: '0.725rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+              >
+                🔄 Retry Connection
+              </button>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', paddingBottom: '0.85rem', borderBottom: '1px solid #e2e8f0' }}>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
               <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#3f1d07', color: '#ffffff', fontWeight: 800, fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {selectedCustomer.name ? selectedCustomer.name.charAt(0).toUpperCase() : 'C'}

@@ -5,7 +5,9 @@ const {
   getCustomers,
   getCustomer,
   getCustomerSales,
+  getCustomer360Profile,
   createCustomer,
+
   updateCustomer,
   deleteCustomer,
   getCustomerPayments,
@@ -23,7 +25,9 @@ const {
 
 router.use(auth);
 router.get('/', getCustomers);
+router.get('/:id/profile', getCustomer360Profile);
 router.get('/:id/sales', getCustomerSales);
+
 router.get('/:id/payments', getCustomerPayments);
 router.get('/:id/dependencies', getCustomerDependencies);
 router.put('/:id/archive', archiveCustomer);

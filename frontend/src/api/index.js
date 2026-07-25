@@ -32,7 +32,9 @@ export const productsApi = {
 export const customersApi = {
   list: (params) => client.get('/customers', { params }),
   get: (id) => client.get(`/customers/${id}`),
+  profile: (id) => client.get(`/customers/${id}/profile`),
   sales: (id) => client.get(`/customers/${id}/sales`),
+
   payments: (id) => client.get(`/customers/${id}/payments`),
   create: (data) => client.post('/customers', data),
   update: (id, data) => client.put(`/customers/${id}`, data),

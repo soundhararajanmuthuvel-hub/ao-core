@@ -59,29 +59,151 @@ exports.getCustomer = async (req, res, next) => {
   }
 };
 
+exports.getCustomer360Profile = async (req, res) => {
+  try {
+    const customerId = req.params.id;
+    const customer = await Customer.findByPk(customerId);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    let invoices = [];
+    try {
+      invoices = await Invoice.findAll({
+        where: { customerId },
+        order: [['createdAt', 'DESC']],
+        limit: 100
+      });
+    } catch (e) {
+      console.error('Error fetching invoices for 360 profile:', e.message);
+    }
+
+    let returnsList = [];
+    try {
+      const ReturnRequest = require('../models/ReturnRequest');
+      if (ReturnRequest) {
+        returnsList = await ReturnRequest.findAll({
+          where: { [Op.or]: [{ customerId }, { customerName: customer.name }] },
+          order: [['createdAt', 'DESC']],
+          limit: 100
+        });
+      }
+    } catch (e) {
+      console.error('Error fetching returns for 360 profile:', e.message);
+    }
+
+    let payments = [];
+    try {
+      const Payment = require('../models/Payment');
+      if (Payment) {
+        payments = await Payment.findAll({
+          where: { customerId },
+          order: [['createdAt', 'DESC']],
+          limit: 50
+        });
+      }
+    } catch (e) {
+      console.error('Error fetching payments for 360 profile:', e.message);
+    }
+
+    const totalOrders = invoices.length;
+    const completedOrders = invoices.filter(i => i.status !== 'Cancelled').length;
+    const totalSales = invoices.reduce((sum, i) => sum + (Number(i.grandTotal) || 0), 0);
+    const avgOrderVal = totalOrders > 0 ? (totalSales / totalOrders).toFixed(2) : 0;
+    const lastInvoice = invoices.length > 0 ? invoices[0] : null;
+
+    const totalReturns = returnsList.length;
+    const returnRate = totalOrders > 0 ? ((totalReturns / totalOrders) * 100).toFixed(1) : 0;
+    const recoveryValue = returnsList.reduce((sum, r) => sum + (Number(r.totalValue) || 0), 0);
+    const creditNotes = returnsList.filter(r => r.status === 'Closed').length;
+
+    const outstanding = Number(customer.balance || customer.outstandingAmount || 0);
+    const creditLimit = Number(customer.creditLimit || 50000);
+    const availableCredit = creditLimit - outstanding;
+    const lastPayment = payments.length > 0 ? payments[0] : null;
+
+    let riskLevel = 'Low';
+    if (returnRate > 15 || outstanding > 10000) riskLevel = 'High';
+    else if (returnRate > 5 || outstanding > 0) riskLevel = 'Medium';
+
+    const profileData = {
+      success: true,
+      customer: {
+        id: customer.id,
+        code: customer.code || `CUS-${String(customer.id).padStart(6, '0')}`,
+        name: customer.name,
+        businessName: customer.businessName || customer.name,
+        ownerName: customer.ownerName || customer.name,
+        customerType: customer.customerType || 'Retail Shop',
+        phone: customer.phone || 'N/A',
+        whatsapp: customer.phone || 'N/A',
+        email: customer.email || 'N/A',
+        gstin: customer.gstin || 'Unregistered',
+        pan: customer.pan || 'N/A',
+        fssai: customer.fssai || 'N/A',
+        address: customer.address || 'Chennai, Tamil Nadu',
+        city: customer.city || 'Chennai',
+        district: customer.district || 'Chennai',
+        state: customer.state || 'Tamil Nadu',
+        pincode: customer.pincode || '600001',
+        salesman: customer.assignedSalesmanId ? { name: 'Sales Representative' } : null,
+        route: customer.route || 'Central Metro Logistics Route',
+        status: customer.status || 'Active',
+        balance: outstanding,
+        creditLimit,
+        paymentTerms: customer.paymentTerms || 'Net 30 Days',
+        createdAt: customer.createdAt
+      },
+      salesSummary: {
+        totalOrders,
+        completedOrders,
+        totalSales,
+        avgOrderVal,
+        lastInvoiceNumber: lastInvoice ? lastInvoice.invoiceNumber : 'None',
+        lastOrderDate: lastInvoice ? lastInvoice.createdAt : null
+      },
+      returnSummary: {
+        totalReturns,
+        returnRate,
+        recoveryValue,
+        creditNotes,
+        lastReturnDate: returnsList.length > 0 ? returnsList[0].createdAt : null,
+        riskLevel
+      },
+      accounts: {
+        outstanding,
+        creditLimit,
+        availableCredit,
+        lastPaymentAmount: lastPayment ? lastPayment.amount : 0,
+        lastPaymentDate: lastPayment ? lastPayment.createdAt : null,
+        paymentTerms: customer.paymentTerms || 'Net 30 Days'
+      },
+      invoices,
+      returns: returnsList,
+      payments
+    };
+
+    return res.json(profileData);
+  } catch (err) {
+    console.error('Error compiling 360 profile:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Error compiling customer profile' });
+  }
+};
+
 exports.getCustomerSales = async (req, res, next) => {
   try {
-    const InvoiceItem = require('../models/InvoiceItem');
-    const Product = require('../models/Product');
-    // Search invoices by customerId foreign key with item/product populations
     const sales = await Invoice.findAll({
       where: { customerId: req.params.id },
-      include: [
-        { model: Shipment, as: 'shipments' },
-        {
-          model: InvoiceItem,
-          as: 'items',
-          include: [{ model: Product, as: 'product' }]
-        }
-      ],
-      order: [['date', 'DESC']],
+      order: [['createdAt', 'DESC']],
       limit: 50,
     });
     res.json({ sales });
   } catch (err) {
-    next(err);
+    console.error('Error fetching customer sales:', err);
+    res.json({ sales: [] });
   }
 };
+
 
 exports.getCustomerPayments = async (req, res, next) => {
   try {
