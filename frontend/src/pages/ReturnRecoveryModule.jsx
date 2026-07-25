@@ -144,6 +144,17 @@ export default function ReturnRecoveryModule() {
     }
   }, [location.search]);
 
+  const parseJsonSafe = async (res) => {
+    if (!res || !res.ok) return null;
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) return null;
+    try {
+      return await res.json();
+    } catch (e) {
+      return null;
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     setErrorState(false);
@@ -163,59 +174,58 @@ export default function ReturnRecoveryModule() {
         fetch('/api/returns/analytics/dashboard'),
         fetch('/api/returns/ai/insights'),
         fetch('/api/returns/near-expiry/scan'),
-        fetch('/api/returns/fast-selling-shops/recommend', { method: 'POST' }),
+        fetch('/api/returns/fast-selling-shops/recommend'),
         fetch('/api/returns/repack-orders'),
         fetch('/api/returns/ncrs'),
         fetch('/api/returns/batch-recalls')
       ]);
 
-      if (resReturns.status === 'fulfilled' && resReturns.value.ok) {
-        const d = await resReturns.value.json();
-        setReturnsList(d.data || []);
+      if (resReturns.status === 'fulfilled') {
+        const d = await parseJsonSafe(resReturns.value);
+        if (d && d.data) setReturnsList(d.data);
       }
 
-      if (resMetrics.status === 'fulfilled' && resMetrics.value.ok) {
-        const d = await resMetrics.value.json();
-        if (d.data) setMetrics(d.data);
+      if (resMetrics.status === 'fulfilled') {
+        const d = await parseJsonSafe(resMetrics.value);
+        if (d && d.data) setMetrics(d.data);
       }
 
-      if (resAi.status === 'fulfilled' && resAi.value.ok) {
-        const d = await resAi.value.json();
-        setAiInsights(d.data || []);
+      if (resAi.status === 'fulfilled') {
+        const d = await parseJsonSafe(resAi.value);
+        if (d && d.data) setAiInsights(d.data);
       }
 
-      if (resExpiry.status === 'fulfilled' && resExpiry.value.ok) {
-        const d = await resExpiry.value.json();
-        setNearExpiryItems(d.data || []);
+      if (resExpiry.status === 'fulfilled') {
+        const d = await parseJsonSafe(resExpiry.value);
+        if (d && d.data) setNearExpiryItems(d.data);
       }
 
-      if (resShops.status === 'fulfilled' && resShops.value.ok) {
-        const d = await resShops.value.json();
-        setFastSellingShops(d.data || []);
+      if (resShops.status === 'fulfilled') {
+        const d = await parseJsonSafe(resShops.value);
+        if (d && d.data) setFastSellingShops(d.data);
       }
 
-      if (resRepack.status === 'fulfilled' && resRepack.value.ok) {
-        const d = await resRepack.value.json();
-        setRepackOrders(d.data || []);
+      if (resRepack.status === 'fulfilled') {
+        const d = await parseJsonSafe(resRepack.value);
+        if (d && d.data) setRepackOrders(d.data);
       }
 
-      if (resNcrs.status === 'fulfilled' && resNcrs.value.ok) {
-        const d = await resNcrs.value.json();
-        setNcrs(d.data || []);
+      if (resNcrs.status === 'fulfilled') {
+        const d = await parseJsonSafe(resNcrs.value);
+        if (d && d.data) setNcrs(d.data);
       }
 
-      if (resRecalls.status === 'fulfilled' && resRecalls.value.ok) {
-        const d = await resRecalls.value.json();
-        setRecalls(d.data || []);
+      if (resRecalls.status === 'fulfilled') {
+        const d = await parseJsonSafe(resRecalls.value);
+        if (d && d.data) setRecalls(d.data);
       }
     } catch (e) {
       console.error('API Error fetching return recovery data:', e);
-      setErrorState(true);
-      setErrorMessage('Failed to connect to Return & Recovery service. Please check API server.');
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleScanLookup = async () => {
     if (!scanQuery) return;

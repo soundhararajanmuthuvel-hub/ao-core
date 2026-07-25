@@ -11,8 +11,10 @@ router.get('/', returnsController.getReturns);
 router.get('/analytics/dashboard', returnsController.getDashboardMetrics);
 router.get('/ai/insights', returnsController.getAiInsights);
 router.get('/near-expiry/scan', returnsController.getNearExpiryScan);
+router.get('/fast-selling-shops/recommend', returnsController.recommendFastSellingShops);
 router.post('/fast-selling-shops/recommend', returnsController.recommendFastSellingShops);
 router.get('/repack-orders', returnsController.getRepackWorkOrders);
+
 router.put('/repack-orders/:id/complete', returnsController.completeRepackWorkOrder);
 router.get('/ncrs', returnsController.getNcrs);
 router.get('/batch-recalls', returnsController.getBatchRecalls);
