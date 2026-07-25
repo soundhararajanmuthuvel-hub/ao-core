@@ -45,14 +45,14 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per file max
   fileFilter: (req, file, cb) => {
-    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'image/avif'];
+    const allowedExts = ['.jpg', '.jpeg', '.png', '.webp', '.avif'];
     const ext = path.extname(file.originalname).toLowerCase();
 
     if (allowedMimeTypes.includes(file.mimetype) || allowedExts.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file format. Only JPG, JPEG, PNG, and WEBP images up to 10MB are allowed.'), false);
+      cb(new Error('Unsupported file format. Only JPG, JPEG, PNG, WEBP, and AVIF images up to 10MB are allowed.'), false);
     }
   },
 });
@@ -77,15 +77,35 @@ router.post('/upload-image', (req, res, next) => {
     if (err) {
       if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({ success: false, error: 'File Too Large', reason: 'Image size exceeds maximum limit of 10MB.' });
+          return res.status(400).json({
+            success: false,
+            error: 'Image exceeds maximum size of 10MB',
+            code: 'FILE_TOO_LARGE',
+            reason: 'File size exceeds maximum limit of 10MB.'
+          });
         }
-        return res.status(400).json({ success: false, error: 'Multer Error', reason: err.message });
+        return res.status(400).json({
+          success: false,
+          error: 'Upload validation error',
+          code: 'MULTER_ERROR',
+          reason: err.message
+        });
       }
-      return res.status(400).json({ success: false, error: 'Upload Error', reason: err.message || 'Image upload failed.' });
+      return res.status(400).json({
+        success: false,
+        error: 'Unsupported file format',
+        code: 'INVALID_FILE_FORMAT',
+        reason: err.message || 'Image upload failed.'
+      });
     }
     try {
       if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ success: false, error: 'No Files', reason: 'No image files uploaded.' });
+        return res.status(400).json({
+          success: false,
+          error: 'No files provided',
+          code: 'NO_FILES_UPLOADED',
+          reason: 'No image files uploaded.'
+        });
       }
       
       const uploadResults = await Promise.all(
@@ -94,27 +114,35 @@ router.post('/upload-image', (req, res, next) => {
 
       const urls = uploadResults.map((r) => r.secure_url);
       const publicIds = uploadResults.map((r) => r.public_id);
+      const imagesMetadata = uploadResults.map((r) => ({
+        publicId: r.public_id,
+        secureUrl: r.secure_url,
+        width: r.width || 0,
+        height: r.height || 0,
+        format: r.format || 'jpg',
+        bytes: r.bytes || 0,
+        createdAt: r.created_at || new Date().toISOString()
+      }));
 
       res.json({
         success: true,
         message: `${uploadResults.length} image(s) uploaded to Cloudinary successfully!`,
         urls,
         publicIds,
+        metadata: imagesMetadata,
         data: uploadResults,
       });
     } catch (error) {
       console.error('[Cloudinary Upload Route Error]', error);
-      // NEVER return 401 for an external Cloudinary service error, as 401 is interpreted as ERP User session expiration
-      const status = (error.httpStatus === 401 || !error.httpStatus) ? 500 : error.httpStatus;
-      res.status(status).json({
+      const errCode = error.type === 'CLOUDINARY_AUTH_ERROR' ? 'CLOUDINARY_AUTH_FAILED' : (error.type || 'CLOUDINARY_UPLOAD_ERROR');
+      res.status(200).json({
         success: false,
-        error: 'Cloudinary Upload Failed',
-        type: error.type || 'CLOUDINARY_UPLOAD_ERROR',
-        reason: error.message || 'Unknown Cloudinary error',
-        suggestion: error.suggestion || 'Please verify Cloudinary configuration in Cloudinary Settings.',
+        error: error.message || 'Cloudinary upload failed',
+        code: errCode,
+        reason: error.reason || error.message || 'Cloudinary service error',
+        suggestion: error.suggestion || 'Please verify Cloudinary credentials in Settings.',
       });
     }
-
   });
 });
 

@@ -174,20 +174,28 @@ export default function EnterpriseProductEditor({
         setIsDirty(true);
         setMsg({ type: 'success', text: `✨ ${res.data.urls.length} image(s) uploaded to Cloudinary CDN successfully!` });
         setLastFailedFiles([]);
+      } else {
+        const errMsg = res.data.error || res.data.reason || 'Cloudinary upload failed';
+        const suggestion = res.data.suggestion || '';
+        const fullMsg = suggestion ? `${errMsg}. ${suggestion}` : errMsg;
+        setUploadErrorMsg(fullMsg);
+        setLastFailedFiles(filesToUpload);
+        setMsg({ type: 'error', text: `Upload Warning: ${fullMsg}` });
       }
     } catch (err) {
       console.error('[Async Upload Failure]', err);
-      const errMsg = err.response?.data?.reason || err.response?.data?.message || err.message || 'Cloudinary upload failed';
+      const errMsg = err.response?.data?.reason || err.response?.data?.error || err.response?.data?.message || err.message || 'Cloudinary upload failed';
       const suggestion = err.response?.data?.suggestion || '';
       const fullMsg = suggestion ? `${errMsg}. ${suggestion}` : errMsg;
       setUploadErrorMsg(fullMsg);
       setLastFailedFiles(filesToUpload);
-      setMsg({ type: 'error', text: `Upload Failed: ${fullMsg}` });
+      setMsg({ type: 'error', text: `Upload Warning: ${fullMsg}` });
     } finally {
       setUploadingToCloudinary(false);
       setOptimisticPreviews([]);
       setUploadProgress(0);
     }
+
   };
 
   const handleCloudinaryFileUpload = (e) => {
