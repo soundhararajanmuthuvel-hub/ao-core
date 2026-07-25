@@ -56,6 +56,11 @@ export default function CustomerPicker({
     gstin: ''
   });
 
+  // Immediate load on mount
+  useEffect(() => {
+    loadCustomers();
+  }, []);
+
   // Debounced Search (300ms)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -80,12 +85,13 @@ export default function CustomerPicker({
     try {
       const params = {
         page,
-        limit: 12,
+        limit: 50,
         search: query.trim() || undefined,
         type: typeFilter === 'All' ? undefined : typeFilter
       };
       const { data } = await customersApi.list(params);
-      setCustomers(data.customers || []);
+      const list = (data && data.customers) ? data.customers : (data && data.data) ? data.data : (Array.isArray(data) ? data : []);
+      setCustomers(list);
     } catch (e) {
       console.error('Error loading customers:', e);
       setCustomers([]);
@@ -93,6 +99,7 @@ export default function CustomerPicker({
       setLoading(false);
     }
   };
+
 
   const loadCustomer360Profile = async (cust) => {
     setCustHistoryLoading(true);

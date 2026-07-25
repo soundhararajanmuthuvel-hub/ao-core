@@ -7,12 +7,17 @@ const { logActivity } = require('../utils/helpers');
 exports.getCustomers = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = parseInt(req.query.limit) || 50;
     const search = req.query.search || '';
 
     const query = {};
-    if (req.query.type) {
-      query.customerType = req.query.type;
+    if (req.query.type && req.query.type !== 'All') {
+      let t = req.query.type;
+      let aliases = [t];
+      if (t === 'Supermarket' || t === 'Super Market') aliases.push('Supermarket', 'Super Market');
+      if (t === 'Wholesale' || t === 'Wholesaler') aliases.push('Wholesale', 'Wholesaler');
+      if (t === 'Private Label' || t === 'White Label') aliases.push('Private Label', 'White Label');
+      query.customerType = { [Op.in]: Array.from(new Set(aliases)) };
     }
     if (req.query.status) {
       query.status = req.query.status;
@@ -46,6 +51,7 @@ exports.getCustomers = async (req, res) => {
     res.json({ success: false, message: 'Failed to retrieve customers', customers: [], total: 0 });
   }
 };
+
 
 exports.getCustomer = async (req, res) => {
   try {
