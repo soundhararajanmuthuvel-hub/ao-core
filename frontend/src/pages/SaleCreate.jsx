@@ -4,7 +4,10 @@ import { productsApi, customersApi, salesApi } from '../api';
 import { useSettings } from '../context/SettingsContext';
 import { useToast } from '../context/ToastContext';
 
+import CustomerPicker from '../components/CustomerPicker';
+
 const getLocalDateString = () => {
+
   const today = new Date();
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -400,13 +403,16 @@ export default function SaleCreate() {
           <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>Customer & Charges Info</h3>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Select Customer</label>
-              <select className="form-control" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-                <option value="">Choose customer...</option>
-                {customers.map((c) => <option key={c.id || c._id} value={c.id || c._id}>{c.name} ({c.customerType})</option>)}
-              </select>
+            <div className="form-group" style={{ marginBottom: 0, gridColumn: 'span 2' }}>
+              <label style={{ fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem', display: 'block' }}>Select Customer *</label>
+              <CustomerPicker
+                mode="dropdown"
+                selectedCustomer={customers.find(c => String(c.id || c._id) === String(customerId))}
+                onSelectCustomer={(c) => setCustomerId(c ? (c.id || c._id) : '')}
+                placeholder="Type 2+ chars to search customer by Name, Store, Code, Phone, GST, City..."
+              />
             </div>
+
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Invoice Date</label>
               <input

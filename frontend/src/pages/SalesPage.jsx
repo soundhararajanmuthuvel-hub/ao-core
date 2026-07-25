@@ -7,7 +7,9 @@ import { salesApi, customersApi } from '../api';
 import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
 import PaymentReminderGenerator from '../components/PaymentReminderGenerator';
+import CustomerPicker from '../components/CustomerPicker';
 import React from 'react';
+
 
 function BackordersDashboard() {
   const [backorders, setBackorders] = useState([]);
@@ -597,21 +599,15 @@ function PaymentEntry({ customers }) {
         </h3>
         
         <div className="form-group">
-          <label>Select Customer *</label>
-          <select 
-            className="form-control" 
-            required 
-            value={selectedCustomerId} 
-            onChange={(e) => setSelectedCustomerId(e.target.value)}
-          >
-            <option value="">-- Choose Customer --</option>
-            {customers.map(c => (
-              <option key={c.id || c._id} value={c.id || c._id}>
-                {c.customerCode ? `[${c.customerCode}] ` : ''}{c.name} ({c.customerType}) — Bal: ₹{Number(c.balance || 0).toLocaleString()}
-              </option>
-            ))}
-          </select>
+          <label style={{ fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem', display: 'block' }}>Select Customer *</label>
+          <CustomerPicker
+            mode="dropdown"
+            selectedCustomer={customers.find(c => String(c.id || c._id) === String(selectedCustomerId))}
+            onSelectCustomer={(c) => setSelectedCustomerId(c ? (c.id || c._id) : '')}
+            placeholder="Type 2+ chars to search customer by Name, Store, Code, Phone, GST, City..."
+          />
         </div>
+
 
         <div className="form-group">
           <label>Payment Amount Received (₹) *</label>

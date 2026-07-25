@@ -9,8 +9,10 @@ import { useAuth } from '../context/AuthContext';
 import InvoiceTemplate from '../components/InvoiceTemplate';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Modal from '../components/Modal';
+import CustomerPicker from '../components/CustomerPicker';
 
 export default function SaleView() {
+
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -1421,20 +1423,15 @@ export default function SaleView() {
               {/* Customer and General Details */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
                 <div className="form-group">
-                  <label style={{ fontWeight: 650 }}>Customer</label>
-                  <select 
-                    className="form-control" 
-                    value={editCustomerId} 
-                    onChange={(e) => setEditCustomerId(e.target.value)}
-                  >
-                    <option value="">Choose customer...</option>
-                    {customers.map((c) => (
-                      <option key={c.id || c._id} value={c.id || c._id}>
-                        {c.name} ({c.customerType})
-                      </option>
-                    ))}
-                  </select>
+                  <label style={{ fontWeight: 650, display: 'block', marginBottom: '0.35rem' }}>Customer *</label>
+                  <CustomerPicker
+                    mode="dropdown"
+                    selectedCustomer={customers.find(c => String(c.id || c._id) === String(editCustomerId))}
+                    onSelectCustomer={(c) => setEditCustomerId(c ? (c.id || c._id) : '')}
+                    placeholder="Type 2+ chars to search customer by Name, Store, Code, Phone, GST, City..."
+                  />
                 </div>
+
                 
                 <div className="form-group">
                   <label style={{ fontWeight: 650 }}>Invoice Date</label>

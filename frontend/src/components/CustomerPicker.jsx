@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
   UserCheck,
@@ -24,20 +24,28 @@ import {
   ExternalLink,
   ChevronRight,
   User,
-  Inbox
+  Inbox,
+  Eye,
+  RefreshCw
 } from 'lucide-react';
 import { customersApi, salesApi } from '../api';
 
 export default function CustomerPicker({
   selectedCustomer,
   onSelectCustomer,
-  onConfirmCustomer
+  onConfirmCustomer,
+  mode = 'panel', // 'panel' | 'dropdown'
+  placeholder = 'Type 2+ chars to search by Name, Store, Code, Phone, GST, City...'
 }) {
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [showProfileDrawer, setShowProfileDrawer] = useState(false);
+  const dropdownRef = useRef(null);
 
   // Selected customer 360 history & tabs state
   const [profileTab, setProfileTab] = useState('overview');
@@ -61,6 +69,17 @@ export default function CustomerPicker({
     loadCustomers();
   }, []);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Debounced Search (300ms)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -79,6 +98,7 @@ export default function CustomerPicker({
       setCustInvoices([]);
     }
   }, [selectedCustomer]);
+
 
   const [loadCustomersError, setLoadCustomersError] = useState(null);
 
@@ -231,12 +251,293 @@ export default function CustomerPicker({
     }
   };
 
-  const isSelected = (c) => {
-    if (!selectedCustomer) return false;
-    return (selectedCustomer.id && selectedCustomer.id === c.id) ||
-           (selectedCustomer._id && selectedCustomer._id === c._id) ||
-           (selectedCustomer.name && selectedCustomer.name === c.name);
+  const handleKeyDown = (e) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev < customers.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : customers.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (highlightedIndex >= 0 && highlightedIndex < customers.length) {
+        const sel = customers[highlightedIndex];
+        if (onSelectCustomer) onSelectCustomer(sel);
+        setIsOpen(false);
+      }
+    } else if (e.key === 'Escape') {
+      setIsOpen(false);
+    }
   };
+
+  if (mode === 'dropdown') {
+    const selCust = selectedCustomer && typeof selectedCustomer === 'object' ? selectedCustomer : customers.find(c => String(c.id || c._id) === String(selectedCustomer));
+    const balance = selCust ? Number(selCust.balance || selCust.outstandingAmount || 0) : 0;
+    const dueColor = balance <= 0 ? '#10b981' : balance <= 10000 ? '#f59e0b' : '#ef4444';
+    const dueText = balance <= 0 ? 'No Due' : balance <= 10000 ? `Small Due (₹${balance.toLocaleString()})` : `Overdue (₹${balance.toLocaleString()})`;
+
+    return (
+      <div ref={dropdownRef} style={{ position: 'relative', width: '100%' }}>
+        {selCust ? (
+          <div style={{ backgroundColor: '#F5EFE6', border: '2px solid #C9A25D', borderRadius: '10px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(43,29,20,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#2B1D14', color: '#E8C97A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '1rem', border: '1px solid #C9A25D' }}>
+                {selCust.name ? selCust.name.charAt(0).toUpperCase() : 'C'}
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <strong style={{ fontSize: '0.9rem', color: '#2B1D14' }}>{selCust.name}</strong>
+                  {selCust.customerCode && <span style={{ fontSize: '0.7rem', fontWeight: 800, fontFamily: 'monospace', color: '#8A734C', backgroundColor: '#FEF3C7', padding: '0.1rem 0.35rem', borderRadius: '4px', border: '1px solid #fde68a' }}>[{selCust.customerCode}]</span>}
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '0.1rem 0.35rem', borderRadius: '4px', backgroundColor: '#eff6ff', color: '#1d4ed8' }}>{selCust.customerType || 'Retail Shop'}</span>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.15rem' }}>
+                  {selCust.phone || selCust.mobile} {selCust.city ? `• ${selCust.city}` : ''} {selCust.gstin || selCust.gstNumber ? `• GST: ${selCust.gstin || selCust.gstNumber}` : ''}
+                </div>
+                <div style={{ marginTop: '0.2rem', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: dueColor, backgroundColor: '#ffffff', padding: '0.1rem 0.4rem', borderRadius: '4px', border: `1px solid ${dueColor}` }}>
+                    ● {dueText}
+                  </span>
+                  {selCust.creditLimit > 0 && (
+                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Limit: ₹{Number(selCust.creditLimit).toLocaleString()}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setShowProfileDrawer(true)}
+                style={{ padding: '0.35rem 0.65rem', borderRadius: '6px', backgroundColor: '#ffffff', color: '#2B1D14', border: '1px solid #C9A25D', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+              >
+                <Eye size={14} /> 360° Profile
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onSelectCustomer) onSelectCustomer(null);
+                  setIsOpen(true);
+                }}
+                style={{ padding: '0.35rem 0.65rem', borderRadius: '6px', backgroundColor: '#2B1D14', color: '#E8C97A', border: '1px solid #C9A25D', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+              >
+                <RefreshCw size={14} /> Change
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={18} style={{ position: 'absolute', left: '12px', top: '12px', color: '#C9A25D' }} />
+              <input
+                type="text"
+                placeholder={placeholder}
+                value={query}
+                onFocus={() => setIsOpen(true)}
+                onChange={e => {
+                  setQuery(e.target.value);
+                  setIsOpen(true);
+                }}
+                onKeyDown={handleKeyDown}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 2.2rem 0.65rem 2.4rem',
+                  borderRadius: '8px',
+                  border: '2px solid #C9A25D',
+                  fontSize: '0.875rem',
+                  fontWeight: 700,
+                  outline: 'none',
+                  backgroundColor: '#FEF3C7',
+                  color: '#2B1D14'
+                }}
+              />
+              {query ? (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  style={{ position: 'absolute', right: '12px', top: '12px', background: 'none', border: 'none', cursor: 'pointer', color: '#2B1D14' }}
+                >
+                  <X size={16} />
+                </button>
+              ) : (
+                <span style={{ position: 'absolute', right: '12px', top: '10px', fontSize: '0.65rem', fontWeight: 800, color: '#8A734C', backgroundColor: '#ffffff', padding: '0.15rem 0.4rem', borderRadius: '4px', border: '1px solid #C9A25D' }}>
+                  ⚡ Enterprise Autocomplete
+                </span>
+              )}
+            </div>
+
+            {/* DROPDOWN OVERLAY */}
+            {isOpen && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: '#ffffff', border: '2px solid #C9A25D', borderRadius: '10px', boxShadow: '0 12px 30px -5px rgba(43,29,20,0.25)', zIndex: 2000, marginTop: '4px', maxHeight: '360px', overflowY: 'auto' }}>
+                <div style={{ padding: '0.5rem 0.75rem', backgroundColor: '#2B1D14', color: '#E8C97A', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #C9A25D' }}>
+                  <span style={{ fontSize: '0.725rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {query.trim() ? `Search Results (${customers.length})` : `Recently Used Customers (${customers.length})`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickModal(true)}
+                    style={{ padding: '0.2rem 0.55rem', borderRadius: '4px', backgroundColor: '#C9A25D', color: '#2B1D14', fontSize: '0.7rem', fontWeight: 900, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                  >
+                    <UserPlus size={12} /> + Create Customer
+                  </button>
+                </div>
+
+                {loading ? (
+                  <div style={{ padding: '1.5rem', textAlign: 'center', color: '#8A734C', fontSize: '0.8rem', fontWeight: 600 }}>
+                    Searching customer database...
+                  </div>
+                ) : customers.length > 0 ? (
+                  <div>
+                    {customers.map((c, idx) => {
+                      const isHighlighted = idx === highlightedIndex;
+                      const bal = Number(c.balance || c.outstandingAmount || 0);
+                      const dueClr = bal <= 0 ? '#10b981' : bal <= 10000 ? '#b45309' : '#dc2626';
+
+                      return (
+                        <div
+                          key={c.id || c._id}
+                          onClick={() => {
+                            if (onSelectCustomer) onSelectCustomer(c);
+                            setIsOpen(false);
+                          }}
+                          onMouseEnter={() => setHighlightedIndex(idx)}
+                          style={{
+                            padding: '0.65rem 0.85rem',
+                            borderBottom: '1px solid #f1f5f9',
+                            cursor: 'pointer',
+                            backgroundColor: isHighlighted ? '#FEF3C7' : '#ffffff',
+                            display: 'flex',
+                            justify: 'space-between',
+                            alignItems: 'center',
+                            transition: 'background-color 0.15s ease'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                            <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: isHighlighted ? '#2B1D14' : '#F5EFE6', color: isHighlighted ? '#E8C97A' : '#2B1D14', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.85rem', border: '1px solid #C9A25D' }}>
+                              {c.name ? c.name.charAt(0).toUpperCase() : 'C'}
+                            </div>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <strong style={{ fontSize: '0.85rem', color: '#2B1D14' }}>{c.name}</strong>
+                                {c.customerCode && <span style={{ fontSize: '0.65rem', fontWeight: 800, fontFamily: 'monospace', color: '#8A734C', backgroundColor: '#F5EFE6', padding: '0.05rem 0.3rem', borderRadius: '3px' }}>[{c.customerCode}]</span>}
+                                <span style={{ fontSize: '0.625rem', fontWeight: 800, padding: '0.05rem 0.3rem', borderRadius: '3px', backgroundColor: '#eff6ff', color: '#1d4ed8' }}>{c.customerType || 'Retail Shop'}</span>
+                              </div>
+                              <div style={{ fontSize: '0.725rem', color: '#64748b' }}>
+                                {c.phone || c.mobile || 'No Phone'} {c.city ? `• ${c.city}` : ''} {c.gstin ? `• GST: ${c.gstin}` : ''}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: dueClr }}>
+                              ₹{bal.toLocaleString('en-IN')}
+                            </div>
+                            <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
+                              {bal <= 0 ? 'No Due' : 'Outstanding'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ padding: '1.5rem', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.825rem', color: '#64748b', fontWeight: 600 }}>No customer found matching "{query}"</div>
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickModal(true)}
+                      style={{ marginTop: '0.5rem', padding: '0.4rem 0.85rem', borderRadius: '6px', backgroundColor: '#2B1D14', color: '#E8C97A', fontSize: '0.75rem', fontWeight: 800, border: '1px solid #C9A25D', cursor: 'pointer' }}
+                    >
+                      + Create Customer "{query}"
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 360 PROFILE DRAWER MODAL */}
+        {showProfileDrawer && selCust && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)', zIndex: 9999, display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ width: '100%', maxWidth: '520px', backgroundColor: '#ffffff', height: '100%', overflowY: 'auto', padding: '1.5rem', boxShadow: '-10px 0 30px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #C9A25D', paddingBottom: '0.75rem' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#2B1D14', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  🏛️ Customer 360° Profile: {selCust.name}
+                </h3>
+                <button type="button" onClick={() => setShowProfileDrawer(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.8rem', backgroundColor: '#F5EFE6', padding: '1rem', borderRadius: '10px', border: '1px solid #C9A25D' }}>
+                <div>
+                  <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#8A734C' }}>Customer Code</div>
+                  <strong style={{ fontFamily: 'monospace', color: '#2B1D14' }}>{selCust.customerCode || 'N/A'}</strong>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#8A734C' }}>Customer Type</div>
+                  <strong style={{ color: '#2B1D14' }}>{selCust.customerType || 'Retail Shop'}</strong>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#8A734C' }}>Mobile / WhatsApp</div>
+                  <strong style={{ color: '#2B1D14' }}>{selCust.phone || selCust.mobile || 'N/A'}</strong>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#8A734C' }}>GST Number</div>
+                  <strong style={{ fontFamily: 'monospace', color: '#2B1D14' }}>{selCust.gstin || selCust.gstNumber || 'Unregistered'}</strong>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#8A734C' }}>Outstanding Balance</div>
+                  <strong style={{ color: dueColor, fontSize: '0.9rem' }}>₹{balance.toLocaleString('en-IN')}</strong>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#8A734C' }}>Credit Limit</div>
+                  <strong style={{ color: '#2B1D14' }}>₹{Number(selCust.creditLimit || 0).toLocaleString('en-IN')}</strong>
+                </div>
+              </div>
+
+              {custHistoryLoading ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#8A734C' }}>Loading 360° metrics...</div>
+              ) : custHistory ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', textAlign: 'center' }}>
+                    <div style={{ padding: '0.6rem', backgroundColor: '#FEF3C7', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#b45309' }}>Total Orders</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#2B1D14' }}>{custHistory.totalOrders}</div>
+                    </div>
+                    <div style={{ padding: '0.6rem', backgroundColor: '#FEF3C7', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#b45309' }}>Total Sales</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#2B1D14' }}>₹{Number(custHistory.totalSalesValue || 0).toLocaleString('en-IN')}</div>
+                    </div>
+                    <div style={{ padding: '0.6rem', backgroundColor: custHistory.riskBg, borderRadius: '8px', border: `1px solid ${custHistory.riskColor}` }}>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: custHistory.riskColor }}>Risk Profile</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 900, color: custHistory.riskColor }}>{custHistory.riskLevel}</div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => setShowProfileDrawer(false)}
+                style={{ padding: '0.65rem', borderRadius: '8px', backgroundColor: '#2B1D14', color: '#E8C97A', fontSize: '0.85rem', fontWeight: 800, border: 'none', cursor: 'pointer', marginTop: 'auto' }}
+              >
+                Close Profile
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
