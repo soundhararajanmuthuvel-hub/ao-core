@@ -73,9 +73,13 @@ export default function WebsiteManagement() {
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+
   const [showResetPassModal, setShowResetPassModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [newPassInput, setNewPassInput] = useState('');
+
 
   const [showApproveReferralModal, setShowApproveReferralModal] = useState(false);
   const [selectedReferral, setSelectedReferral] = useState(null);
@@ -185,37 +189,6 @@ export default function WebsiteManagement() {
   };
 
   // Product Actions
-  const handleSaveProduct = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const payload = {
-        ...productForm,
-        benefits: Array.isArray(productForm.benefits)
-          ? productForm.benefits.map((b) => b.trim()).filter(Boolean)
-          : [],
-        ingredients: Array.isArray(productForm.ingredients)
-          ? productForm.ingredients.map((i) => i.trim()).filter(Boolean)
-          : [],
-        images: Array.isArray(productForm.images) ? productForm.images : [],
-      };
-
-      if (editingProduct) {
-        await client.put(`${API_BASE}/products/${editingProduct.id}`, payload);
-        setMsg({ type: 'success', text: 'Product updated successfully!' });
-      } else {
-        await client.post(`${API_BASE}/products`, payload);
-        setMsg({ type: 'success', text: 'New website product created!' });
-      }
-      setShowProductModal(false);
-      fetchDataForTab('products');
-    } catch (err) {
-      setMsg({ type: 'error', text: err.response?.data?.message || 'Failed to save product.' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDeleteProduct = async (id) => {
     if (!window.confirm('Delete this product from Blovit web store?')) return;
     try {
@@ -226,6 +199,7 @@ export default function WebsiteManagement() {
       setMsg({ type: 'error', text: 'Failed to delete product.' });
     }
   };
+
 
   // Order Actions
   const handleUpdateOrderStatus = async (orderId, status) => {
@@ -446,29 +420,13 @@ export default function WebsiteManagement() {
               className="btn btn-primary"
               onClick={() => {
                 setEditingProduct(null);
-                setProductForm({
-                  name: '',
-                  slug: '',
-                  price: '',
-                  compareAtPrice: '',
-                  stock: 100,
-                  category: 'Malt Blends',
-                  description: '',
-                  shortDescription: '',
-                  images: [],
-                  benefits: ['100% Organic', 'Boosts Immunity', 'Rich in Calcium'],
-                  ingredients: ['Sprouted Ragi', 'Almonds', 'Cardamom'],
-                  nutritionFacts: '{"Calories": "180 kcal", "Protein": "6g", "Calcium": "120mg"}',
-                  usageInstructions: 'Mix 2 tbsp with warm milk or water. Stir well and serve.',
-                  isBestseller: false,
-                  isActive: true,
-                });
                 setShowProductModal(true);
               }}
               style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
             >
               <Plus size={16} /> Add Product
             </button>
+
           </div>
 
           <div className="card" style={{ overflowX: 'auto' }}>
@@ -542,46 +500,13 @@ export default function WebsiteManagement() {
                             className="btn btn-secondary"
                             style={{ padding: '0.3rem 0.5rem' }}
                             onClick={() => {
-                              let ben = [];
-                              if (Array.isArray(p.benefits)) {
-                                ben = p.benefits;
-                              } else {
-                                try { ben = JSON.parse(p.benefits || '[]'); } catch { ben = p.benefits ? [p.benefits] : []; }
-                              }
-                              if (ben.length === 0) ben = [''];
-
-                              let ing = [];
-                              if (Array.isArray(p.ingredients)) {
-                                ing = p.ingredients;
-                              } else {
-                                try { ing = JSON.parse(p.ingredients || '[]'); } catch { ing = p.ingredients ? [p.ingredients] : []; }
-                              }
-                              if (ing.length === 0) ing = [''];
-
                               setEditingProduct(p);
-                              setProductForm({
-                                name: p.name,
-                                slug: p.slug,
-                                price: p.price,
-                                compareAtPrice: p.compareAtPrice || '',
-                                stock: p.stock,
-                                category: p.category || '',
-                                description: p.description || '',
-                                shortDescription: p.shortDescription || '',
-                                images: pImages,
-                                benefits: ben,
-                                ingredients: ing,
-                                nutritionFacts: typeof p.nutritionFacts === 'object' ? JSON.stringify(p.nutritionFacts) : p.nutritionFacts || '',
-                                usageInstructions: p.usageInstructions || '',
-                                isBestseller: !!p.isBestseller,
-                                isActive: !!p.isActive,
-                                managementProductId: p.managementProductId || '',
-                              });
                               setShowProductModal(true);
                             }}
                           >
                             <Edit2 size={14} />
                           </button>
+
                           <button
                             className="btn btn-secondary"
                             style={{ padding: '0.3rem 0.5rem', color: '#EF4444' }}
@@ -660,9 +585,10 @@ export default function WebsiteManagement() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className="btn btn-secondary" style={{ padding: '0.3rem 0.5rem' }} onClick={() => setSelectedOrder(o)}>
+                        <button className="btn btn-secondary" style={{ padding: '0.3rem 0.5rem' }} onClick={() => { setSelectedOrder(o); setShowOrderModal(true); }}>
                           <Eye size={14} /> Details
                         </button>
+
                         {o.paymentStatus === 'Captured' && o.status !== 'Cancelled' && (
                           <button className="btn btn-secondary" style={{ padding: '0.3rem 0.5rem', color: '#EF4444' }} onClick={() => handleRefundOrder(o.id)}>
                             <RotateCcw size={14} /> Refund
@@ -1011,6 +937,62 @@ export default function WebsiteManagement() {
           </div>
         </div>
       )}
+
+      {/* MODAL: ORDER DETAILS */}
+      {showOrderModal && selectedOrder && (
+        <div className="modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="card" style={{ width: '100%', maxWidth: '550px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+              <h3 style={{ fontWeight: 800, margin: 0 }}>Order Details: {selectedOrder.orderNumber}</h3>
+              <button type="button" onClick={() => setShowOrderModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.85rem', marginBottom: '1rem', background: '#F8FAFC', padding: '0.75rem', borderRadius: '8px' }}>
+              <div>Guest / Customer: <strong>{selectedOrder.guestName || `Customer #${selectedOrder.websiteCustomerId}`}</strong></div>
+              <div>Mobile: <strong>{selectedOrder.guestMobile || 'N/A'}</strong></div>
+              <div>Total Amount: <strong>₹{selectedOrder.totalAmount}</strong></div>
+              <div>Payment Status: <strong style={{ color: selectedOrder.paymentStatus === 'Captured' ? '#10B981' : '#F59E0B' }}>{selectedOrder.paymentStatus}</strong></div>
+              <div>Order Status: <strong>{selectedOrder.status}</strong></div>
+              <div>Date: <strong>{selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleString() : 'N/A'}</strong></div>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.5rem' }}>Order Items ({selectedOrder.items?.length || 0})</h4>
+              {selectedOrder.items && selectedOrder.items.length > 0 ? (
+                <div style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
+                  <table className="table" style={{ width: '100%', margin: 0, fontSize: '0.82rem' }}>
+                    <thead>
+                      <tr>
+                        <th>Product</th>
+                        <th>Qty</th>
+                        <th>Price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedOrder.items.map((it, idx) => (
+                        <tr key={idx}>
+                          <td>{it.productName || it.name}</td>
+                          <td>{it.quantity || it.qty}</td>
+                          <td>₹{it.price}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No item details available</div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowOrderModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
