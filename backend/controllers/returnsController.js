@@ -174,15 +174,22 @@ exports.createReturnRequest = async (req, res) => {
       });
     }
 
-    // Calculate total return value
+    // Validate and calculate total return value
     let totalVal = 0;
     let totalQuantity = 0;
-    items.forEach(it => {
+    for (const it of items) {
       const q = parseFloat(it.quantity || 1);
       const p = parseFloat(it.unitPrice || 0);
+      if (isNaN(p) || p < 0 || isNaN(q) || q <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid return item details. Quantity and Unit Price must be valid non-negative numbers.'
+        });
+      }
       totalVal += q * p;
       totalQuantity += q;
-    });
+    }
+
 
     // Approval matrix calculation
     let approvalLevel = 'Sales Manager';

@@ -78,13 +78,13 @@ export default function Login() {
               alt="AO Core Logo"
               className="brand-logo-top"
             />
-            <span className="brand-logo-text-top">{companyName ? companyName.toUpperCase() : 'AO AURUM'}</span>
+            <span className="brand-logo-text-top">{companyName ? companyName.toUpperCase() : 'AO CORE ERP'}</span>
           </div>
 
           {/* Hero Typography with Spotlight */}
           <div className="left-panel-hero">
             <h1 className="giant-brand-title">
-              <span className="brand-white-title">{companyName ? companyName.toUpperCase() : 'AO AURUM'}</span>
+              <span className="brand-white-title">{companyName ? companyName.toUpperCase() : 'AO CORE ERP'}</span>
             </h1>
             <h3 className="hero-subtitle-primary">MANAGE BLOVIT MALTS</h3>
             <p className="hero-subtitle-detail">
@@ -93,45 +93,52 @@ export default function Login() {
           </div>
           
           {/* 2x2 Dark Glass Feature Grid */}
-          <div className="premium-feature-grid">
-            <div className="glass-feature-card">
-              <span className="feature-icon">🏭</span>
-              <h4>Manufacturing</h4>
-              <p>Formulas, batches, repacking & costing</p>
+          <div className="features-2x2-grid">
+            <div className="feature-card-glass">
+              <div className="feature-icon-circle">⚡</div>
+              <div className="feature-text-content">
+                <h4>Manufacturing ERP</h4>
+                <p>Formula batches, raw materials & cost recovery</p>
+              </div>
             </div>
-            <div className="glass-feature-card">
-              <span className="feature-icon">📦</span>
-              <h4>Inventory</h4>
-              <p>Multi-unit pack sizes, stock counts & tracking</p>
+            
+            <div className="feature-card-glass">
+              <div className="feature-icon-circle">📦</div>
+              <div className="feature-text-content">
+                <h4>Inventory Control</h4>
+                <p>Live warehouse stock & QR tracking</p>
+              </div>
             </div>
-            <div className="glass-feature-card">
-              <span className="feature-icon">🧾</span>
-              <h4>GST & Accounts</h4>
-              <p>Invoicing, payments & outstanding reports</p>
+            
+            <div className="feature-card-glass">
+              <div className="feature-icon-circle">🧾</div>
+              <div className="feature-text-content">
+                <h4>GST & E-Invoicing</h4>
+                <p>Automated B2B/B2C GST tax invoices</p>
+              </div>
             </div>
-            <div className="glass-feature-card">
-              <span className="feature-icon">🚚</span>
-              <h4>Shipping</h4>
-              <p>Courier routing, QR delivery & live timelines</p>
+            
+            <div className="feature-card-glass">
+              <div className="feature-icon-circle">📈</div>
+              <div className="feature-text-content">
+                <h4>Sales & Route SFA</h4>
+                <p>Field ordering & delivery tracking</p>
+              </div>
             </div>
           </div>
+        </div>
 
-          {/* Bottom Highlight Strip */}
-          <div className="bottom-highlight-strip">
-            <div className="highlight-item">✔ Manufacturing</div>
-            <div className="highlight-item">✔ Repacking</div>
-            <div className="highlight-item">✔ Inventory Tracking</div>
-            <div className="highlight-item">✔ GST Billing</div>
-            <div className="highlight-item">✔ Supplier Management</div>
-            <div className="highlight-item">✔ Delivery Tracking</div>
-          </div>
+        {/* Floating Customer Trust Badge */}
+        <div className="trust-footer-badge">
+          <span className="trust-stars">★★★★★</span>
+          <span className="trust-text">Enterprise Manufacturing System • Amudhasurabiy Organics</span>
         </div>
       </div>
       
       {/* 30% Right Side - Login Card */}
-      <div className="login-right-panel">
-        <div className="login-card-container">
-          <div className="login-glass-card animate-slide-up">
+      <div className="login-right-section">
+        <div className="login-form-container">
+          <div className="login-card-glass">
             <div className="login-card-header">
               {/* Mobile Header Branding */}
               <div className="mobile-logo-header">
@@ -140,7 +147,7 @@ export default function Login() {
                     alt="Logo"
                     className="mobile-logo"
                   />
-                <h3>{companyName ? companyName.toUpperCase() : 'AO AURUM'}</h3>
+                <h3>{companyName ? companyName.toUpperCase() : 'AO CORE ERP'}</h3>
               </div>
               
               <h2>Welcome Back</h2>
@@ -238,7 +245,7 @@ export default function Login() {
                     Authenticating...
                   </span>
                 ) : (
-                  `Login to ${companyName || 'AO Aurum'}`
+                  `Login to ${companyName || 'AO Core ERP'}`
                 )}
               </button>
             </form>
@@ -246,7 +253,7 @@ export default function Login() {
           
           {/* Footer */}
           <footer className="login-footer">
-            <p className="footer-copyright">{companyName || 'AO Aurum'} • Version 1.0</p>
+            <p className="footer-copyright">{companyName || 'AO Core ERP'} • Version 1.0</p>
             <p className="footer-powered">Powered by Amudhasurabiy Technologies</p>
           </footer>
         </div>

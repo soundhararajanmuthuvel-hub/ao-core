@@ -1057,7 +1057,7 @@ export default function ReturnRecoveryModule() {
                       🧾 Official Cost Recovery Review
                     </span>
                     <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b' }}>
-                      AO Aurum Verification
+                      AO Core ERP Verification
                     </span>
                   </div>
 
@@ -1083,10 +1083,18 @@ export default function ReturnRecoveryModule() {
                       <strong style={{ fontSize: '0.875rem', color: '#2B1D14' }}>{formData.quantity} Pks</strong>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.675rem', fontWeight: 700, color: '#7A6A56', textTransform: 'uppercase' }}>Unit Price</div>
-                      <strong style={{ fontSize: '0.875rem', color: '#2B1D14' }}>₹{Number(formData.unitPrice || 0).toLocaleString('en-IN')}</strong>
+                      <div style={{ fontSize: '0.675rem', fontWeight: 700, color: '#7A6A56', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Unit Price (Editable ₹)</div>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.unitPrice}
+                        onChange={e => setFormData({ ...formData, unitPrice: Math.max(0, parseFloat(e.target.value) || 0) })}
+                        style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #C9A25D', fontSize: '0.875rem', fontWeight: 800, color: '#2B1D14', backgroundColor: '#ffffff' }}
+                      />
                     </div>
                   </div>
+
 
                   {/* PROMINENT TOTAL VALUE BANNER */}
                   <div style={{ marginTop: '0.5rem', padding: '0.85rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg, #2B1D14 0%, #1A120B 100%)', border: '1px solid #C9A25D', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
