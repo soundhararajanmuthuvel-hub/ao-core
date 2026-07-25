@@ -204,6 +204,37 @@ exports.createReturnRequest = async (req, res) => {
     const transportCost = 150;
     const labourCost = 100;
 
+    // Calculate dynamic GST reversal based on billed GST rate from Invoice line or payload
+    let totalGstReversal = 0;
+    if (invoiceId) {
+      try {
+        const inv = await Invoice.findByPk(invoiceId, { include: [{ model: InvoiceItem, as: 'items' }] });
+        if (inv) {
+          if (inv.invoiceType === 'NON_GST' || inv.type === 'NON_GST') {
+            totalGstReversal = 0;
+          } else {
+            for (const it of items) {
+              const matchedInvItem = inv.items ? inv.items.find(ii => ii.productId === it.productId || ii.productName === it.productName) : null;
+              const lineGstPct = matchedInvItem && matchedInvItem.gstPercent !== undefined 
+                ? Number(matchedInvItem.gstPercent) 
+                : (it.gstPercent !== undefined ? Number(it.gstPercent) : 18);
+              const lineVal = (parseFloat(it.quantity || 1) * parseFloat(it.unitPrice || 0));
+              totalGstReversal += lineGstPct > 0 ? (lineVal * lineGstPct) / 100 : 0;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error computing invoice GST reversal:', err.message);
+      }
+    } else {
+      // Manual return item GST calculation from payload
+      for (const it of items) {
+        const lineGstPct = it.gstPercent !== undefined ? Number(it.gstPercent) : (req.body.gstPercent !== undefined ? Number(req.body.gstPercent) : 0);
+        const lineVal = (parseFloat(it.quantity || 1) * parseFloat(it.unitPrice || 0));
+        totalGstReversal += lineGstPct > 0 ? (lineVal * lineGstPct) / 100 : 0;
+      }
+    }
+
     const returnReq = await ReturnRequest.create({
       rmaNumber,
       category,
@@ -227,6 +258,7 @@ exports.createReturnRequest = async (req, res) => {
       customerSignatureUrl,
       totalQty: totalQuantity,
       totalValue: totalVal,
+      recoveredValue: totalGstReversal, // Store calculated GST Reversal amount
       mfgCost,
       transportCost,
       labourCost,
@@ -258,6 +290,7 @@ exports.createReturnRequest = async (req, res) => {
         });
       }
     }
+
 
     // Process Return Type Specific Financial, Invoice & Customer Ledger Workflows
     if (invoiceId) {

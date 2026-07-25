@@ -60,8 +60,9 @@ import {
   CreditCard,
   History
 } from 'lucide-react';
-import { customersApi, salesApi, productsApi } from '../api';
+import { customersApi, salesApi, productsApi, returnsApi } from '../api';
 import CustomerPicker from '../components/CustomerPicker';
+
 
 export default function ReturnRecoveryModule() {
 
@@ -925,13 +926,18 @@ export default function ReturnRecoveryModule() {
                                   type="button"
                                   onClick={() => {
                                     const firstItem = inv.items && inv.items.length > 0 ? inv.items[0] : null;
+                                    const itemGst = firstItem?.gstPercent !== undefined ? Number(firstItem.gstPercent) : (firstItem?.taxRate !== undefined ? Number(firstItem.taxRate) : (inv.invoiceType === 'NON_GST' || inv.type === 'NON_GST' ? 0 : 18));
+                                    const itemDisc = Number(firstItem?.discountPercent || firstItem?.discount || 0);
                                     suppressNextProdSearchRef.current = true;
                                     setFormData(prev => ({
                                       ...prev,
+                                      invoiceId: inv.id,
                                       invoiceNumber: inv.invoiceNumber,
                                       productName: firstItem?.product?.name || firstItem?.productName || firstItem?.name || '',
                                       productId: firstItem?.productId || firstItem?.product?.id || null,
                                       unitPrice: Number(firstItem?.unitPrice || firstItem?.price || firstItem?.product?.sellingPrice || 0),
+                                      gstPercent: itemGst,
+                                      discountPercent: itemDisc,
                                       batchNumber: ''
                                     }));
                                     setWizardStep(3);
@@ -955,7 +961,7 @@ export default function ReturnRecoveryModule() {
                 </div>
               )}
 
-              {/* STEP 3: QUANTITIES & REASON */}
+              {/* STEP 3: QUANTITIES, PRICE & GST RATE */}
               {wizardStep === 3 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ position: 'relative' }}>
@@ -983,12 +989,14 @@ export default function ReturnRecoveryModule() {
                             <div
                               key={p.id}
                               onClick={() => {
+                                const prodGst = p.gstPercent !== undefined ? Number(p.gstPercent) : (p.gstRate !== undefined ? Number(p.gstRate) : 18);
                                 suppressNextProdSearchRef.current = true;
                                 setFormData(prev => ({
                                   ...prev,
                                   productName: p.name,
                                   productId: p.id,
-                                  unitPrice: Number(p.sellingPrice || p.mrp || 0)
+                                  unitPrice: Number(p.sellingPrice || p.mrp || 0),
+                                  gstPercent: prodGst
                                 }));
                                 setShowProdDropdown(false);
                               }}
@@ -1032,6 +1040,39 @@ export default function ReturnRecoveryModule() {
                         value={formData.quantity}
                         onChange={e => setFormData({ ...formData, quantity: e.target.value })}
                         style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 800 }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* BILLED GST RATE & DISCOUNT SELECTOR */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2B1D14', display: 'block', marginBottom: '0.3rem' }}>
+                        Billed GST Rate (%) *
+                      </label>
+                      <select
+                        value={formData.gstPercent !== undefined ? formData.gstPercent : 18}
+                        onChange={e => setFormData({ ...formData, gstPercent: Number(e.target.value) })}
+                        style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#2B1D14' }}
+                      >
+                        <option value={0}>0% (Non-GST / Exempt)</option>
+                        <option value={5}>5% GST</option>
+                        <option value={12}>12% GST</option>
+                        <option value={18}>18% GST</option>
+                        <option value={28}>28% GST</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2B1D14', display: 'block', marginBottom: '0.3rem' }}>
+                        Line Discount (%)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={formData.discountPercent || 0}
+                        onChange={e => setFormData({ ...formData, discountPercent: Math.max(0, parseFloat(e.target.value) || 0) })}
+                        style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700 }}
                       />
                     </div>
                   </div>
@@ -1133,93 +1174,137 @@ export default function ReturnRecoveryModule() {
               )}
 
               {/* STEP 6: FINAL CONFIRMATION & FINANCIAL/INVENTORY/GST IMPACT SUMMARY */}
-              {wizardStep === 6 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <CheckCircle2 size={44} style={{ color: '#10b981', margin: '0 auto 0.35rem auto' }} />
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#2B1D14', fontFamily: "'Playfair Display', 'Georgia', serif", margin: 0 }}>
-                      Confirm Return Authorization (RMA)
-                    </h3>
-                    <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
-                      Please review the financial, inventory, and GST impact before generating the official RMA.
-                    </p>
-                  </div>
+              {wizardStep === 6 && (() => {
+                const qtyVal = Number(formData.quantity || 1);
+                const priceVal = Number(formData.unitPrice || 0);
+                const grossReturnVal = qtyVal * priceVal;
+                const discPctVal = Number(formData.discountPercent || 0);
+                const discReversalVal = (grossReturnVal * discPctVal) / 100;
+                const netTaxableVal = Math.max(0, grossReturnVal - discReversalVal);
+                const gstPctVal = Number(formData.gstPercent !== undefined && formData.gstPercent !== null ? formData.gstPercent : 18);
+                const gstReversalVal = gstPctVal > 0 ? (netTaxableVal * gstPctVal) / 100 : 0;
+                const netRefundVal = netTaxableVal + gstReversalVal;
 
-                  {/* 4-PANEL IMPACT PREVIEW GRID */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                    <div style={{ padding: '0.85rem', backgroundColor: '#F5EFE6', borderRadius: '10px', border: '1px solid #C9A25D' }}>
-                      <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#8A734C', textTransform: 'uppercase' }}>Customer & Invoice</div>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#2B1D14', marginTop: '0.2rem' }}>{formData.customerName || 'Customer'}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Invoice: {formData.invoiceNumber || 'Manual Entry'}</div>
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <CheckCircle2 size={44} style={{ color: '#10b981', margin: '0 auto 0.35rem auto' }} />
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#2B1D14', fontFamily: "'Playfair Display', 'Georgia', serif", margin: 0 }}>
+                        Confirm Return Authorization (RMA)
+                      </h3>
+                      <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
+                        Please review the financial, inventory, and GST impact before generating the official RMA.
+                      </p>
                     </div>
 
-                    <div style={{ padding: '0.85rem', backgroundColor: '#F5EFE6', borderRadius: '10px', border: '1px solid #C9A25D' }}>
-                      <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#8A734C', textTransform: 'uppercase' }}>Product & Return Qty</div>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#2B1D14', marginTop: '0.2rem' }}>{formData.productName || 'Product'}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Qty: {formData.quantity} Pks @ ₹{formData.unitPrice}/Pk</div>
-                    </div>
+                    {/* 4-PANEL IMPACT PREVIEW GRID */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div style={{ padding: '0.85rem', backgroundColor: '#F5EFE6', borderRadius: '10px', border: '1px solid #C9A25D' }}>
+                        <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#8A734C', textTransform: 'uppercase' }}>Customer & Invoice</div>
+                        <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#2B1D14', marginTop: '0.2rem' }}>{formData.customerName || 'Customer'}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Invoice: {formData.invoiceNumber || 'Manual Entry'}</div>
+                      </div>
 
-                    <div style={{ padding: '0.85rem', backgroundColor: '#FEF3C7', borderRadius: '10px', border: '1px solid #b45309' }}>
-                      <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Selected Return Type</div>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 900, color: '#2B1D14', marginTop: '0.2rem' }}>{formData.returnType || 'Partial Return'}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#78350f', fontWeight: 700 }}>
-                        Total Value: ₹{Number((formData.quantity || 0) * (formData.unitPrice || 0)).toLocaleString('en-IN')}
+                      <div style={{ padding: '0.85rem', backgroundColor: '#F5EFE6', borderRadius: '10px', border: '1px solid #C9A25D' }}>
+                        <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#8A734C', textTransform: 'uppercase' }}>Product & Return Qty</div>
+                        <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#2B1D14', marginTop: '0.2rem' }}>{formData.productName || 'Product'}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Qty: {formData.quantity} Pks @ ₹{formData.unitPrice}/Pk</div>
+                      </div>
+
+                      <div style={{ padding: '0.85rem', backgroundColor: '#FEF3C7', borderRadius: '10px', border: '1px solid #b45309' }}>
+                        <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Selected Return Type</div>
+                        <div style={{ fontSize: '0.875rem', fontWeight: 900, color: '#2B1D14', marginTop: '0.2rem' }}>{formData.returnType || 'Partial Return'}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#78350f', fontWeight: 700 }}>
+                          Gross Value: ₹{grossReturnVal.toLocaleString('en-IN')}
+                        </div>
+                      </div>
+
+                      <div style={{ padding: '0.85rem', backgroundColor: gstPctVal > 0 ? '#ecfdf5' : '#f8fafc', borderRadius: '10px', border: `1px solid ${gstPctVal > 0 ? '#10b981' : '#cbd5e1'}` }}>
+                        <div style={{ fontSize: '0.675rem', fontWeight: 800, color: gstPctVal > 0 ? '#047857' : '#64748b', textTransform: 'uppercase' }}>GST & Tax Reversal</div>
+                        <div style={{ fontSize: '0.875rem', fontWeight: 800, color: gstPctVal > 0 ? '#047857' : '#475569', marginTop: '0.2rem' }}>
+                          {gstPctVal > 0 ? `₹${gstReversalVal.toFixed(2)} (${gstPctVal}%)` : 'No GST Applicable (0%)'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: gstPctVal > 0 ? '#065f46' : '#94a3b8' }}>
+                          {gstPctVal > 0 ? `Proportional ${gstPctVal}% Tax Reversal` : 'Non-GST Invoice Line'}
+                        </div>
                       </div>
                     </div>
 
-                    <div style={{ padding: '0.85rem', backgroundColor: '#ecfdf5', borderRadius: '10px', border: '1px solid #10b981' }}>
-                      <div style={{ fontSize: '0.675rem', fontWeight: 800, color: '#047857', textTransform: 'uppercase' }}>GST & Tax Reversal</div>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#047857', marginTop: '0.2rem' }}>
-                        ₹{Number((formData.quantity || 0) * (formData.unitPrice || 0) * 0.18).toFixed(2)}
+                    {/* COMPREHENSIVE FINANCIAL SUMMARY BREAKDOWN */}
+                    <div style={{ padding: '0.85rem 1rem', backgroundColor: '#F5EFE6', borderRadius: '10px', border: '1px solid #C9A25D', fontSize: '0.78rem' }}>
+                      <div style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', color: '#8A734C', marginBottom: '0.4rem', letterSpacing: '0.05em' }}>
+                        📊 Comprehensive Financial Summary
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#065f46' }}>18% GST Adjustment</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem 1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: '#64748b' }}>Return Item Value:</span>
+                          <strong style={{ color: '#2B1D14' }}>₹{grossReturnVal.toLocaleString('en-IN')}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: '#64748b' }}>Discount Reversal ({discPctVal}%):</span>
+                          <strong style={{ color: '#2B1D14' }}>-₹{discReversalVal.toFixed(2)}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: '#64748b' }}>Net Taxable Return:</span>
+                          <strong style={{ color: '#2B1D14' }}>₹{netTaxableVal.toFixed(2)}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: '#64748b' }}>GST Reversal ({gstPctVal}%):</span>
+                          <strong style={{ color: gstPctVal > 0 ? '#047857' : '#64748b' }}>{gstPctVal > 0 ? `+₹${gstReversalVal.toFixed(2)}` : 'No GST (0%)'}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gridColumn: 'span 2', paddingTop: '0.4rem', borderTop: '1px solid #C9A25D', fontSize: '0.85rem' }}>
+                          <span style={{ fontWeight: 800, color: '#2B1D14' }}>Net Refund / Recovery Total:</span>
+                          <strong style={{ fontWeight: 900, color: '#b45309', fontSize: '0.95rem' }}>₹{netRefundVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* WORKFLOW IMPACT DESCRIPTION BOX */}
-                  <div style={{ padding: '0.85rem 1rem', backgroundColor: '#2B1D14', color: '#E8C97A', borderRadius: '10px', border: '1px solid #C9A25D', fontSize: '0.78rem' }}>
-                    <div style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em', color: '#C9A25D', marginBottom: '0.35rem' }}>
-                      ⚡ System Workflow & Ledger Actions
+                    {/* WORKFLOW IMPACT DESCRIPTION BOX */}
+                    <div style={{ padding: '0.85rem 1rem', backgroundColor: '#2B1D14', color: '#E8C97A', borderRadius: '10px', border: '1px solid #C9A25D', fontSize: '0.78rem' }}>
+                      <div style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em', color: '#C9A25D', marginBottom: '0.35rem' }}>
+                        ⚡ System Workflow & Ledger Actions
+                      </div>
+                      {formData.returnType === 'Replacement' && (
+                        <div>• <strong>Financial:</strong> No cash refund or invoice deduction. Replacement delivery order generated.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks), Saleable Stock (-{formData.quantity} Pks).</div>
+                      )}
+                      {formData.returnType === 'Credit Note' && (
+                        <div>• <strong>Financial:</strong> Credit Note of ₹{netRefundVal.toFixed(2)} issued. Customer balance reduced.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks).</div>
+                      )}
+                      {formData.returnType === 'Cash Refund' && (
+                        <div>• <strong>Financial:</strong> Refund Voucher created. Invoice balance reduced by ₹{netRefundVal.toFixed(2)}.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks).</div>
+                      )}
+                      {(formData.returnType === 'Partial Return' || !formData.returnType) && (
+                        <div>• <strong>Financial:</strong> Partial return ₹{netRefundVal.toFixed(2)} deducted from invoice balance. Invoice remains active.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks).</div>
+                      )}
+                      {formData.returnType === 'Full Return' && (
+                        <div>• <strong>Financial:</strong> Full Return processed. Entire invoice closed and marked Refunded.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks), Revenue reversed.</div>
+                      )}
+                      {formData.returnType === 'Repacking' && (
+                        <div>• <strong>Financial:</strong> Packaging material cost estimated.<br />• <strong>Inventory:</strong> Stock routed to Repacking Zone (Saleable -&gt; Repacking).</div>
+                      )}
+                      {formData.returnType === 'Near Expiry Transfer' && (
+                        <div>• <strong>Financial:</strong> Transfer Order generated for secondary store. No customer refund.<br />• <strong>Inventory:</strong> Stock transferred to secondary store.</div>
+                      )}
+                      {formData.returnType === 'Employee Sale' && (
+                        <div>• <strong>Financial:</strong> Discounted employee sale invoice generated.<br />• <strong>Inventory:</strong> Stock moved to Employee Sale inventory.</div>
+                      )}
+                      {formData.returnType === 'Sample' && (
+                        <div>• <strong>Financial:</strong> Allocated as promotional sample. No financial charge.<br />• <strong>Inventory:</strong> Stock moved to Sample inventory.</div>
+                      )}
+                      {formData.returnType === 'Destroy' && (
+                        <div>• <strong>Financial:</strong> Inventory Write-off Loss Journal entry ₹{netTaxableVal.toFixed(2)} recorded.<br />• <strong>Inventory:</strong> Stock moved to Destroyed Inventory.</div>
+                      )}
+                      {formData.returnType === 'Scrap' && (
+                        <div>• <strong>Financial:</strong> Scrap Salvage entry ₹{(netTaxableVal * 0.1).toFixed(2)} recorded.<br />• <strong>Inventory:</strong> Stock moved to Scrap Inventory.</div>
+                      )}
+                      {formData.returnType === 'Return to Supplier' && (
+                        <div>• <strong>Financial:</strong> Supplier Debit Note ₹{netRefundVal.toFixed(2)} generated.<br />• <strong>Inventory:</strong> Returned to Supplier (-{formData.quantity} Pks).</div>
+                      )}
                     </div>
-                    {formData.returnType === 'Replacement' && (
-                      <div>• <strong>Financial:</strong> No cash refund or invoice deduction. Replacement delivery order generated.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks), Saleable Stock (-{formData.quantity} Pks).</div>
-                    )}
-                    {formData.returnType === 'Credit Note' && (
-                      <div>• <strong>Financial:</strong> Credit Note of ₹{((formData.quantity || 0) * (formData.unitPrice || 0)).toFixed(2)} issued. Customer balance reduced.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks).</div>
-                    )}
-                    {formData.returnType === 'Cash Refund' && (
-                      <div>• <strong>Financial:</strong> Refund Voucher created. Invoice balance reduced by ₹{((formData.quantity || 0) * (formData.unitPrice || 0)).toFixed(2)}.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks).</div>
-                    )}
-                    {(formData.returnType === 'Partial Return' || !formData.returnType) && (
-                      <div>• <strong>Financial:</strong> Partial return ₹{((formData.quantity || 0) * (formData.unitPrice || 0)).toFixed(2)} deducted from invoice balance. Invoice remains active.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks).</div>
-                    )}
-                    {formData.returnType === 'Full Return' && (
-                      <div>• <strong>Financial:</strong> Full Return processed. Entire invoice closed and marked Refunded.<br />• <strong>Inventory:</strong> Returned Stock (+{formData.quantity} Pks), Revenue reversed.</div>
-                    )}
-                    {formData.returnType === 'Repacking' && (
-                      <div>• <strong>Financial:</strong> Packaging material cost estimated.<br />• <strong>Inventory:</strong> Stock routed to Repacking Zone (Saleable -&gt; Repacking).</div>
-                    )}
-                    {formData.returnType === 'Near Expiry Transfer' && (
-                      <div>• <strong>Financial:</strong> Transfer Order generated for secondary store. No customer refund.<br />• <strong>Inventory:</strong> Stock transferred to secondary store.</div>
-                    )}
-                    {formData.returnType === 'Employee Sale' && (
-                      <div>• <strong>Financial:</strong> Discounted employee sale invoice generated.<br />• <strong>Inventory:</strong> Stock moved to Employee Sale inventory.</div>
-                    )}
-                    {formData.returnType === 'Sample' && (
-                      <div>• <strong>Financial:</strong> Allocated as promotional sample. No financial charge.<br />• <strong>Inventory:</strong> Stock moved to Sample inventory.</div>
-                    )}
-                    {formData.returnType === 'Destroy' && (
-                      <div>• <strong>Financial:</strong> Inventory Write-off Loss Journal entry ₹{((formData.quantity || 0) * (formData.unitPrice || 0)).toFixed(2)} recorded.<br />• <strong>Inventory:</strong> Stock moved to Destroyed Inventory.</div>
-                    )}
-                    {formData.returnType === 'Scrap' && (
-                      <div>• <strong>Financial:</strong> Scrap Salvage entry ₹{((formData.quantity || 0) * (formData.unitPrice || 0) * 0.1).toFixed(2)} recorded.<br />• <strong>Inventory:</strong> Stock moved to Scrap Inventory.</div>
-                    )}
-                    {formData.returnType === 'Return to Supplier' && (
-                      <div>• <strong>Financial:</strong> Supplier Debit Note ₹{((formData.quantity || 0) * (formData.unitPrice || 0)).toFixed(2)} generated.<br />• <strong>Inventory:</strong> Returned to Supplier (-{formData.quantity} Pks).</div>
-                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
+
 
             </div>
 
