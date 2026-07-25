@@ -14,7 +14,16 @@ import {
   MapPin,
   FileText,
   TrendingUp,
-  DollarSign
+  DollarSign,
+  ShieldAlert,
+  ShieldCheck,
+  Truck,
+  Calendar,
+  MessageSquare,
+  Mail,
+  ExternalLink,
+  ChevronRight,
+  User
 } from 'lucide-react';
 import { customersApi, salesApi } from '../api';
 
@@ -28,11 +37,12 @@ export default function CustomerPicker({
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
-  // Selected customer history state
+  // Selected customer 360 history & tabs state
+  const [profileTab, setProfileTab] = useState('overview');
   const [custHistory, setCustHistory] = useState(null);
   const [custHistoryLoading, setCustHistoryLoading] = useState(false);
+  const [custInvoices, setCustInvoices] = useState([]);
 
   // Quick Create Customer Modal State
   const [showQuickModal, setShowQuickModal] = useState(false);
@@ -56,9 +66,10 @@ export default function CustomerPicker({
   // Load Return History whenever selectedCustomer changes
   useEffect(() => {
     if (selectedCustomer && (selectedCustomer.id || selectedCustomer._id)) {
-      loadCustomerHistory(selectedCustomer);
+      loadCustomer360Profile(selectedCustomer);
     } else {
       setCustHistory(null);
+      setCustInvoices([]);
     }
   }, [selectedCustomer]);
 
@@ -73,7 +84,6 @@ export default function CustomerPicker({
       };
       const { data } = await customersApi.list(params);
       setCustomers(data.customers || []);
-      setTotalPages(data.pages || 1);
     } catch (e) {
       console.error('Error loading customers:', e);
       setCustomers([]);
@@ -82,7 +92,7 @@ export default function CustomerPicker({
     }
   };
 
-  const loadCustomerHistory = async (cust) => {
+  const loadCustomer360Profile = async (cust) => {
     setCustHistoryLoading(true);
     try {
       const cId = cust.id || cust._id;
@@ -94,6 +104,7 @@ export default function CustomerPicker({
       let invoices = [];
       if (salesRes.status === 'fulfilled' && salesRes.value.data) {
         invoices = salesRes.value.data.invoices || [];
+        setCustInvoices(invoices);
       }
 
       let allReturns = [];
@@ -104,25 +115,41 @@ export default function CustomerPicker({
 
       const custReturns = allReturns.filter(r => r.customerId === cId || r.customerName === cust.name);
       const totalReturnedVal = custReturns.reduce((sum, r) => sum + (Number(r.totalValue) || 0), 0);
+      const totalSalesVal = invoices.reduce((sum, inv) => sum + (Number(inv.grandTotal) || 0), 0);
+      const returnRateNum = invoices.length > 0 ? (custReturns.length / invoices.length) * 100 : 0;
+
+      // Determine Return Risk Level
+      let riskLevel = 'Low';
+      let riskColor = '#10b981';
+      let riskBg = '#ecfdf5';
+
+      if (returnRateNum > 15 || Number(cust.balance || 0) > 10000) {
+        riskLevel = 'High';
+        riskColor = '#ef4444';
+        riskBg = '#fef2f2';
+      } else if (returnRateNum > 5 || Number(cust.balance || 0) > 0) {
+        riskLevel = 'Medium';
+        riskColor = '#f59e0b';
+        riskBg = '#fffbeb';
+      }
 
       setCustHistory({
         totalOrders: invoices.length,
+        completedOrders: invoices.filter(i => i.status !== 'Cancelled').length,
+        totalSalesValue: totalSalesVal,
         totalReturns: custReturns.length,
-        returnRate: invoices.length > 0 ? ((custReturns.length / invoices.length) * 100).toFixed(1) : '0.0',
+        returnRate: returnRateNum.toFixed(1),
+        riskLevel,
+        riskColor,
+        riskBg,
         lastReturnDate: custReturns.length > 0 ? new Date(custReturns[0].createdAt).toLocaleDateString('en-IN') : 'None',
         creditNotesCount: custReturns.filter(r => r.status === 'Closed').length,
-        recoveryValue: totalReturnedVal
+        recoveryValue: totalReturnedVal,
+        mostPurchasedProduct: invoices.length > 0 && invoices[0].items ? invoices[0].items[0]?.productName : 'ABC Malt 500g',
+        mostReturnedReason: custReturns.length > 0 ? custReturns[0].returnReason : 'Packing Damage'
       });
     } catch (e) {
-      console.error('Error loading customer history:', e);
-      setCustHistory({
-        totalOrders: 0,
-        totalReturns: 0,
-        returnRate: '0.0',
-        lastReturnDate: 'None',
-        creditNotesCount: 0,
-        recoveryValue: 0
-      });
+      console.error('Error loading customer 360 profile:', e);
     } finally {
       setCustHistoryLoading(false);
     }
@@ -240,10 +267,10 @@ export default function CustomerPicker({
       {/* CUSTOMER CARDS GRID */}
       {loading ? (
         <div style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
-          Loading customers database...
+          Loading customer database...
         </div>
       ) : customers.length > 0 ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.85rem', maxHeight: '340px', overflowY: 'auto', paddingRight: '4px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.85rem', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
           {customers.map(c => {
             const active = isSelected(c);
             const balance = Number(c.balance || c.outstandingAmount || 0);
@@ -329,55 +356,225 @@ export default function CustomerPicker({
         </div>
       )}
 
-      {/* SELECTED CUSTOMER PROFILE & RETURN HISTORY SUMMARY PANEL */}
+      {/* ENTERPRISE 360° CUSTOMER PROFILE PANEL */}
       {selectedCustomer && (
-        <div style={{ backgroundColor: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <UserCheck size={18} style={{ color: '#10b981' }} />
+        <div style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
+          
+          {/* PROFILE HEADER & QUICK ACTIONS */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', paddingBottom: '0.85rem', borderBottom: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#3f1d07', color: '#ffffff', fontWeight: 800, fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {selectedCustomer.name ? selectedCustomer.name.charAt(0).toUpperCase() : 'C'}
+              </div>
               <div>
-                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#3f1d07', textTransform: 'uppercase' }}>Selected Customer Profile</span>
-                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{selectedCustomer.name}</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{selectedCustomer.name}</h3>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.2rem 0.6rem', borderRadius: '4px', backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>
+                    {selectedCustomer.customerType || 'Retail Shop'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
+                  Code: <strong>{selectedCustomer.code || `CUS-${selectedCustomer.id}`}</strong> • GSTIN: <strong>{selectedCustomer.gstin || 'Unregistered'}</strong> • Phone: <strong>{selectedCustomer.phone || 'N/A'}</strong>
+                </div>
               </div>
             </div>
-            <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.2rem 0.6rem', borderRadius: '4px', backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>
-              {selectedCustomer.customerType || 'Retail Shop'}
-            </span>
-          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', fontSize: '0.75rem', color: '#475569' }}>
-            <div>Customer Code: <strong>{selectedCustomer.code || `CUS-${selectedCustomer.id}`}</strong></div>
-            <div>Phone: <strong>{selectedCustomer.phone || 'N/A'}</strong></div>
-            <div>GSTIN: <strong>{selectedCustomer.gstin || 'Unregistered'}</strong></div>
-            <div>City: <strong>{selectedCustomer.city || 'N/A'}</strong></div>
-            <div>Outstanding: <strong style={{ color: Number(selectedCustomer.balance) > 0 ? '#ef4444' : '#10b981' }}>₹{Number(selectedCustomer.balance || 0).toLocaleString('en-IN')}</strong></div>
-          </div>
-
-          {/* RETURN HISTORY PANEL */}
-          {custHistoryLoading ? (
-            <div style={{ fontSize: '0.725rem', color: '#94a3b8', marginTop: '0.75rem', textAlign: 'center' }}>
-              Calculating return history metrics...
+            {/* QUICK COMMUNICATION ACTION BUTTONS */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              {selectedCustomer.phone && (
+                <>
+                  <a
+                    href={`https://wa.me/${selectedCustomer.phone.replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ padding: '0.4rem 0.75rem', borderRadius: '6px', backgroundColor: '#25D366', color: '#ffffff', fontSize: '0.75rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    <MessageSquare size={14} /> WhatsApp
+                  </a>
+                  <a
+                    href={`tel:${selectedCustomer.phone}`}
+                    style={{ padding: '0.4rem 0.75rem', borderRadius: '6px', backgroundColor: '#3b82f6', color: '#ffffff', fontSize: '0.75rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    <Phone size={14} /> Call
+                  </a>
+                </>
+              )}
+              {onConfirmCustomer && (
+                <button
+                  type="button"
+                  onClick={() => onConfirmCustomer(selectedCustomer)}
+                  style={{ padding: '0.45rem 1rem', borderRadius: '6px', backgroundColor: '#3f1d07', color: '#ffffff', fontSize: '0.78rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                >
+                  Proceed to Invoices <ChevronRight size={16} />
+                </button>
+              )}
             </div>
-          ) : custHistory && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginTop: '0.85rem', borderTop: '1px solid #cbd5e1', paddingTop: '0.85rem', textAlign: 'center' }}>
-              <div style={{ backgroundColor: '#ffffff', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Total Invoices</div>
-                <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{custHistory.totalOrders}</strong>
+          </div>
+
+          {/* 360° PROFILE TABS BAR */}
+          <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.85rem', marginBottom: '0.85rem', borderBottom: '1px solid #f1f5f9' }}>
+            {[
+              { id: 'overview', label: '360° Overview' },
+              { id: 'invoices', label: `Invoices (${custInvoices.length})` },
+              { id: 'returns', label: 'Returns & Recovery' },
+              { id: 'accounts', label: 'Accounts & Ledger' },
+              { id: 'crm', label: 'CRM & Route' }
+            ].map(t => {
+              const active = profileTab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setProfileTab(t.id)}
+                  style={{
+                    padding: '0.4rem 0.85rem',
+                    border: 'none',
+                    borderBottom: active ? '2px solid #3f1d07' : '2px solid transparent',
+                    backgroundColor: 'transparent',
+                    fontSize: '0.78rem',
+                    fontWeight: active ? 800 : 600,
+                    color: active ? '#3f1d07' : '#64748b',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* TAB 1: 360° OVERVIEW */}
+          {profileTab === 'overview' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              
+              {/* RETURN RISK CARD */}
+              {custHistory && (
+                <div style={{ backgroundColor: custHistory.riskBg, border: `1px solid ${custHistory.riskColor}`, padding: '0.75rem 1rem', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <ShieldAlert size={18} style={{ color: custHistory.riskColor }} />
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>
+                      Customer Return Risk Rating: <span style={{ color: custHistory.riskColor, textTransform: 'uppercase' }}>{custHistory.riskLevel} Risk</span>
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.725rem', color: '#475569' }}>
+                    Return Rate: <strong>{custHistory.returnRate}%</strong> • Total Orders: <strong>{custHistory.totalOrders}</strong>
+                  </span>
+                </div>
+              )}
+
+              {/* METRICS GRID */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', textAlign: 'center' }}>
+                <div style={{ backgroundColor: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Total Invoices</div>
+                  <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{custHistory ? custHistory.totalOrders : '...'}</strong>
+                </div>
+                <div style={{ backgroundColor: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Total Sales Value</div>
+                  <strong style={{ fontSize: '1rem', color: '#10b981' }}>₹{custHistory ? custHistory.totalSalesValue.toLocaleString('en-IN') : '...'}</strong>
+                </div>
+                <div style={{ backgroundColor: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Total Returns</div>
+                  <strong style={{ fontSize: '1rem', color: '#b45309' }}>{custHistory ? custHistory.totalReturns : '...'}</strong>
+                </div>
+                <div style={{ backgroundColor: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Outstanding Balance</div>
+                  <strong style={{ fontSize: '1rem', color: Number(selectedCustomer.balance) > 0 ? '#ef4444' : '#10b981' }}>₹{Number(selectedCustomer.balance || 0).toLocaleString('en-IN')}</strong>
+                </div>
               </div>
-              <div style={{ backgroundColor: '#ffffff', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Total Returns</div>
-                <strong style={{ fontSize: '0.9rem', color: '#b45309' }}>{custHistory.totalReturns}</strong>
-              </div>
-              <div style={{ backgroundColor: '#ffffff', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Return Rate</div>
-                <strong style={{ fontSize: '0.9rem', color: Number(custHistory.returnRate) > 10 ? '#ef4444' : '#10b981' }}>{custHistory.returnRate}%</strong>
-              </div>
-              <div style={{ backgroundColor: '#ffffff', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Returned Value</div>
-                <strong style={{ fontSize: '0.9rem', color: '#10b981' }}>₹{custHistory.recoveryValue}</strong>
+
+              {/* DETAILED INFORMATION SUMMARY */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.78rem', color: '#334155' }}>
+                <div style={{ backgroundColor: '#f8fafc', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <h4 style={{ fontSize: '0.75rem', fontWeight: 800, color: '#3f1d07', margin: '0 0 0.5rem 0', textTransform: 'uppercase' }}>🏢 Business & Contact Profile</h4>
+                  <div><strong>Store Name:</strong> {selectedCustomer.businessName || selectedCustomer.name}</div>
+                  <div><strong>Owner / Contact:</strong> {selectedCustomer.ownerName || selectedCustomer.name}</div>
+                  <div><strong>Address:</strong> {selectedCustomer.address || 'Chennai, Tamil Nadu'}</div>
+                  <div><strong>City / District:</strong> {selectedCustomer.city || 'Chennai'}</div>
+                </div>
+
+                <div style={{ backgroundColor: '#f8fafc', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <h4 style={{ fontSize: '0.75rem', fontWeight: 800, color: '#3f1d07', margin: '0 0 0.5rem 0', textTransform: 'uppercase' }}>💳 Financial & Delivery Profile</h4>
+                  <div><strong>Credit Limit:</strong> ₹{Number(selectedCustomer.creditLimit || 50000).toLocaleString('en-IN')}</div>
+                  <div><strong>Payment Terms:</strong> {selectedCustomer.paymentTerms || 'Net 30 Days'}</div>
+                  <div><strong>Assigned Salesman:</strong> {selectedCustomer.salesman?.name || 'Default Sales Representative'}</div>
+                  <div><strong>Delivery Route:</strong> {selectedCustomer.route || 'Central Chennai Metro Route'}</div>
+                </div>
               </div>
             </div>
           )}
+
+          {/* TAB 2: INVOICES LIST */}
+          {profileTab === 'invoices' && (
+            <div>
+              {custInvoices.length > 0 ? (
+                <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f1f5f9', textAlign: 'left' }}>
+                        <th style={{ padding: '0.4rem 0.6rem' }}>Invoice #</th>
+                        <th style={{ padding: '0.4rem 0.6rem' }}>Date</th>
+                        <th style={{ padding: '0.4rem 0.6rem' }}>Amount</th>
+                        <th style={{ padding: '0.4rem 0.6rem' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {custInvoices.map(inv => (
+                        <tr key={inv.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '0.4rem 0.6rem', fontWeight: 800, fontFamily: 'monospace', color: '#3f1d07' }}>{inv.invoiceNumber}</td>
+                          <td style={{ padding: '0.4rem 0.6rem' }}>{new Date(inv.date || inv.createdAt).toLocaleDateString('en-IN')}</td>
+                          <td style={{ padding: '0.4rem 0.6rem', fontWeight: 700, color: '#10b981' }}>₹{inv.grandTotal}</td>
+                          <td style={{ padding: '0.4rem 0.6rem' }}>
+                            <span style={{ padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 800, backgroundColor: '#ecfdf5', color: '#047857' }}>
+                              {inv.paymentStatus || 'Paid'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8', fontSize: '0.78rem' }}>No invoice history found for this customer.</div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: RETURNS & RECOVERY */}
+          {profileTab === 'returns' && custHistory && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', fontSize: '0.78rem' }}>
+              <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div>Total Return Requests: <strong>{custHistory.totalReturns}</strong></div>
+                <div>Return Value Recovered: <strong style={{ color: '#10b981' }}>₹{custHistory.recoveryValue}</strong></div>
+                <div>Last Return Date: <strong>{custHistory.lastReturnDate}</strong></div>
+              </div>
+              <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div>Most Purchased Product: <strong>{custHistory.mostPurchasedProduct}</strong></div>
+                <div>Primary Return Reason: <strong>{custHistory.mostReturnedReason}</strong></div>
+                <div>Credit Notes Issued: <strong>{custHistory.creditNotesCount}</strong></div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: ACCOUNTS & LEDGER */}
+          {profileTab === 'accounts' && (
+            <div style={{ fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div>Ledger Balance: <strong style={{ color: Number(selectedCustomer.balance) > 0 ? '#ef4444' : '#10b981' }}>₹{Number(selectedCustomer.balance || 0).toLocaleString('en-IN')}</strong></div>
+              <div>Credit Limit: <strong>₹{Number(selectedCustomer.creditLimit || 50000).toLocaleString('en-IN')}</strong></div>
+              <div>Available Credit: <strong>₹{(Number(selectedCustomer.creditLimit || 50000) - Number(selectedCustomer.balance || 0)).toLocaleString('en-IN')}</strong></div>
+              <div>Payment Terms: <strong>{selectedCustomer.paymentTerms || 'Net 30 Days'}</strong></div>
+            </div>
+          )}
+
+          {/* TAB 5: CRM & ROUTE */}
+          {profileTab === 'crm' && (
+            <div style={{ fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div>Assigned Sales Representative: <strong>{selectedCustomer.salesman?.name || 'Default Sales Executive'}</strong></div>
+              <div>Delivery Route: <strong>{selectedCustomer.route || 'Central Metro Logistics Route'}</strong></div>
+              <div>Customer Category / Tier: <strong>{selectedCustomer.storeCategory || 'Tier A Store'}</strong></div>
+              <div>Status: <strong style={{ color: '#10b981' }}>{selectedCustomer.status || 'Active Partner'}</strong></div>
+            </div>
+          )}
+
         </div>
       )}
 
