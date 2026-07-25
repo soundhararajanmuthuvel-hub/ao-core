@@ -15,6 +15,8 @@ const {
   restoreProduct,
   deleteProductPermanent,
   adjustProductStockToZero,
+  updateWebsiteFields,
+  updateBillingFields,
 } = require('../controllers/productController');
 
 router.use(auth);
@@ -28,7 +30,12 @@ router.post('/', uploadProduct, createProduct);
 router.post('/:id/restore', restoreProduct);
 router.post('/:id/adjust-zero', adjustProductStockToZero);
 router.put('/:id', uploadProduct, updateProduct);
+router.patch('/website', updateWebsiteFields);
+router.patch('/billing', updateBillingFields);
+router.patch('/:id/website', updateWebsiteFields);
+router.patch('/:id/billing', updateBillingFields);
 router.delete('/:id/permanent', deleteProductPermanent);
 router.delete('/:id', deleteProduct);
 
 module.exports = router;
+

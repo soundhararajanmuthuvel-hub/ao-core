@@ -206,10 +206,55 @@ const Product = sequelize.define('Product', {
     type: DataTypes.TEXT,
     allowNull: true,
   },
-  publishToWebsite: {
+  nutritionFacts: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  usageInstructions: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  slug: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  images: {
+    type: DataTypes.TEXT,
+    defaultValue: '[]',
+  },
+  isBestseller: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
+  isFeatured: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  isWebsiteVisible: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+  },
+  seoTitle: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  seoDescription: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  seoKeywords: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  publishToWebsite: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+  },
+
   isLowStock: {
     type: DataTypes.VIRTUAL,
     get() {

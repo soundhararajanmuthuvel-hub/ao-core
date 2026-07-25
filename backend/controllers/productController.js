@@ -556,3 +556,131 @@ exports.adjustProductStockToZero = async (req, res, next) => {
   }
 };
 
+// PATCH /api/products/:id/website - Website Storefront Fields
+exports.updateWebsiteFields = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const product = await Product.findByPk(id);
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+
+    const websiteFields = {};
+    const allowed = [
+      'description',
+      'shortDescription',
+      'benefits',
+      'ingredients',
+      'nutritionFacts',
+      'usageInstructions',
+      'images',
+      'imageUrl',
+      'imagePublicId',
+      'isBestseller',
+      'isFeatured',
+      'isWebsiteVisible',
+      'publishToWebsite',
+      'seoTitle',
+      'seoDescription',
+      'seoKeywords',
+      'slug'
+    ];
+
+    allowed.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        if (typeof req.body[field] === 'object') {
+          websiteFields[field] = JSON.stringify(req.body[field]);
+        } else {
+          websiteFields[field] = req.body[field];
+        }
+      }
+    });
+
+    await product.update(websiteFields);
+
+    try {
+      const catalogController = require('../controllers/catalogController');
+      catalogController.clearCatalogCache();
+    } catch (e) {}
+
+    await logActivity(req.user?.id || 1, 'update', 'products', `Updated website fields for product: ${product.name}`);
+
+    res.json({
+      success: true,
+      message: 'Website storefront fields updated successfully',
+      product,
+      data: product
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PATCH /api/products/:id/billing - Billing & POS Fields
+exports.updateBillingFields = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const product = await Product.findByPk(id);
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+
+    const billingFields = {};
+    const allowed = [
+      'name',
+      'sellingPrice',
+      'price',
+      'mrp',
+      'gstPercent',
+      'stock',
+      'lowStockThreshold',
+      'unit',
+      'barcode',
+      'sku',
+      'category',
+      'isActive',
+      'purchasePrice',
+      'brand',
+      'weight',
+      'reorderQty'
+    ];
+
+    // Prevent Duplicate SKU across other products
+    if (req.body.sku && req.body.sku !== product.sku) {
+      const duplicateSku = await Product.findOne({ where: { sku: req.body.sku, id: { [Op.ne]: id } } });
+      if (duplicateSku) {
+        return res.status(400).json({ success: false, message: `Product with SKU "${req.body.sku}" already exists.` });
+      }
+    }
+
+    allowed.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        billingFields[field] = req.body[field];
+      }
+    });
+
+    // Keep sellingPrice and price in sync
+    if (billingFields.sellingPrice !== undefined) {
+      billingFields.price = billingFields.sellingPrice;
+    } else if (billingFields.price !== undefined) {
+      billingFields.sellingPrice = billingFields.price;
+    }
+
+    await product.update(billingFields);
+
+    try {
+      await recalculateProductPrice(product.id);
+      const catalogController = require('../controllers/catalogController');
+      catalogController.clearCatalogCache();
+    } catch (e) {}
+
+    await logActivity(req.user?.id || 1, 'update', 'products', `Updated billing fields for product: ${product.name}`);
+
+    res.json({
+      success: true,
+      message: 'Billing & POS fields updated successfully',
+      product,
+      data: product
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+

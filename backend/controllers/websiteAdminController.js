@@ -75,58 +75,42 @@ const regenerateApiKey = async (req, res) => {
 };
 
 /* =========================================================
-   2. PRODUCT MANAGEMENT (CRUD)
+   2. PRODUCT MANAGEMENT (CRUD) - UNIFIED PRODUCT MASTER
    ========================================================= */
 const getAdminProducts = async (req, res) => {
   try {
-    const [products, managementProductsList] = await Promise.all([
-      WebsiteProduct.findAll({
-        include: [
-          {
-            model: Product,
-            as: 'managementProduct',
-            attributes: ['id', 'name', 'sku', 'stock', 'sellingPrice', 'price', 'mrp', 'publishToWebsite', 'unit'],
-          },
-        ],
-        order: [['createdAt', 'DESC']],
-      }),
-      Product.findAll({
-        where: { isArchived: false },
-        attributes: ['id', 'name', 'sku', 'stock', 'sellingPrice', 'price', 'mrp', 'publishToWebsite', 'unit', 'category'],
-        order: [['name', 'ASC']],
-      }),
-    ]);
+    const products = await Product.findAll({
+      where: { isArchived: false },
+      order: [['createdAt', 'DESC']],
+    });
+
+    const formatJsonField = (val, isArray = true) => {
+      if (Array.isArray(val)) return val;
+      if (typeof val === 'string') {
+        try { return JSON.parse(val); } catch { return isArray ? (val ? [val] : []) : val; }
+      }
+      return isArray ? [] : {};
+    };
 
     const data = products.map((p) => {
       const pJson = p.toJSON();
-      const mgmt = pJson.managementProduct;
-
-      let imagesArr = [];
-      try { imagesArr = JSON.parse(p.images || '[]'); } catch { imagesArr = p.images ? [p.images] : []; }
-
-      let benefitsArr = [];
-      try { benefitsArr = JSON.parse(p.benefits || '[]'); } catch { benefitsArr = p.benefits ? [p.benefits] : []; }
-
-      let ingredientsArr = [];
-      try { ingredientsArr = JSON.parse(p.ingredients || '[]'); } catch { ingredientsArr = p.ingredients ? [p.ingredients] : []; }
-
-      const effectiveStock = mgmt ? Number(mgmt.stock) : Number(p.stock || 0);
-      const effectivePrice = mgmt ? (Number(mgmt.sellingPrice) || Number(mgmt.price) || Number(p.price)) : Number(p.price || 0);
-      const effectiveSku = mgmt?.sku || p.sku || '';
+      const imagesArr = formatJsonField(p.images || p.galleryImages, true);
 
       return {
         ...pJson,
-        stock: effectiveStock,
-        price: effectivePrice,
-        sku: effectiveSku,
-        images: imagesArr,
-        benefits: benefitsArr,
-        ingredients: ingredientsArr,
-        isLinkedToManagement: !!mgmt,
+        price: Number(p.sellingPrice) || Number(p.price) || 0,
+        compareAtPrice: Number(p.mrp) || 0,
+        stock: Number(p.stock) || 0,
+        sku: p.sku || '',
+        images: imagesArr.length > 0 ? imagesArr : (p.imageUrl ? [p.imageUrl] : []),
+        benefits: formatJsonField(p.benefits, true),
+        ingredients: formatJsonField(p.ingredients, true),
+        isLinkedToManagement: true,
+        managementProductId: p.id,
       };
     });
 
-    res.json({ success: true, count: data.length, data, managementProductsList });
+    res.json({ success: true, count: data.length, data, managementProductsList: products });
   } catch (err) {
     console.error('Error fetching admin products:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch products' });
@@ -153,37 +137,22 @@ const createAdminProduct = async (req, res) => {
       isActive,
       sku,
       weight,
-      managementProductId,
+      barcode,
+      gstPercent,
+      unit,
     } = req.body;
 
-    let linkedMgmtProduct = null;
-    let finalName = name;
-    let finalPrice = price;
-    let finalStock = stock;
-    let finalSku = sku;
-
-    if (managementProductId) {
-      linkedMgmtProduct = await Product.findByPk(managementProductId);
-      if (linkedMgmtProduct) {
-        finalName = name || linkedMgmtProduct.name;
-        finalPrice = price !== undefined && price !== '' ? price : (linkedMgmtProduct.sellingPrice || linkedMgmtProduct.price || 0);
-        finalStock = linkedMgmtProduct.stock || 0;
-        finalSku = linkedMgmtProduct.sku || sku || '';
-        linkedMgmtProduct.publishToWebsite = true;
-        await linkedMgmtProduct.save();
-      }
-    }
-
-    if (!finalName || finalPrice === undefined) {
+    if (!name || price === undefined) {
       return res.status(400).json({ success: false, message: 'Product Name and Price are required.' });
     }
 
-    const finalSlug = slug ? generateSlug(slug) : generateSlug(finalName);
-    const existing = await WebsiteProduct.findOne({ where: { slug: finalSlug } });
-    if (existing) {
-      return res.status(400).json({ success: false, message: 'A product with this URL slug already exists.' });
+    const finalSku = sku || `SKU-${Date.now()}`;
+    const duplicateSku = await Product.findOne({ where: { sku: finalSku } });
+    if (duplicateSku) {
+      return res.status(400).json({ success: false, message: `Product with SKU "${finalSku}" already exists.` });
     }
 
+    const finalSlug = slug ? generateSlug(slug) : generateSlug(`${name}-${finalSku}`);
     const formatArrayJson = (val) => {
       if (Array.isArray(val)) return JSON.stringify(val);
       if (typeof val === 'string') {
@@ -194,28 +163,47 @@ const createAdminProduct = async (req, res) => {
       return '[]';
     };
 
-    const newProduct = await WebsiteProduct.create({
-      name: finalName,
+    const parsedImages = formatArrayJson(images);
+    let mainImageUrl = '';
+    try {
+      const imgArr = JSON.parse(parsedImages);
+      mainImageUrl = imgArr[0] || '';
+    } catch (e) {}
+
+    const newProduct = await Product.create({
+      name,
+      sku: finalSku,
+      barcode: barcode || '',
       slug: finalSlug,
-      price: finalPrice,
-      compareAtPrice: compareAtPrice || 0,
-      stock: finalStock || 0,
-      images: formatArrayJson(images),
-      category: category || linkedMgmtProduct?.category || 'General',
-      description: description || linkedMgmtProduct?.description || '',
-      shortDescription: shortDescription || linkedMgmtProduct?.shortDescription || '',
+      sellingPrice: price || 0,
+      price: price || 0,
+      mrp: compareAtPrice || 0,
+      stock: stock || 0,
+      gstPercent: gstPercent || 5,
+      unit: unit || 'pcs',
+      images: parsedImages,
+      imageUrl: mainImageUrl,
+      image: mainImageUrl,
+      category: category || 'General',
+      description: description || '',
+      shortDescription: shortDescription || '',
       benefits: formatArrayJson(benefits),
       ingredients: formatArrayJson(ingredients),
       nutritionFacts: typeof nutritionFacts === 'object' ? JSON.stringify(nutritionFacts) : nutritionFacts || '{}',
       usageInstructions: usageInstructions || '',
       isBestseller: !!isBestseller,
+      isWebsiteVisible: true,
+      publishToWebsite: true,
       isActive: isActive !== undefined ? !!isActive : true,
-      sku: finalSku || '',
-      weight: weight || linkedMgmtProduct?.weight || '',
-      managementProductId: managementProductId || null,
+      weight: weight || 0.200,
     });
 
-    res.status(201).json({ success: true, message: 'Product created successfully', data: newProduct });
+    try {
+      const catalogController = require('../controllers/catalogController');
+      catalogController.clearCatalogCache();
+    } catch (e) {}
+
+    res.status(201).json({ success: true, message: 'Product created in Unified Product Master', data: newProduct });
   } catch (err) {
     console.error('Error creating admin product:', err);
     res.status(500).json({ success: false, message: 'Failed to create product' });
@@ -225,9 +213,9 @@ const createAdminProduct = async (req, res) => {
 const updateAdminProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const product = await WebsiteProduct.findByPk(id);
+    const product = await Product.findByPk(id);
     if (!product) {
-      return res.status(404).json({ success: false, message: 'Product not found' });
+      return res.status(404).json({ success: false, message: 'Product not found in Product Master' });
     }
 
     const {
@@ -248,23 +236,21 @@ const updateAdminProduct = async (req, res) => {
       isActive,
       sku,
       weight,
-      managementProductId,
+      barcode,
+      gstPercent,
+      unit,
     } = req.body;
 
-    if (managementProductId !== undefined && managementProductId !== product.managementProductId) {
-      product.managementProductId = managementProductId || null;
-      if (managementProductId) {
-        await Product.update({ publishToWebsite: true }, { where: { id: managementProductId } });
+    if (sku && sku !== product.sku) {
+      const duplicateSku = await Product.findOne({ where: { sku, id: { [Op.ne]: id } } });
+      if (duplicateSku) {
+        return res.status(400).json({ success: false, message: `Product SKU "${sku}" is used by another product.` });
       }
+      product.sku = sku;
     }
 
     if (slug && slug !== product.slug) {
-      const newSlug = generateSlug(slug);
-      const existing = await WebsiteProduct.findOne({ where: { slug: newSlug } });
-      if (existing && existing.id !== product.id) {
-        return res.status(400).json({ success: false, message: 'Slug is already used by another product.' });
-      }
-      product.slug = newSlug;
+      product.slug = generateSlug(slug);
     }
 
     const formatArrayJson = (val) => {
@@ -278,10 +264,23 @@ const updateAdminProduct = async (req, res) => {
     };
 
     if (name !== undefined) product.name = name;
-    if (price !== undefined) product.price = price;
-    if (compareAtPrice !== undefined) product.compareAtPrice = compareAtPrice;
+    if (price !== undefined) {
+      product.price = price;
+      product.sellingPrice = price;
+    }
+    if (compareAtPrice !== undefined) product.mrp = compareAtPrice;
     if (stock !== undefined) product.stock = stock;
-    if (images !== undefined) product.images = formatArrayJson(images);
+    if (images !== undefined) {
+      const parsedImages = formatArrayJson(images);
+      product.images = parsedImages;
+      try {
+        const imgArr = JSON.parse(parsedImages);
+        if (imgArr[0]) {
+          product.imageUrl = imgArr[0];
+          product.image = imgArr[0];
+        }
+      } catch (e) {}
+    }
     if (category !== undefined) product.category = category;
     if (description !== undefined) product.description = description;
     if (shortDescription !== undefined) product.shortDescription = shortDescription;
@@ -291,11 +290,19 @@ const updateAdminProduct = async (req, res) => {
     if (usageInstructions !== undefined) product.usageInstructions = usageInstructions;
     if (isBestseller !== undefined) product.isBestseller = !!isBestseller;
     if (isActive !== undefined) product.isActive = !!isActive;
-    if (sku !== undefined) product.sku = sku;
     if (weight !== undefined) product.weight = weight;
+    if (barcode !== undefined) product.barcode = barcode;
+    if (gstPercent !== undefined) product.gstPercent = gstPercent;
+    if (unit !== undefined) product.unit = unit;
 
     await product.save();
-    res.json({ success: true, message: 'Product updated successfully', data: product });
+
+    try {
+      const catalogController = require('../controllers/catalogController');
+      catalogController.clearCatalogCache();
+    } catch (e) {}
+
+    res.json({ success: true, message: 'Product updated in Unified Product Master', data: product });
   } catch (err) {
     console.error('Error updating admin product:', err);
     res.status(500).json({ success: false, message: 'Failed to update product' });
@@ -304,28 +311,29 @@ const updateAdminProduct = async (req, res) => {
 
 const deleteAdminProduct = async (req, res) => {
   try {
-    const cloudinaryService = require('../services/cloudinaryService');
     const { id } = req.params;
-    const product = await WebsiteProduct.findByPk(id);
+    const product = await Product.findByPk(id);
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
-    if (product.imagePublicId) {
-      try {
-        await cloudinaryService.deleteImage(product.imagePublicId);
-      } catch (err) {
-        console.warn(`[Cloudinary Delete] Failed to delete image (${product.imagePublicId}):`, err.message);
-      }
-    }
+    product.isArchived = true;
+    product.publishToWebsite = false;
+    product.isWebsiteVisible = false;
+    await product.save();
 
-    await product.destroy();
-    res.json({ success: true, message: 'Product deleted successfully' });
+    try {
+      const catalogController = require('../controllers/catalogController');
+      catalogController.clearCatalogCache();
+    } catch (e) {}
+
+    res.json({ success: true, message: 'Product removed from Website Storefront & archived in Product Master.' });
   } catch (err) {
     console.error('Error deleting admin product:', err);
     res.status(500).json({ success: false, message: 'Failed to delete product' });
   }
 };
+
 
 /* =========================================================
    3. ORDER MANAGEMENT & REFUNDS
