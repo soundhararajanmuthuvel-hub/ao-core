@@ -57,7 +57,9 @@ exports.getSales = async (req, res, next) => {
     const query = {};
     if (req.query.status) query.paymentStatus = req.query.status;
     if (req.query.erpStatus) query.status = req.query.erpStatus;
+    if (req.query.customerId) query.customerId = req.query.customerId;
     if (search) {
+
       query[Op.or] = [
         { invoiceNumber: { [Op.like]: `%${search}%` } },
         { '$customer.name$': { [Op.like]: `%${search}%` } },

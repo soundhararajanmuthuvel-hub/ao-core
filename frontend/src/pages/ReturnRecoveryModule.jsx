@@ -842,20 +842,22 @@ export default function ReturnRecoveryModule() {
 
       {/* CREATE RETURN 6-STEP WIZARD MODAL */}
       {showCreateModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 1000 }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #cbd5e1', maxWidth: '680px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(26,18,11,0.75)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 1000 }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #C9A25D', maxWidth: '680px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 30px -5px rgba(26,18,11,0.25)' }}>
             
-            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}>
+            {/* AO AURUM BRANDED HEADER */}
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #C9A25D', backgroundColor: '#2B1D14', borderTopLeftRadius: '15px', borderTopRightRadius: '15px', color: '#F5EFE6' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, fontFamily: "'Playfair Display', 'Georgia', serif", color: '#E8C97A', margin: 0, letterSpacing: '0.02em' }}>
                   Create Return Authorization (RMA) Wizard
                 </h2>
-                <button onClick={() => setShowCreateModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                <button onClick={() => setShowCreateModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#C9A25D' }}>
                   <X size={20} />
                 </button>
               </div>
               
-              <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.75rem' }}>
+              {/* GRADIENT PROGRESS SEGMENTS */}
+              <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.85rem' }}>
                 {[1, 2, 3, 4, 5, 6].map(st => (
                   <div
                     key={st}
@@ -864,14 +866,14 @@ export default function ReturnRecoveryModule() {
                       flex: 1,
                       height: '6px',
                       borderRadius: '3px',
-                      backgroundColor: wizardStep >= st ? '#3f1d07' : '#cbd5e1',
+                      background: wizardStep >= st ? 'linear-gradient(90deg, #C9A25D 0%, #E8C97A 100%)' : 'rgba(201, 162, 93, 0.25)',
                       cursor: 'pointer',
-                      transition: 'all 0.2s ease'
+                      transition: 'all 0.25s ease'
                     }}
                   />
                 ))}
               </div>
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', marginTop: '0.35rem', display: 'block' }}>
+              <span style={{ fontSize: '0.725rem', fontWeight: 700, color: '#C9A25D', marginTop: '0.45rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Step {wizardStep} of 6: {
                   wizardStep === 1 ? 'Customer Selection' :
                   wizardStep === 2 ? 'Invoice & Product Lookup' :
@@ -897,28 +899,28 @@ export default function ReturnRecoveryModule() {
               {/* STEP 2: INVOICE & PRODUCT LOOKUP */}
               {wizardStep === 2 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#2B1D14' }}>
                     Select Invoice for {formData.customerName || 'Customer'}
                   </div>
 
                   {selectedCustInvoices.length > 0 ? (
-                    <div style={{ maxHeight: '220px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                    <div style={{ maxHeight: '240px', overflowY: 'auto', border: '1px solid #C9A25D', borderRadius: '10px' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
                         <thead>
-                          <tr style={{ backgroundColor: '#f1f5f9', textAlign: 'left' }}>
-                            <th style={{ padding: '0.5rem 0.75rem' }}>Invoice #</th>
-                            <th style={{ padding: '0.5rem 0.75rem' }}>Date</th>
-                            <th style={{ padding: '0.5rem 0.75rem' }}>Amount</th>
-                            <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>Select</th>
+                          <tr style={{ backgroundColor: '#2B1D14', color: '#E8C97A', textAlign: 'left' }}>
+                            <th style={{ padding: '0.6rem 0.85rem', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>Invoice #</th>
+                            <th style={{ padding: '0.6rem 0.85rem', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>Date</th>
+                            <th style={{ padding: '0.6rem 0.85rem', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>Amount</th>
+                            <th style={{ padding: '0.6rem 0.85rem', textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>Action</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {selectedCustInvoices.map(inv => (
-                            <tr key={inv.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                              <td style={{ padding: '0.5rem 0.75rem', fontWeight: 800, fontFamily: 'monospace', color: '#3f1d07' }}>{inv.invoiceNumber}</td>
-                              <td style={{ padding: '0.5rem 0.75rem' }}>{new Date(inv.date || inv.createdAt).toLocaleDateString('en-IN')}</td>
-                              <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700, color: '#10b981' }}>₹{inv.grandTotal}</td>
-                              <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>
+                          {selectedCustInvoices.map((inv, idx) => (
+                            <tr key={inv.id} style={{ backgroundColor: idx % 2 === 0 ? '#F5EFE6' : '#ffffff', borderBottom: '1px solid #E2E8F0' }}>
+                              <td style={{ padding: '0.6rem 0.85rem', fontWeight: 800, fontFamily: 'monospace', color: '#2B1D14' }}>{inv.invoiceNumber}</td>
+                              <td style={{ padding: '0.6rem 0.85rem', color: '#475569' }}>{new Date(inv.date || inv.createdAt).toLocaleDateString('en-IN')}</td>
+                              <td style={{ padding: '0.6rem 0.85rem', fontWeight: 800, color: '#C9A25D' }}>₹{Number(inv.grandTotal).toLocaleString('en-IN')}</td>
+                              <td style={{ padding: '0.6rem 0.85rem', textAlign: 'right' }}>
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -934,7 +936,7 @@ export default function ReturnRecoveryModule() {
                                     }));
                                     setWizardStep(3);
                                   }}
-                                  style={{ padding: '0.3rem 0.6rem', borderRadius: '4px', backgroundColor: '#3f1d07', color: '#fff', fontSize: '0.725rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                                  style={{ padding: '0.35rem 0.75rem', borderRadius: '6px', backgroundColor: '#2B1D14', color: '#E8C97A', fontSize: '0.725rem', fontWeight: 800, border: '1px solid #C9A25D', cursor: 'pointer', transition: 'all 0.15s ease' }}
                                 >
                                   Select Invoice
                                 </button>
@@ -945,9 +947,9 @@ export default function ReturnRecoveryModule() {
                       </table>
                     </div>
                   ) : (
-                    <div style={{ textAlign: 'center', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <FileText size={32} style={{ color: '#cbd5e1', marginBottom: '0.5rem' }} />
-                      <div style={{ fontSize: '0.8rem', color: '#64748b' }}>No invoices found for this customer. You can enter product & batch details directly in Step 3.</div>
+                    <div style={{ textAlign: 'center', padding: '1.75rem', backgroundColor: '#F5EFE6', borderRadius: '10px', border: '1px solid #C9A25D' }}>
+                      <FileText size={36} style={{ color: '#C9A25D', marginBottom: '0.5rem' }} />
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2B1D14' }}>No invoices found for this customer. You can enter product & batch details directly in Step 3.</div>
                     </div>
                   )}
                 </div>
@@ -957,7 +959,7 @@ export default function ReturnRecoveryModule() {
               {wizardStep === 3 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ position: 'relative' }}>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2B1D14', display: 'block', marginBottom: '0.3rem' }}>
                       Product Name (Catalog Live Search)
                     </label>
                     <input
@@ -968,14 +970,14 @@ export default function ReturnRecoveryModule() {
                       onFocus={() => {
                         if (prodSearchResults.length > 0 && formData.productName) setShowProdDropdown(true);
                       }}
-                      style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                      style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
                     />
 
-                    {/* LIVE PRODUCT SEARCH DROPDOWN */}
+                    {/* AO AURUM LIVE PRODUCT DROPDOWN */}
                     {showProdDropdown && (
-                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', zIndex: 1100, maxHeight: '200px', overflowY: 'auto', marginTop: '4px' }}>
+                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: '#F5EFE6', border: '1px solid #C9A25D', borderRadius: '8px', boxShadow: '0 10px 25px -5px rgba(43,29,20,0.15)', zIndex: 1100, maxHeight: '200px', overflowY: 'auto', marginTop: '4px' }}>
                         {isProdSearching ? (
-                          <div style={{ padding: '0.75rem', fontSize: '0.78rem', color: '#64748b', textAlign: 'center' }}>Searching catalog...</div>
+                          <div style={{ padding: '0.75rem', fontSize: '0.78rem', color: '#8A734C', textAlign: 'center', fontWeight: 600 }}>Searching catalog...</div>
                         ) : prodSearchResults.length > 0 ? (
                           prodSearchResults.map(p => (
                             <div
@@ -990,15 +992,15 @@ export default function ReturnRecoveryModule() {
                                 }));
                                 setShowProdDropdown(false);
                               }}
-                              style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                              onMouseLeave={e => e.currentTarget.style.backgroundColor = '#ffffff'}
+                              style={{ padding: '0.6rem 0.85rem', borderBottom: '1px solid rgba(201, 162, 93, 0.2)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'background-color 0.15s ease' }}
+                              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#FEF3C7'}
+                              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                             >
                               <div>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{p.name}</div>
+                                <div style={{ fontSize: '0.825rem', fontWeight: 800, color: '#2B1D14' }}>{p.name}</div>
                                 <div style={{ fontSize: '0.7rem', color: '#64748b' }}>SKU: {p.sku || 'N/A'} • Unit: {p.unit || 'Pk'}</div>
                               </div>
-                              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#10b981' }}>
+                              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#b45309' }}>
                                 ₹{Number(p.sellingPrice || p.mrp || 0).toLocaleString('en-IN')}
                               </div>
                             </div>
@@ -1014,22 +1016,22 @@ export default function ReturnRecoveryModule() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                     <div>
-                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Batch Number</label>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2B1D14', display: 'block', marginBottom: '0.3rem' }}>Batch Number</label>
                       <input
                         type="text"
                         placeholder="Batch Number..."
                         value={formData.batchNumber}
                         onChange={e => setFormData({ ...formData, batchNumber: e.target.value })}
-                        style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontFamily: 'monospace' }}
+                        style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontFamily: 'monospace' }}
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Quantity (Pks)</label>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2B1D14', display: 'block', marginBottom: '0.3rem' }}>Quantity (Pks)</label>
                       <input
                         type="number"
                         value={formData.quantity}
                         onChange={e => setFormData({ ...formData, quantity: e.target.value })}
-                        style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 800 }}
+                        style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 800 }}
                       />
                     </div>
                   </div>
@@ -1039,58 +1041,99 @@ export default function ReturnRecoveryModule() {
               {/* STEP 4: PHOTOS */}
               {wizardStep === 4 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ border: '2px dashed #cbd5e1', padding: '2rem', borderRadius: '10px', textAlign: 'center', backgroundColor: '#f8fafc' }}>
-                    <Camera size={32} style={{ color: '#94a3b8', marginBottom: '0.5rem' }} />
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>Upload Returned Item Photos / Video</div>
+                  <div style={{ border: '2px dashed #C9A25D', padding: '2rem', borderRadius: '10px', textAlign: 'center', backgroundColor: '#F5EFE6' }}>
+                    <Camera size={36} style={{ color: '#C9A25D', marginBottom: '0.5rem' }} />
+                    <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#2B1D14' }}>Upload Returned Item Photos / Video</div>
                     <span style={{ fontSize: '0.75rem', color: '#64748b' }}>PNG, JPG, MP4 supported up to 25MB</span>
                   </div>
                 </div>
               )}
 
-              {/* STEP 5: REVIEW */}
+              {/* STEP 5: RECEIPT-STYLE COST RECOVERY REVIEW */}
               {wizardStep === 5 && (
-                <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div><strong>Customer:</strong> {formData.customerName || 'Not specified'}</div>
-                  <div><strong>Product:</strong> {formData.productName || 'Not specified'}</div>
-                  <div><strong>Batch:</strong> {formData.batchNumber || 'Not specified'}</div>
-                  <div><strong>Quantity:</strong> {formData.quantity} Pks</div>
-                  <div><strong>Total Value:</strong> ₹{formData.quantity * formData.unitPrice}</div>
+                <div style={{ backgroundColor: '#F5EFE6', padding: '1.25rem', borderRadius: '12px', border: '1px solid #C9A25D', boxShadow: '0 8px 20px -4px rgba(43, 29, 20, 0.08)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.6rem', borderBottom: '1px solid #C9A25D' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#8A734C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      🧾 Official Cost Recovery Review
+                    </span>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b' }}>
+                      AO Aurum Verification
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.8rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.675rem', fontWeight: 700, color: '#7A6A56', textTransform: 'uppercase' }}>Customer Name</div>
+                      <strong style={{ fontSize: '0.875rem', color: '#2B1D14' }}>{formData.customerName || 'Not specified'}</strong>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.675rem', fontWeight: 700, color: '#7A6A56', textTransform: 'uppercase' }}>Invoice Number</div>
+                      <strong style={{ fontSize: '0.875rem', color: '#2B1D14', fontFamily: 'monospace' }}>{formData.invoiceNumber || 'Manual Entry'}</strong>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.675rem', fontWeight: 700, color: '#7A6A56', textTransform: 'uppercase' }}>Returned Product</div>
+                      <strong style={{ fontSize: '0.875rem', color: '#2B1D14' }}>{formData.productName || 'Not specified'}</strong>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.675rem', fontWeight: 700, color: '#7A6A56', textTransform: 'uppercase' }}>Batch Number</div>
+                      <strong style={{ fontSize: '0.875rem', color: '#2B1D14', fontFamily: 'monospace' }}>{formData.batchNumber || 'Not specified'}</strong>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.675rem', fontWeight: 700, color: '#7A6A56', textTransform: 'uppercase' }}>Return Quantity</div>
+                      <strong style={{ fontSize: '0.875rem', color: '#2B1D14' }}>{formData.quantity} Pks</strong>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.675rem', fontWeight: 700, color: '#7A6A56', textTransform: 'uppercase' }}>Unit Price</div>
+                      <strong style={{ fontSize: '0.875rem', color: '#2B1D14' }}>₹{Number(formData.unitPrice || 0).toLocaleString('en-IN')}</strong>
+                    </div>
+                  </div>
+
+                  {/* PROMINENT TOTAL VALUE BANNER */}
+                  <div style={{ marginTop: '0.5rem', padding: '0.85rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg, #2B1D14 0%, #1A120B 100%)', border: '1px solid #C9A25D', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#E8C97A', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Estimated Cost Recovery Value
+                    </span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#E8C97A' }}>
+                      ₹{Number((formData.quantity || 0) * (formData.unitPrice || 0)).toLocaleString('en-IN')}
+                    </span>
+                  </div>
                 </div>
               )}
 
               {/* STEP 6: SUBMIT */}
               {wizardStep === 6 && (
-                <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-                  <CheckCircle2 size={48} style={{ color: '#10b981', margin: '0 auto 0.5rem auto' }} />
-                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>Ready to Issue Return Authorization</h3>
-                  <p style={{ fontSize: '0.8rem', color: '#64748b' }}>Clicking submit will generate the official RMA number and notify warehouse gate staff.</p>
+                <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
+                  <CheckCircle2 size={52} style={{ color: '#10b981', margin: '0 auto 0.75rem auto' }} />
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#2B1D14', fontFamily: "'Playfair Display', 'Georgia', serif" }}>Ready to Issue Return Authorization</h3>
+                  <p style={{ fontSize: '0.825rem', color: '#64748b', marginTop: '0.35rem' }}>Clicking submit will generate the official RMA number and notify warehouse gate staff.</p>
                 </div>
               )}
             </div>
 
-            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px', display: 'flex', justifyContent: 'space-between' }}>
+            {/* AO AURUM FOOTER BUTTONS */}
+            <div style={{ padding: '1.25rem 1.5rem', borderTop: '1px solid #E2E8F0', backgroundColor: '#F5EFE6', borderBottomLeftRadius: '15px', borderBottomRightRadius: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button
                 type="button"
                 disabled={wizardStep === 1}
                 onClick={() => setWizardStep(prev => prev - 1)}
-                style={{ padding: '0.5rem 1rem', borderRadius: '8px', backgroundColor: '#e2e8f0', color: '#475569', fontSize: '0.8rem', fontWeight: 700, border: 'none', cursor: 'pointer', opacity: wizardStep === 1 ? 0.5 : 1 }}
+                style={{ padding: '0.5rem 1.1rem', borderRadius: '8px', backgroundColor: 'transparent', color: '#2B1D14', fontSize: '0.8rem', fontWeight: 700, border: '1px solid #C9A25D', cursor: 'pointer', opacity: wizardStep === 1 ? 0.4 : 1 }}
               >
-                Back
+                ← Back
               </button>
               
               {wizardStep < 6 ? (
                 <button
                   type="button"
                   onClick={() => setWizardStep(prev => prev + 1)}
-                  style={{ padding: '0.5rem 1.25rem', borderRadius: '8px', backgroundColor: '#3f1d07', color: '#ffffff', fontSize: '0.8rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                  style={{ padding: '0.55rem 1.35rem', borderRadius: '8px', backgroundColor: '#2B1D14', color: '#E8C97A', fontSize: '0.8rem', fontWeight: 800, border: '1px solid #C9A25D', cursor: 'pointer', boxShadow: '0 4px 10px rgba(43,29,20,0.15)' }}
                 >
-                  Next Step
+                  Next Step →
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={handleCreateRma}
-                  style={{ padding: '0.5rem 1.25rem', borderRadius: '8px', backgroundColor: '#10b981', color: '#ffffff', fontSize: '0.8rem', fontWeight: 800, border: 'none', cursor: 'pointer' }}
+                  style={{ padding: '0.55rem 1.35rem', borderRadius: '8px', backgroundColor: '#2B1D14', color: '#E8C97A', fontSize: '0.8rem', fontWeight: 900, border: '2px solid #C9A25D', cursor: 'pointer', boxShadow: '0 4px 12px rgba(201,162,93,0.25)' }}
                 >
                   Submit & Generate RMA
                 </button>
@@ -1100,6 +1143,7 @@ export default function ReturnRecoveryModule() {
           </div>
         </div>
       )}
+
 
       {/* QUICK CREATE CUSTOMER MODAL */}
       {showQuickCustModal && (
