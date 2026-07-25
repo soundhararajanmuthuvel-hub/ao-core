@@ -142,7 +142,11 @@ exports.scanLookup = async (req, res) => {
 };
 
 // 2. CREATE RMA / RETURN REQUEST
+const { sequelize } = require('../config/db');
+const ActivityLog = require('../models/ActivityLog');
+
 exports.createReturnRequest = async (req, res) => {
+  const t = await sequelize.transaction();
   try {
     const {
       category = 'External',
@@ -166,8 +170,9 @@ exports.createReturnRequest = async (req, res) => {
     const rmaNumber = await generateRmaNumber();
 
     // Check policy limits
-    const policy = await ReturnPolicy.findOne({ where: { customerType, isActive: true } });
+    const policy = await ReturnPolicy.findOne({ where: { customerType, isActive: true }, transaction: t });
     if (policy && !policy.allowExpired && returnReason === 'Expired') {
+      await t.rollback();
       return res.status(400).json({
         success: false,
         message: `Return Policy for ${customerType} prohibits expired product returns.`
@@ -181,6 +186,7 @@ exports.createReturnRequest = async (req, res) => {
       const q = parseFloat(it.quantity || 1);
       const p = parseFloat(it.unitPrice || 0);
       if (isNaN(p) || p < 0 || isNaN(q) || q <= 0) {
+        await t.rollback();
         return res.status(400).json({
           success: false,
           message: 'Invalid return item details. Quantity and Unit Price must be valid non-negative numbers.'
@@ -190,6 +196,91 @@ exports.createReturnRequest = async (req, res) => {
       totalQuantity += q;
     }
 
+    // Invoice Validation & Previous Returned Quantity Check
+    let inv = null;
+    let totalInvQty = 0;
+    let existingReturnedQty = 0;
+
+    if (invoiceId) {
+      inv = await Invoice.findByPk(invoiceId, {
+        include: [{ model: InvoiceItem, as: 'items' }],
+        transaction: t
+      });
+
+      if (!inv) {
+        await t.rollback();
+        return res.status(404).json({
+          success: false,
+          message: 'Original Invoice not found.'
+        });
+      }
+
+      if (inv.status === 'Cancelled') {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot create return for a cancelled invoice.'
+        });
+      }
+
+      if (inv.status === 'Returned' || inv.status === 'Closed - Returned') {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'This invoice has already been fully returned.'
+        });
+      }
+
+      // Check existing returned quantity for this invoice
+      const previousReturns = await ReturnRequest.findAll({
+        where: { invoiceId, status: { [Op.ne]: 'Rejected' } },
+        include: [{ model: ReturnItem, as: 'items' }],
+        transaction: t
+      });
+
+      previousReturns.forEach(pr => {
+        if (pr.items) {
+          pr.items.forEach(pi => {
+            existingReturnedQty += Number(pi.quantity || 0);
+          });
+        }
+      });
+
+      totalInvQty = inv.items && inv.items.length > 0 
+        ? inv.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+        : Number(inv.totalQty || 10);
+
+      if (totalInvQty > 0 && (existingReturnedQty + totalQuantity) > totalInvQty) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `Returned quantity (${totalQuantity} + previous ${existingReturnedQty}) exceeds original sold quantity (${totalInvQty}) on Invoice ${inv.invoiceNumber}.`
+        });
+      }
+    }
+
+    // Calculate dynamic GST reversal based on billed GST rate from Invoice line or payload
+    let totalGstReversal = 0;
+    if (inv) {
+      if (inv.invoiceType !== 'NON_GST' && inv.type !== 'NON_GST') {
+        for (const it of items) {
+          const matchedInvItem = inv.items ? inv.items.find(ii => ii.productId === it.productId || ii.productName === it.productName) : null;
+          const lineGstPct = matchedInvItem && matchedInvItem.gstPercent !== undefined 
+            ? Number(matchedInvItem.gstPercent) 
+            : (it.gstPercent !== undefined ? Number(it.gstPercent) : 18);
+          const lineVal = (parseFloat(it.quantity || 1) * parseFloat(it.unitPrice || 0));
+          totalGstReversal += lineGstPct > 0 ? (lineVal * lineGstPct) / 100 : 0;
+        }
+      }
+    } else {
+      for (const it of items) {
+        const lineGstPct = it.gstPercent !== undefined ? Number(it.gstPercent) : (req.body.gstPercent !== undefined ? Number(req.body.gstPercent) : 0);
+        const lineVal = (parseFloat(it.quantity || 1) * parseFloat(it.unitPrice || 0));
+        totalGstReversal += lineGstPct > 0 ? (lineVal * lineGstPct) / 100 : 0;
+      }
+    }
+
+    const totalReturnDeduction = totalVal + totalGstReversal;
 
     // Approval matrix calculation
     let approvalLevel = 'Sales Manager';
@@ -203,37 +294,6 @@ exports.createReturnRequest = async (req, res) => {
     const mfgCost = totalVal * 0.55;
     const transportCost = 150;
     const labourCost = 100;
-
-    // Calculate dynamic GST reversal based on billed GST rate from Invoice line or payload
-    let totalGstReversal = 0;
-    if (invoiceId) {
-      try {
-        const inv = await Invoice.findByPk(invoiceId, { include: [{ model: InvoiceItem, as: 'items' }] });
-        if (inv) {
-          if (inv.invoiceType === 'NON_GST' || inv.type === 'NON_GST') {
-            totalGstReversal = 0;
-          } else {
-            for (const it of items) {
-              const matchedInvItem = inv.items ? inv.items.find(ii => ii.productId === it.productId || ii.productName === it.productName) : null;
-              const lineGstPct = matchedInvItem && matchedInvItem.gstPercent !== undefined 
-                ? Number(matchedInvItem.gstPercent) 
-                : (it.gstPercent !== undefined ? Number(it.gstPercent) : 18);
-              const lineVal = (parseFloat(it.quantity || 1) * parseFloat(it.unitPrice || 0));
-              totalGstReversal += lineGstPct > 0 ? (lineVal * lineGstPct) / 100 : 0;
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Error computing invoice GST reversal:', err.message);
-      }
-    } else {
-      // Manual return item GST calculation from payload
-      for (const it of items) {
-        const lineGstPct = it.gstPercent !== undefined ? Number(it.gstPercent) : (req.body.gstPercent !== undefined ? Number(req.body.gstPercent) : 0);
-        const lineVal = (parseFloat(it.quantity || 1) * parseFloat(it.unitPrice || 0));
-        totalGstReversal += lineGstPct > 0 ? (lineVal * lineGstPct) / 100 : 0;
-      }
-    }
 
     const returnReq = await ReturnRequest.create({
       rmaNumber,
@@ -258,13 +318,14 @@ exports.createReturnRequest = async (req, res) => {
       customerSignatureUrl,
       totalQty: totalQuantity,
       totalValue: totalVal,
-      recoveredValue: totalGstReversal, // Store calculated GST Reversal amount
+      recoveredValue: totalGstReversal,
       mfgCost,
       transportCost,
       labourCost,
-    });
+      createdById: req.user ? req.user.id : null
+    }, { transaction: t });
 
-    // Save Return Items
+    // Save Return Items & Create Stock Movements
     if (items && items.length > 0) {
       for (const item of items) {
         const remainingDays = item.expiryDate 
@@ -287,45 +348,93 @@ exports.createReturnRequest = async (req, res) => {
           disposition: 'Pending QC',
           originalImageUrl: item.originalImageUrl || null,
           returnedImageUrl: item.returnedImageUrl || null,
-        });
-      }
-    }
+        }, { transaction: t });
 
-
-    // Process Return Type Specific Financial, Invoice & Customer Ledger Workflows
-    if (invoiceId) {
-      try {
-        const inv = await Invoice.findByPk(invoiceId);
-        if (inv) {
-          if (returnType === 'Full Return' || totalVal >= Number(inv.grandTotal || 0)) {
-            inv.balance = 0;
-            inv.paymentStatus = 'Refunded';
-            inv.status = 'Refunded';
-            await inv.save();
-          } else if (returnType === 'Partial Return' || returnType === 'Credit Note' || returnType === 'Cash Refund') {
-            const currentBal = Number(inv.balance !== undefined && inv.balance !== null ? inv.balance : inv.grandTotal || 0);
-            inv.balance = Math.max(0, currentBal - totalVal);
-            inv.paymentStatus = inv.balance <= 0 ? (returnType === 'Cash Refund' ? 'Refunded' : 'Paid') : 'Partially Paid';
-            await inv.save();
-          }
+        // Record Inventory Stock Movement
+        try {
+          await StockMovement.create({
+            productId: item.productId || 1,
+            batchNumber: item.batchNumber || 'ABC240715',
+            quantity: item.quantity || 1,
+            type: 'RETURN_IN',
+            sourceLocation: 'Customer Location',
+            destinationLocation: 'Receiving Zone',
+            reason: `${returnType} - ${returnReason}`,
+            referenceNumber: rmaNumber
+          }, { transaction: t });
+        } catch (mErr) {
+          console.error('StockMovement error notice:', mErr.message);
         }
-      } catch (err) {
-        console.error('Invoice balance update notice:', err.message);
       }
     }
 
+    // Financial Posting: Generate Credit Note if Credit Note Return Type
+    if (returnType === 'Credit Note') {
+      try {
+        const creditNoteNo = await generateCreditNoteNumber();
+        await ReturnCreditNote.create({
+          creditNoteNumber: creditNoteNo,
+          returnRequestId: returnReq.id,
+          customerId: customerId || null,
+          invoiceId: invoiceId || null,
+          amount: totalReturnDeduction,
+          status: 'Issued',
+          issueDate: new Date()
+        }, { transaction: t });
+      } catch (cnErr) {
+        console.error('Credit Note creation notice:', cnErr.message);
+      }
+    }
+
+    // Process Return Type Specific Invoice Balance & Status Updates
+    if (inv) {
+      const newReturnedQty = existingReturnedQty + totalQuantity;
+      const currentBal = Number(inv.balance !== undefined && inv.balance !== null ? inv.balance : inv.grandTotal || 0);
+      const updatedBal = Math.max(0, currentBal - totalReturnDeduction);
+
+      inv.balance = updatedBal;
+      if (returnType === 'Full Return' || (totalInvQty > 0 && newReturnedQty >= totalInvQty) || updatedBal <= 0) {
+        inv.balance = 0;
+        inv.paymentStatus = 'Refunded';
+        inv.status = 'Returned';
+      } else {
+        inv.paymentStatus = updatedBal <= 0 ? (returnType === 'Cash Refund' ? 'Refunded' : 'Paid') : 'Partially Paid';
+      }
+      await inv.save({ transaction: t });
+    }
+
+    // Process Customer Balance & Profile Counter Updates
     if (customerId) {
       try {
-        const cust = await Customer.findByPk(customerId);
-        if (cust && (returnType === 'Credit Note' || returnType === 'Cash Refund' || returnType === 'Full Return' || returnType === 'Partial Return')) {
-          const currentCustBal = Number(cust.balance || 0);
-          cust.balance = Math.max(0, currentCustBal - totalVal);
-          await cust.save();
+        const cust = await Customer.findByPk(customerId, { transaction: t });
+        if (cust) {
+          if (returnType === 'Credit Note' || returnType === 'Cash Refund' || returnType === 'Full Return' || returnType === 'Partial Return') {
+            const currentCustBal = Number(cust.balance || 0);
+            cust.balance = Math.max(0, currentCustBal - totalReturnDeduction);
+          }
+          cust.totalReturns = Number(cust.totalReturns || 0) + 1;
+          cust.lastReturnDate = new Date();
+          await cust.save({ transaction: t });
         }
-      } catch (err) {
-        console.error('Customer balance update notice:', err.message);
+      } catch (custErr) {
+        console.error('Customer profile update notice:', custErr.message);
       }
     }
+
+    // Audit Log Entry
+    try {
+      await ActivityLog.create({
+        action: 'CREATE_RMA',
+        module: 'Returns',
+        details: `Created Return Authorization (${rmaNumber}) for Customer ID ${customerId || 'N/A'} against Invoice ${invoiceId || 'N/A'}. Total value: ₹${totalVal}, Return Type: ${returnType}`,
+        userId: req.user ? req.user.id : null,
+        metadata: { rmaNumber, invoiceId, customerId, totalVal, totalGstReversal, returnType }
+      }, { transaction: t });
+    } catch (logErr) {
+      console.error('ActivityLog creation notice:', logErr.message);
+    }
+
+    await t.commit();
 
     res.status(201).json({
       success: true,
@@ -334,10 +443,12 @@ exports.createReturnRequest = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Create Return Request error:', error);
+    await t.rollback();
+    console.error('Create Return Request transaction error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 // 3. GET ALL RETURNS WITH FILTERS & SEARCH (<50ms)
 exports.getReturns = async (req, res) => {
