@@ -2448,7 +2448,40 @@ export default function Customers() {
               </div>
             </div>
 
+            {/* Returns & Recovery History */}
+            <div className="card" style={{ padding: '1rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h4 style={{ margin: 0, fontWeight: 800, fontSize: '0.85rem', color: '#166534' }}>🛡️ Returns & Recovery History</h4>
+                <a
+                  href={`/sales/returns?customerName=${encodeURIComponent(selectedCustomer.name || '')}`}
+                  className="btn btn-sm btn-success"
+                  style={{ fontSize: '0.75rem', fontWeight: 700 }}
+                >
+                  + Create Return
+                </a>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginBottom: '0.75rem', fontSize: '0.75rem', textAlign: 'center' }}>
+                <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '6px', border: '1px solid #dcfce7' }}>
+                  <div style={{ color: '#64748b' }}>Total Returns</div>
+                  <strong style={{ color: '#166534', fontSize: '0.9rem' }}>{salesHistory.filter(i => i.type === 'credit_note').length} Pks</strong>
+                </div>
+                <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '6px', border: '1px solid #dcfce7' }}>
+                  <div style={{ color: '#64748b' }}>Recovery Value</div>
+                  <strong style={{ color: '#10b981', fontSize: '0.9rem' }}>₹{salesHistory.filter(i => i.type === 'credit_note').reduce((s, c) => s + Number(c.grandTotal || 0), 0).toLocaleString('en-IN')}</strong>
+                </div>
+                <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '6px', border: '1px solid #dcfce7' }}>
+                  <div style={{ color: '#64748b' }}>Credit Notes</div>
+                  <strong style={{ color: '#2563eb', fontSize: '0.9rem' }}>{creditNotesList.length} Issued</strong>
+                </div>
+                <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '6px', border: '1px solid #dcfce7' }}>
+                  <div style={{ color: '#64748b' }}>Complaints</div>
+                  <strong style={{ color: '#f59e0b', fontSize: '0.9rem' }}>0 Open</strong>
+                </div>
+              </div>
+            </div>
+
             {/* Sales Receipts */}
+
             <div className="card" style={{ padding: '1rem' }}>
               <h4 style={{ margin: '0 0 0.75rem 0', fontWeight: 800, fontSize: '0.85rem', color: '#334155' }}>🧾 Sales Receipts</h4>
               <div className="table-wrap" style={{ maxHeight: '180px', overflowY: 'auto' }}>

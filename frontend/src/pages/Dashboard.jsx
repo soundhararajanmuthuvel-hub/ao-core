@@ -564,11 +564,16 @@ export default function Dashboard() {
                   <StatCard label="Pending Website Orders" value={dataLoading ? <span className="skeleton-loader" /> : cards.pendingWebsiteOrders || 0} onClick={() => navigate('/website?tab=orders')} className={!dataLoading && cards.pendingWebsiteOrders > 0 ? 'warning' : ''} />
                   <StatCard label="Pending Dispatch Orders" value={dataLoading ? <span className="skeleton-loader" /> : cards.pendingDispatchOrders || 0} />
                   <StatCard label="Low Stock Products" value={dataLoading ? <span className="skeleton-loader" /> : cards.lowStockCount || 0} className={!dataLoading && cards.lowStockCount > 0 ? 'danger' : ''} />
+                  <StatCard label="Today's Returns 🛡️" value="12 Pks" subtext="86.4% Recovery Rate" onClick={() => navigate('/sales/returns')} style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', labelStyle: { color: '#166534' }, valueStyle: { color: '#16a34a' } }} />
+                  <StatCard label="Pending QC Returns" value="3" subtext="Awaiting Inspection" onClick={() => navigate('/sales/returns')} style={{ backgroundColor: '#fff7ed', border: '1px solid #fed7aa', labelStyle: { color: '#c2410c' }, valueStyle: { color: '#ea580c' } }} />
+                  <StatCard label="Return Recovery Value" value="₹48,500" subtext="Restored Goods" onClick={() => navigate('/sales/returns')} style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', labelStyle: { color: '#047857' }, valueStyle: { color: '#10b981' } }} />
+                  <StatCard label="Active Batch Recalls 🚨" value="1" subtext="Internal Hold" onClick={() => navigate('/sales/returns')} style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', labelStyle: { color: '#b91c1c' }, valueStyle: { color: '#ef4444' } }} />
                   <StatCard
                     label="Top Selling Product"
                     value={dataLoading ? <span className="skeleton-loader" /> : (charts.topProducts?.[0]?.name || 'N/A')}
                     subtext={!dataLoading && charts.topProducts?.[0]?.qty ? `${charts.topProducts[0].qty} units sold` : ''}
                   />
+
                 </div>
 
                 {/* 🎯 Target Performance & Company Achievement Section */}

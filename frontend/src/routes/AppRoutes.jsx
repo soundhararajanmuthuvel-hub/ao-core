@@ -300,6 +300,15 @@ export default function AppRoutes() {
             </RoleRoute>
           }
         />
+        <Route
+          path="sales/returns"
+          element={
+            <RoleRoute roles={['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager', 'Sales Manager', 'Billing Executive', 'Sales Executive']}>
+              <ReturnRecoveryModule />
+            </RoleRoute>
+          }
+        />
+
 
         <Route
           path="customers"

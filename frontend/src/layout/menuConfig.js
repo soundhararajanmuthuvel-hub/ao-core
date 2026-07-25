@@ -196,21 +196,9 @@ export const menuStructure = [
       { to: '/products/catalog-center', label: 'Catalog Center', roles: ['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive'] },
       { to: '/products?tab=raw-materials', label: 'Raw Materials', roles: ['Super Admin', 'admin', 'Manufacturing Manager', 'Store Keeper'] },
       { to: '/inventory', label: 'Stock', roles: ['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager'] },
-      { to: '/returns', label: 'Return & Recovery', roles: ['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager', 'Sales Manager'] },
       { to: '/suppliers', label: 'Suppliers', roles: ['Super Admin', 'admin', 'Manufacturing Manager', 'Store Keeper'] }
     ]
   },
-  {
-    id: 'returns',
-    type: 'link',
-    to: '/returns',
-    icon: RotateCcw,
-    emoji: '🛡️',
-    label: 'Return & Recovery',
-    roles: ['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager', 'Sales Manager', 'Billing Executive'],
-    showOnMobileDrawer: true
-  },
-
   {
     id: 'sales',
     type: 'group',
@@ -222,9 +210,11 @@ export const menuStructure = [
     children: [
       { to: '/order-noting', label: 'Orders', roles: ['Super Admin', 'admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive', 'Store Keeper'] },
       { to: '/sales', label: 'Invoices', roles: ['Super Admin', 'admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive', 'Sales Manager', 'Salesman'] },
-      { to: '/customers', label: 'Customers', roles: ['Super Admin', 'admin', 'Sales Executive', 'Billing Executive', 'Sales Manager', 'Salesman'] }
+      { to: '/customers', label: 'Customers', roles: ['Super Admin', 'admin', 'Sales Executive', 'Billing Executive', 'Sales Manager', 'Salesman'] },
+      { to: '/sales/returns', label: 'Returns', roles: ['Super Admin', 'admin', 'Billing Executive', 'Sales Executive', 'Sales Manager', 'Dispatch Executive', 'Store Keeper'] }
     ]
   },
+
   {
     id: 'manufacturing',
     type: 'group',

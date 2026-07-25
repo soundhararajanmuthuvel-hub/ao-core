@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   ShieldAlert,
   RotateCcw,
@@ -32,10 +33,12 @@ import {
 } from 'lucide-react';
 
 export default function ReturnRecoveryModule() {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
+
 
   // Sample data states
   const [returnsList, setReturnsList] = useState([]);
@@ -84,7 +87,28 @@ export default function ReturnRecoveryModule() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+    const params = new URLSearchParams(location.search);
+    const inv = params.get('invoiceNo') || params.get('invoiceId') || params.get('createForInvoice');
+    const cust = params.get('customerName') || params.get('customer');
+    const prod = params.get('productName');
+    const batch = params.get('batchNumber');
+    const qty = params.get('qty');
+    const price = params.get('price');
+
+    if (inv || cust || prod) {
+      setFormData(prev => ({
+        ...prev,
+        productName: prod || prev.productName,
+        batchNumber: batch || prev.batchNumber,
+        quantity: qty ? parseFloat(qty) : prev.quantity,
+        unitPrice: price ? parseFloat(price) : prev.unitPrice,
+        customerType: cust || prev.customerType,
+      }));
+      setShowCreateModal(true);
+      setActiveTab('register');
+    }
+  }, [location.search]);
+
 
   const fetchData = async () => {
     try {

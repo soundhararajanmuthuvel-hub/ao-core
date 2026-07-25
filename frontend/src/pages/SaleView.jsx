@@ -823,8 +823,26 @@ export default function SaleView() {
                 💳 Record Payment
               </button>
             )}
+            <button
+              type="button"
+              className="btn btn-sm btn-warning"
+              onClick={() => {
+                const firstItem = sale.items && sale.items.length > 0 ? sale.items[0] : {};
+                const invNo = sale.invoiceNumber || sale.id;
+                const custName = sale.customer?.name || '';
+                const prodName = firstItem.productName || firstItem.product?.name || 'ABC Malt 500g Pouch';
+                const bNo = firstItem.batchNumber || 'ABC240715';
+                const q = firstItem.quantity || 10;
+                const p = firstItem.price || firstItem.unitPrice || 250;
+                navigate(`/sales/returns?createForInvoice=${invNo}&customer=${encodeURIComponent(custName)}&productName=${encodeURIComponent(prodName)}&batchNumber=${encodeURIComponent(bNo)}&qty=${q}&price=${p}`);
+              }}
+              style={{ border: 'none', background: 'transparent', fontWeight: 650, color: '#ef4444' }}
+            >
+              ↩️ Return
+            </button>
           </>
         )}
+
         {activeShipment ? (
           <button
             type="button"
