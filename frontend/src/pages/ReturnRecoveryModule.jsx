@@ -43,6 +43,7 @@ import {
   Calendar,
   ChevronRight,
   User,
+  UserCheck,
   ShieldCheck,
   ShieldAlert,
   Award,
@@ -51,6 +52,7 @@ import {
   BarChart2,
   FileSpreadsheet
 } from 'lucide-react';
+
 
 
 export default function ReturnRecoveryModule() {
