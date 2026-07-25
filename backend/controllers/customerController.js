@@ -44,7 +44,7 @@ exports.getCustomers = async (req, res) => {
     try {
       const User = require('../models/User');
       if (User) {
-        includeClause = [{ model: User, as: 'salesman', attributes: ['id', 'name', 'phone', 'email'], required: false }];
+        includeClause = [{ model: User, as: 'salesman', attributes: ['id', 'name', 'email'], required: false }];
       }
     } catch (e) {
       console.warn('Salesman association not bound:', e.message);
@@ -71,7 +71,7 @@ exports.getCustomer = async (req, res) => {
   try {
     const User = require('../models/User');
     const customer = await Customer.findByPk(req.params.id, {
-      include: [{ model: User, as: 'salesman', attributes: ['id', 'name', 'phone', 'email'], required: false }]
+      include: [{ model: User, as: 'salesman', attributes: ['id', 'name', 'email'], required: false }]
     });
     if (!customer) return res.status(404).json({ success: false, message: 'Customer not found' });
     res.json({ success: true, customer });
@@ -86,8 +86,9 @@ exports.getCustomer360Profile = async (req, res) => {
     const customerId = req.params.id;
     const User = require('../models/User');
     const customer = await Customer.findByPk(customerId, {
-      include: [{ model: User, as: 'salesman', attributes: ['id', 'name', 'phone', 'email'], required: false }]
+      include: [{ model: User, as: 'salesman', attributes: ['id', 'name', 'email'], required: false }]
     });
+
     if (!customer) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
     }

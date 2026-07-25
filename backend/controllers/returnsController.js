@@ -297,7 +297,7 @@ exports.getReturns = async (req, res) => {
       include: [
         { model: Customer, as: 'customer' },
         { model: Invoice, as: 'invoice' },
-        { model: User, as: 'salesman' },
+        { model: User, as: 'salesman', attributes: ['id', 'name', 'email', 'role'] },
         { model: ReturnItem, as: 'items', include: [{ model: Product, as: 'product' }] }
       ],
       order: [['createdAt', 'DESC']]
@@ -317,12 +317,13 @@ exports.getReturnById = async (req, res) => {
       include: [
         { model: Customer, as: 'customer' },
         { model: Invoice, as: 'invoice' },
-        { model: User, as: 'salesman' },
-        { model: User, as: 'qcInspector' },
-        { model: User, as: 'approvedBy' },
+        { model: User, as: 'salesman', attributes: ['id', 'name', 'email', 'role'] },
+        { model: User, as: 'qcInspector', attributes: ['id', 'name', 'email', 'role'] },
+        { model: User, as: 'approvedBy', attributes: ['id', 'name', 'email', 'role'] },
         { model: ReturnItem, as: 'items', include: [{ model: Product, as: 'product' }] }
       ]
     });
+
 
     if (!returnReq) {
       return res.status(404).json({ success: false, message: 'Return Request not found' });
