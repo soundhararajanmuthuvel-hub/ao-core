@@ -299,14 +299,15 @@ export const ordersApi = {
 
 export const migrationApi = {
   upload: (formData) => client.post('/migration/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
-  execute: (data) => client.post('/migration/execute', data),
+  execute: (data) => client.post('/migration/execute', data, { timeout: 300000 }),
+  jobStatus: (jobId) => client.get(`/migration/status/${jobId}`),
   history: () => client.get('/migration/history'),
   logs: (id) => client.get(`/migration/logs/${id}`),
   rollback: (id) => client.post(`/migration/rollback/${id}`),
   exportUrl: () => `${client.defaults.baseURL}/migration/export`,
-  exportBackup: () => client.get('/migration/export', { responseType: 'blob' }),
+  exportBackup: () => client.get('/migration/export', { responseType: 'blob', timeout: 300000 }),
   downloadErrorReport: (id) => client.get(`/migration/error-report/${id}`, { responseType: 'blob' }),
-  restore: (formData) => client.post('/migration/restore', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  restore: (formData) => client.post('/migration/restore', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000 }),
 };
 
 export const sfaApi = {

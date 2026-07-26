@@ -2670,9 +2670,13 @@ function MigrationCenter() {
     }
   };
 
+  const [migrationJobProgress, setMigrationJobProgress] = useState(null);
+
   const handleStartIngestion = async () => {
     setMigrating(true);
     setMigrationErrorDetails(null);
+    setMigrationJobProgress({ progress: 5, currentStage: 'Initiating Background Migration Job (5%)', currentFile: 'Analysis Summary', recordsProcessed: 0, totalRecords: 100 });
+
     try {
       const { data } = await migrationApi.execute({
         tempFileId,
@@ -2681,23 +2685,53 @@ function MigrationCenter() {
         productDuplicatePolicy,
         is_historical_data: importType === 'historical_import'
       });
-      if (data.success) {
-        setMigrationReport(data.report || {});
-        setMigrationTotals(data.totals || null);
-        setSelectedMigrationId(data.migrationId);
-        setStep(5);
-        toast('Data migration successful', 'success');
+
+      if (data.success && data.jobId) {
+        toast('Migration background job started', 'info');
+        
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusRes = await migrationApi.jobStatus(data.jobId);
+            const job = statusRes.data?.job;
+            if (job) {
+              setMigrationJobProgress(job);
+              
+              if (job.status === 'Completed') {
+                clearInterval(pollInterval);
+                setMigrationReport(job.report || {});
+                setMigrationTotals(job.totals || null);
+                setSelectedMigrationId(job.migrationId);
+                setStep(5);
+                setMigrating(false);
+                setMigrationJobProgress(null);
+                toast('Data migration completed successfully', 'success');
+              } else if (job.status === 'Failed') {
+                clearInterval(pollInterval);
+                setMigrationErrorDetails({
+                  stage: job.currentStage || 'Data Ingestion',
+                  error: job.error || 'Ingestion failed',
+                  details: job.details || 'Check logs for details.',
+                  fixSuggestion: job.fixSuggestion || 'Resolve validation or formatting errors and retry.',
+                  migrationId: job.migrationId
+                });
+                setMigrating(false);
+                setMigrationJobProgress(null);
+                toast(`Ingestion Failed: ${job.error}`, 'error');
+              }
+            }
+          } catch (pollErr) {
+            console.error('Job status polling error:', pollErr);
+          }
+        }, 2000);
+
       } else {
-        setMigrationErrorDetails({
-          stage: data.stage || 'Data Ingestion',
-          error: data.error || data.message || 'Ingestion failed',
-          details: data.details || 'Check input data or logs.',
-          fixSuggestion: data.fixSuggestion || 'Resolve validation or format errors and retry.',
-          migrationId: data.migrationId
-        });
-        toast(`Ingestion Failed: ${data.error || data.message}`, 'error');
+        setMigrating(false);
+        setMigrationJobProgress(null);
+        toast(data.message || 'Failed to start migration job', 'error');
       }
     } catch (err) {
+      setMigrating(false);
+      setMigrationJobProgress(null);
       const resp = err.response?.data || {};
       setMigrationErrorDetails({
         stage: resp.stage || 'Ingestion Error',
@@ -2707,8 +2741,6 @@ function MigrationCenter() {
         migrationId: resp.migrationId
       });
       toast(`Ingestion Failed: ${resp.error || resp.message || err.message}`, 'error');
-    } finally {
-      setMigrating(false);
     }
   };
 

@@ -21,6 +21,7 @@ const migrationController = require('../controllers/migrationController');
 // Routes
 router.post('/upload', auth, authorize('admin'), upload.single('file'), migrationController.analyzeUploadedFiles);
 router.post('/execute', auth, authorize('admin'), migrationController.executeMigration);
+router.get('/status/:jobId', auth, migrationController.getJobStatus);
 router.get('/history', auth, authorize('admin'), migrationController.getMigrationHistory);
 router.get('/logs/:id', auth, authorize('admin'), migrationController.getMigrationLogs);
 router.post('/rollback/:id', auth, authorize('admin'), migrationController.rollbackMigration);

@@ -200,21 +200,41 @@ async function parseExcel(buffer) {
 
 // Smart detection handler
 // Filename to module helper
+// Smart detection handler
+// Filename to module helper
 const mapFilenameToModule = (filename) => {
   const nameWithoutExt = filename.replace(/\.(csv|xlsx)$/i, '').toLowerCase();
-  if (/^contacts?$/i.test(nameWithoutExt)) return 'customers';
-  if (/^contact_persons?$/i.test(nameWithoutExt)) return 'contact_persons';
-  if (/^invoices?$/i.test(nameWithoutExt) || /^invoice$/i.test(nameWithoutExt)) return 'invoices';
-  if (/^(customer_)?payments?$/i.test(nameWithoutExt) || /^paymentsreceived$/i.test(nameWithoutExt)) return 'payments';
-  if (/^(items?|products?)$/i.test(nameWithoutExt)) return 'products';
-  if (/^credit_notes?$/i.test(nameWithoutExt) || /^credit_note$/i.test(nameWithoutExt)) return 'credit_notes';
-  if (/^creditnotes_invoice$/i.test(nameWithoutExt)) return 'credit_note_links';
-  if (/^quotes?$/i.test(nameWithoutExt) || /^quote$/i.test(nameWithoutExt)) return 'quotations';
-  if (/^sales_receipts?$/i.test(nameWithoutExt) || /^sales_receipt$/i.test(nameWithoutExt)) return 'sales_receipts';
-  if (/^refunds?$/i.test(nameWithoutExt) || /^refund$/i.test(nameWithoutExt)) return 'refunds';
-  if (/^recurring_invoices?$/i.test(nameWithoutExt) || /^recurring_invoice$/i.test(nameWithoutExt)) return 'recurring_invoices';
-  if (/^expenses?$/i.test(nameWithoutExt) || /^expense$/i.test(nameWithoutExt)) return 'expenses';
-  if (/^activity_logs?$/i.test(nameWithoutExt) || /^activity_logs$/i.test(nameWithoutExt)) return 'activity_logs';
+
+  // Customers (customers.csv, contacts.csv, customer.csv, Customers Export.csv, CustomerMaster.csv, Client_Master.csv)
+  if (/customer|contact|client/i.test(nameWithoutExt) && !/contact_person/i.test(nameWithoutExt)) return 'customers';
+  if (/contact_person/i.test(nameWithoutExt)) return 'contact_persons';
+
+  // Invoices & Billing
+  if (/invoice|bill|sales_inv|tax_inv/i.test(nameWithoutExt) && !/recurring/i.test(nameWithoutExt)) return 'invoices';
+  if (/recurring.*invoice/i.test(nameWithoutExt)) return 'recurring_invoices';
+  if (/sales_receipt|receipt/i.test(nameWithoutExt) && !/payment/i.test(nameWithoutExt)) return 'sales_receipts';
+
+  // Payments
+  if (/payment|received|amount_rec/i.test(nameWithoutExt)) return 'payments';
+
+  // Products & Inventory
+  if (/product|item|sku|goods|master_product/i.test(nameWithoutExt) && !/raw_material/i.test(nameWithoutExt)) return 'products';
+
+  // Credit Notes
+  if (/credit_note|creditnote/i.test(nameWithoutExt) && !/link|invoice/i.test(nameWithoutExt)) return 'credit_notes';
+  if (/credit.*link|credit.*invoice/i.test(nameWithoutExt)) return 'credit_note_links';
+
+  // Quotations & Estimates
+  if (/quote|estimate|quotation/i.test(nameWithoutExt)) return 'quotations';
+
+  // Refunds & Expenses
+  if (/refund/i.test(nameWithoutExt)) return 'refunds';
+  if (/expense/i.test(nameWithoutExt)) return 'expenses';
+
+  // Raw Materials & Activity Logs
+  if (/raw_material|rawmaterial|ingredient|bom/i.test(nameWithoutExt)) return 'raw_materials';
+  if (/activity|log/i.test(nameWithoutExt)) return 'activity_logs';
+
   return null;
 };
 
@@ -262,19 +282,19 @@ const detectModuleFromHeaders = (headers) => {
   const lowerHeaders = headers.map(h => h.toLowerCase().trim());
   const matchesCount = (arr) => arr.filter(item => lowerHeaders.some(lh => lh.includes(item))).length;
 
-  if (matchesCount(['customer name', 'display name', 'outstanding balance', 'customer type']) >= 2) return 'customers';
-  if (matchesCount(['contact person', 'salutation', 'first name', 'last name']) >= 2) return 'contact_persons';
-  if (matchesCount(['invoice number', 'invoice date', 'invoice id', 'invoice #']) >= 2) return 'invoices';
-  if (matchesCount(['payment number', 'payment mode', 'payment date', 'amount received']) >= 2) return 'payments';
-  if (matchesCount(['item name', 'item code', 'sku', 'selling price', 'rate']) >= 2) return 'products';
-  if (matchesCount(['credit note', 'credit note number', 'credit note date', 'credit note #']) >= 2) return 'credit_notes';
-  if (matchesCount(['credit note id', 'creditnote id', 'invoice number', 'credited amount']) >= 2) return 'credit_note_links';
-  if (matchesCount(['quote number', 'quote #', 'quote date', 'expiry date']) >= 2) return 'quotations';
-  if (matchesCount(['sales receipt', 'sales receipt number', 'receipt date']) >= 2) return 'sales_receipts';
-  if (matchesCount(['refund number', 'refund id', 'amount refunded']) >= 2) return 'refunds';
-  if (matchesCount(['recurring invoice', 'profile name', 'recurrence']) >= 2) return 'recurring_invoices';
-  if (matchesCount(['expense id', 'expense account', 'expense amount']) >= 2) return 'expenses';
-  if (matchesCount(['activity log', 'log time', 'activity description']) >= 2) return 'activity_logs';
+  if (matchesCount(['customer name', 'display name', 'outstanding balance', 'customer type', 'contact name', 'phone', 'email']) >= 1) return 'customers';
+  if (matchesCount(['contact person', 'salutation', 'first name', 'last name']) >= 1) return 'contact_persons';
+  if (matchesCount(['invoice number', 'invoice date', 'invoice id', 'invoice #', 'due date', 'total']) >= 1) return 'invoices';
+  if (matchesCount(['payment number', 'payment mode', 'payment date', 'amount received', 'reference']) >= 1) return 'payments';
+  if (matchesCount(['item name', 'item code', 'sku', 'selling price', 'rate', 'price', 'product name']) >= 1) return 'products';
+  if (matchesCount(['credit note', 'credit note number', 'credit note date', 'credit note #']) >= 1) return 'credit_notes';
+  if (matchesCount(['credit note id', 'creditnote id', 'invoice number', 'credited amount']) >= 1) return 'credit_note_links';
+  if (matchesCount(['quote number', 'quote #', 'quote date', 'expiry date']) >= 1) return 'quotations';
+  if (matchesCount(['sales receipt', 'sales receipt number', 'receipt date']) >= 1) return 'sales_receipts';
+  if (matchesCount(['refund number', 'refund id', 'amount refunded']) >= 1) return 'refunds';
+  if (matchesCount(['recurring invoice', 'profile name', 'recurrence']) >= 1) return 'recurring_invoices';
+  if (matchesCount(['expense id', 'expense account', 'expense amount']) >= 1) return 'expenses';
+  if (matchesCount(['activity log', 'log time', 'activity description']) >= 1) return 'activity_logs';
 
   return null;
 };
@@ -430,15 +450,25 @@ exports.analyzeUploadedFiles = async (req, res) => {
   }
 };
 
-// Executing migration
-exports.executeMigration = async (req, res) => {
-  const { tempFileId, duplicatePolicy, customerDuplicatePolicy, productDuplicatePolicy, is_historical_data } = req.body;
-  const isHistorical = is_historical_data === true || is_historical_data === 'true';
-  const username = req.user?.name || 'Super Admin';
+const activeMigrationJobs = new Map();
 
-  const custPolicy = customerDuplicatePolicy || duplicatePolicy || 'merge';
-  const prodPolicy = productDuplicatePolicy || duplicatePolicy || 'merge';
-  const generalPolicy = duplicatePolicy || 'merge';
+exports.getJobStatus = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const job = activeMigrationJobs.get(jobId);
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Migration background job not found' });
+    }
+    res.json({ success: true, job });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to retrieve job status', error: err.message });
+  }
+};
+
+// Executing migration background job starter
+exports.executeMigration = async (req, res) => {
+  const { tempFileId } = req.body;
+  const username = req.user?.name || 'Super Admin';
 
   if (!tempFileId) {
     return res.status(400).json({ success: false, message: 'Temporary session data missing' });
@@ -451,7 +481,6 @@ exports.executeMigration = async (req, res) => {
 
   const extractedData = JSON.parse(fs.readFileSync(tempPath, 'utf8'));
 
-  // Create migration session history log OUTSIDE transaction so it persists on failure!
   let migrationHistoryRecord = null;
   try {
     migrationHistoryRecord = await MigrationHistory.create({
@@ -467,11 +496,72 @@ exports.executeMigration = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to initiate migration log' });
   }
 
+  const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const totalCount = Object.values(extractedData).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+
+  const jobState = {
+    jobId,
+    migrationId: migrationHistoryRecord.id,
+    status: 'Processing',
+    progress: 5,
+    currentStage: 'Initiating Background Migration Job (5%)',
+    currentFile: 'Analysis Summary',
+    recordsProcessed: 0,
+    totalRecords: Math.max(1, totalCount),
+    recordsImported: 0,
+    recordsUpdated: 0,
+    recordsSkipped: 0,
+    recordsFailed: 0,
+    report: {},
+    totals: null,
+    error: null,
+    details: null,
+    fixSuggestion: null,
+    startTime: Date.now(),
+    endTime: null,
+    durationMs: 0
+  };
+
+  activeMigrationJobs.set(jobId, jobState);
+
+  // Return HTTP 200 immediately to frontend (< 50ms)!
+  res.json({
+    success: true,
+    jobId,
+    migrationId: migrationHistoryRecord.id,
+    message: 'Migration job started in background'
+  });
+
+  // Launch asynchronous execution in background worker thread
+  setImmediate(() => {
+    runAsyncMigrationWorker(jobId, tempPath, extractedData, req.body, migrationHistoryRecord, req.user);
+  });
+};
+
+// Async Background Migration Worker Implementation
+const runAsyncMigrationWorker = async (jobId, tempPath, extractedData, bodyOptions, migrationHistoryRecord, userUser) => {
+  const jobState = activeMigrationJobs.get(jobId);
+  const { duplicatePolicy, customerDuplicatePolicy, productDuplicatePolicy, is_historical_data } = bodyOptions;
+  const isHistorical = is_historical_data === true || is_historical_data === 'true';
+
+  const custPolicy = customerDuplicatePolicy || duplicatePolicy || 'merge';
+  const prodPolicy = productDuplicatePolicy || duplicatePolicy || 'merge';
+  const generalPolicy = duplicatePolicy || 'merge';
+
+  const updateProgress = (stage, percent, fileInfo, processedCount) => {
+    if (!jobState) return;
+    jobState.currentStage = stage;
+    jobState.progress = Math.min(99, Math.max(jobState.progress, percent));
+    if (fileInfo) jobState.currentFile = fileInfo;
+    if (processedCount !== undefined) jobState.recordsProcessed = processedCount;
+  };
+
+  updateProgress('Starting Transaction & File Ingestion (10%)', 10, 'Preparation', 0);
+
   // Database transaction boundary
   const t = await sequelize.transaction();
 
   try {
-
     const logMessages = [];
     const addLog = async (level, message) => {
       logMessages.push({ migrationId: migrationHistoryRecord.id, level, message });
@@ -1641,6 +1731,9 @@ exports.executeMigration = async (req, res) => {
     // Write all detailed diagnostic logs
     await MigrationDetailLog.bulkCreate(logMessages, { transaction: t });
 
+    // Write all detailed diagnostic logs
+    await MigrationDetailLog.bulkCreate(logMessages, { transaction: t });
+
     // Commit Transaction!
     await t.commit();
 
@@ -1649,13 +1742,15 @@ exports.executeMigration = async (req, res) => {
       fs.unlinkSync(tempPath);
     } catch {}
 
-    res.json({
-      success: true,
-      message: 'Data migration completed successfully',
-      migrationId: migrationHistoryRecord.id,
-      report: countReport,
-      totals: reportTotals
-    });
+    if (jobState) {
+      jobState.status = 'Completed';
+      jobState.progress = 100;
+      jobState.currentStage = 'Migration completed (100%)';
+      jobState.report = countReport;
+      jobState.totals = reportTotals;
+      jobState.endTime = Date.now();
+      jobState.durationMs = jobState.endTime - jobState.startTime;
+    }
 
   } catch (err) {
     // Rollback transaction on failure!
@@ -1682,15 +1777,15 @@ exports.executeMigration = async (req, res) => {
       }
     }
 
-    res.status(200).json({
-      success: false,
-      stage: stage,
-      error: err.message,
-      details: err.stack || err.message,
-      fixSuggestion: fixSuggestion,
-      migrationId: migrationHistoryRecord ? migrationHistoryRecord.id : null,
-      message: `[${stage}] ${err.message}`
-    });
+    if (jobState) {
+      jobState.status = 'Failed';
+      jobState.error = err.message;
+      jobState.currentStage = stage;
+      jobState.details = err.stack || err.message;
+      jobState.fixSuggestion = fixSuggestion;
+      jobState.endTime = Date.now();
+      jobState.durationMs = jobState.endTime - jobState.startTime;
+    }
   }
 };
 
