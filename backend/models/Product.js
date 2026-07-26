@@ -254,6 +254,62 @@ const Product = sequelize.define('Product', {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
+  isPublished: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+  },
+  status: {
+    type: DataTypes.STRING,
+    defaultValue: 'Published',
+  },
+  availabilityState: {
+    type: DataTypes.STRING,
+    defaultValue: 'In Stock',
+  },
+  faqs: {
+    type: DataTypes.TEXT,
+    defaultValue: '[]',
+  },
+  badges: {
+    type: DataTypes.TEXT,
+    defaultValue: '[]',
+  },
+  healthGoals: {
+    type: DataTypes.TEXT,
+    defaultValue: '[]',
+  },
+  isTrending: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  sortOrder: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  relatedProductIds: {
+    type: DataTypes.TEXT,
+    defaultValue: '[]',
+  },
+  upsellProductIds: {
+    type: DataTypes.TEXT,
+    defaultValue: '[]',
+  },
+  crossSellProductIds: {
+    type: DataTypes.TEXT,
+    defaultValue: '[]',
+  },
+  versionHistory: {
+    type: DataTypes.TEXT,
+    defaultValue: '[]',
+  },
+  createdById: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  lastUpdatedBy: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
 
   isLowStock: {
     type: DataTypes.VIRTUAL,

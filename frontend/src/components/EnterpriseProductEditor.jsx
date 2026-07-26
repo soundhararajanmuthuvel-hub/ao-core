@@ -275,42 +275,69 @@ export default function EnterpriseProductEditor({
 
   // Save Product Handler
   const handleSaveProduct = async (statusOverride = null) => {
-    const targetMasterId = formData.managementProductId || formData.productId;
-    if (!targetMasterId) {
-      setMsg({ type: 'error', text: 'Please select an active product from Billing Product Master.' });
+    // 1. Client-Side Enterprise Validation
+    if (!formData.name || !formData.name.trim()) {
+      setMsg({ type: 'error', text: 'Product Title is required.' });
+      return;
+    }
+
+    if (!formData.slug || !formData.slug.trim()) {
+      setMsg({ type: 'error', text: 'URL Slug is required.' });
+      return;
+    }
+
+    const numPrice = Number(formData.price);
+    if (formData.price === undefined || formData.price === null || formData.price === '' || isNaN(numPrice) || numPrice <= 0) {
+      setMsg({ type: 'error', text: 'Please enter a valid positive Selling Price (₹).' });
       return;
     }
 
     setSaving(true);
     setMsg({ type: '', text: '' });
 
-    const finalStatus = statusOverride || formData.status;
+    const finalIsPublished = formData.isPublished !== undefined ? !!formData.isPublished : (formData.status === 'Published' || formData.status === 'published');
+
     const payload = {
-      managementProductId: targetMasterId,
-      productId: targetMasterId,
-      slug: formData.slug,
-      description: formData.description,
-      shortDescription: formData.shortDescription,
-      galleryImages: JSON.stringify(formData.images),
-      images: JSON.stringify(formData.images),
-      benefits: JSON.stringify(formData.benefits),
-      ingredients: JSON.stringify(formData.ingredients),
-      nutritionFacts: JSON.stringify(
-        (formData.nutritionTable || []).reduce((acc, curr) => {
-          acc[curr.nutrient] = `${curr.value}${curr.unit}`;
-          return acc;
-        }, {})
-      ),
-      faqs: JSON.stringify(formData.faqs || []),
-      seoTitle: formData.metaTitle || formData.seoTitle || '',
-      seoDescription: formData.metaDescription || formData.seoDescription || '',
+      name: formData.name.trim(),
+      slug: formData.slug.trim(),
+      sku: formData.sku?.trim() || '',
+      barcode: formData.barcode?.trim() || '',
+      category: formData.category || 'General',
+      brand: formData.brand || 'Blovit Organics',
+      price: numPrice,
+      compareAtPrice: Number(formData.mrp || formData.compareAtPrice || 0),
+      mrp: Number(formData.mrp || formData.compareAtPrice || 0),
+      stock: Number(formData.stock || 0),
+      unit: formData.unit || 'pcs',
+      gstPercent: Number(formData.gstPercent || 5),
+      status: formData.status || (finalIsPublished ? 'Published' : 'Draft'),
+      availabilityState: formData.availabilityState || 'In Stock',
+      isPublished: finalIsPublished,
+      isActive: formData.isActive !== undefined ? !!formData.isActive : true,
+      shortDescription: formData.shortDescription || '',
+      description: formData.description || '',
+      images: formData.images || [],
+      galleryImages: formData.images || [],
+      imageUrl: formData.images?.[0] || formData.imageUrl || '',
+      benefits: formData.benefits || [],
+      ingredients: formData.ingredients || [],
+      nutritionFacts: (formData.nutritionTable || []).reduce((acc, curr) => {
+        if (curr.nutrient) acc[curr.nutrient] = `${curr.value}${curr.unit}`;
+        return acc;
+      }, {}),
+      usageInstructions: formData.usageInstructions || '',
+      faqs: formData.faqs || [],
+      seoTitle: formData.metaTitle || formData.seoTitle || formData.name,
+      seoDescription: formData.metaDescription || formData.seoDescription || formData.shortDescription || formData.name,
       seoKeywords: formData.keywords || formData.seoKeywords || '',
-      badges: JSON.stringify(formData.badges || []),
-      healthGoals: JSON.stringify(formData.healthGoals || []),
+      badges: formData.badges || [],
+      healthGoals: formData.healthGoals || [],
       isFeatured: !!formData.isFeatured,
       isBestseller: !!formData.isBestseller,
       isTrending: !!formData.isTrending,
-      isPublished: finalStatus === 'published',
+      sortOrder: Number(formData.sortOrder || 0),
+      managementProductId: formData.managementProductId || formData.productId || formData.id,
+      productId: formData.id || formData.productId,
     };
 
     try {
@@ -323,12 +350,12 @@ export default function EnterpriseProductEditor({
 
       if (res.data.success) {
         setIsDirty(false);
-        setMsg({ type: 'success', text: `Website Product settings ${formData.id ? 'updated' : 'configured'} successfully!` });
+        setMsg({ type: 'success', text: `Product "${formData.name}" saved successfully!` });
         onSaveSuccess();
         setTimeout(() => onClose(), 800);
       }
     } catch (err) {
-      setMsg({ type: 'error', text: err.response?.data?.message || 'Failed to save website product settings.' });
+      setMsg({ type: 'error', text: err.response?.data?.message || 'Failed to save product.' });
     } finally {
       setSaving(false);
     }

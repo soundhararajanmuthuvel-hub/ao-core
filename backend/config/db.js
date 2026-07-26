@@ -615,6 +615,8 @@ const connectDB = async () => {
   try {
     const ProductModel = require('../models/Product');
     await syncModelAttributesToTable(ProductModel, 'Product');
+    const ProductAuditLogModel = require('../models/ProductAuditLog');
+    await syncModelAttributesToTable(ProductAuditLogModel, 'ProductAuditLog');
   } catch (syncErr) {
     console.error('Failed to sync Product model attributes to table:', syncErr.message);
   }

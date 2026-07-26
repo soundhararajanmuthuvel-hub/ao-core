@@ -123,19 +123,23 @@ export default function ProductInformationCard({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {/* Title */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
-                Product Title (Product Master)
-              </label>
-              <span style={{ fontSize: '0.7rem', color: '#0284C7', fontWeight: 700, background: '#E0F2FE', padding: '1px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                <Lock size={10} /> Read-Only from Billing
-              </span>
-            </div>
+            <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569', marginBottom: '4px', display: 'block' }}>
+              Product Title *
+            </label>
             <input
               type="text"
-              readOnly
+              placeholder="e.g. Sprouted Ragi Malt 250g"
               value={formData.name || ''}
-              style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem', fontWeight: 700, backgroundColor: '#F8FAFC', color: '#334155' }}
+              onChange={(e) => {
+                const newName = e.target.value;
+                setFormData((prev) => ({
+                  ...prev,
+                  name: newName,
+                  slug: prev.editingSlugManually ? prev.slug : newName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+                }));
+                setIsDirty(true);
+              }}
+              style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem', fontWeight: 700, color: '#0F172A' }}
             />
           </div>
 
@@ -147,9 +151,10 @@ export default function ProductInformationCard({
               </label>
               <input
                 type="text"
+                placeholder="product-url-slug"
                 value={formData.slug || ''}
                 onChange={(e) => {
-                  setFormData((prev) => ({ ...prev, slug: e.target.value }));
+                  setFormData((prev) => ({ ...prev, slug: e.target.value, editingSlugManually: true }));
                   setIsDirty(true);
                 }}
                 style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.85rem', fontFamily: 'monospace' }}
@@ -157,32 +162,34 @@ export default function ProductInformationCard({
             </div>
 
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
-                  Category
-                </label>
-                <Lock size={10} color="#0284C7" />
-              </div>
+              <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569', marginBottom: '4px', display: 'block' }}>
+                Category
+              </label>
               <input
                 type="text"
-                readOnly
+                placeholder="Category (e.g. Health Mixes)"
                 value={formData.category || 'General'}
-                style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.85rem', backgroundColor: '#F8FAFC', color: '#334155', fontWeight: 600 }}
+                onChange={(e) => {
+                  setFormData((prev) => ({ ...prev, category: e.target.value }));
+                  setIsDirty(true);
+                }}
+                style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.85rem', color: '#0F172A', fontWeight: 600 }}
               />
             </div>
 
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
-                  Brand
-                </label>
-                <Lock size={10} color="#0284C7" />
-              </div>
+              <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569', marginBottom: '4px', display: 'block' }}>
+                Brand
+              </label>
               <input
                 type="text"
-                readOnly
-                value={formData.brand || 'Blovit'}
-                style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.85rem', backgroundColor: '#F8FAFC', color: '#334155', fontWeight: 600 }}
+                placeholder="Brand Name"
+                value={formData.brand || 'Blovit Organics'}
+                onChange={(e) => {
+                  setFormData((prev) => ({ ...prev, brand: e.target.value }));
+                  setIsDirty(true);
+                }}
+                style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.85rem', color: '#0F172A', fontWeight: 600 }}
               />
             </div>
           </div>

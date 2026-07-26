@@ -41,8 +41,8 @@ const getProducts = async (req, res) => {
     const formattedProducts = masterProducts.map((p) => {
       const wp = p.websiteProduct || {};
 
-      // If website settings explicitly set isPublished to false, check publication
-      if (wp.isPublished === false) return null;
+      // If website settings or product explicitly set isPublished to false or status is Draft, filter out
+      if (wp.isPublished === false || p.isPublished === false || p.publishToWebsite === false || p.status === 'Draft') return null;
 
       if (isBestseller === 'true' && !wp.isBestseller) return null;
       if (isFeatured === 'true' && !wp.isFeatured) return null;
@@ -125,7 +125,7 @@ const getProductBySlug = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Product not found or unavailable' });
     }
 
-    if (wp && wp.isPublished === false) {
+    if ((wp && wp.isPublished === false) || masterProduct.isPublished === false || masterProduct.publishToWebsite === false || masterProduct.status === 'Draft') {
       return res.status(404).json({ success: false, message: 'Product is currently not published on website' });
     }
 

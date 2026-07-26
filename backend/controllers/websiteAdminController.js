@@ -185,12 +185,47 @@ const getAdminProducts = async (req, res) => {
   }
 };
 
+const ProductAuditLog = require('../models/ProductAuditLog');
+
+// Helper for automatic slug conflict resolution
+const resolveUniqueSlug = async (rawSlug, currentProductId = null) => {
+  const baseSlug = generateSlug(rawSlug || 'product');
+  let candidateSlug = baseSlug;
+  let counter = 1;
+
+  while (true) {
+    const whereClause = { slug: candidateSlug };
+    if (currentProductId) {
+      whereClause.id = { [Op.ne]: currentProductId };
+    }
+    const existing = await Product.findOne({ where: whereClause });
+    if (!existing) {
+      return candidateSlug;
+    }
+    counter++;
+    candidateSlug = `${baseSlug}-${counter}`;
+  }
+};
+
 const createAdminProduct = async (req, res) => {
   try {
     const {
-      managementProductId,
-      productId,
+      name,
       slug,
+      sku,
+      barcode,
+      category,
+      brand,
+      price,
+      compareAtPrice,
+      mrp,
+      stock,
+      unit,
+      gstPercent,
+      status,
+      availabilityState,
+      isPublished,
+      isActive,
       shortDescription,
       description,
       benefits,
@@ -206,31 +241,44 @@ const createAdminProduct = async (req, res) => {
       isFeatured,
       isBestseller,
       isTrending,
-      isPublished,
       sortOrder,
       images,
       galleryImages,
+      imageUrl,
+      relatedProductIds,
+      upsellProductIds,
+      crossSellProductIds,
+      managementProductId,
+      productId,
     } = req.body;
 
-    const targetMasterId = managementProductId || productId;
-    if (!targetMasterId) {
-      return res.status(400).json({ success: false, message: 'Please select a Product from Product Master.' });
+    // 1. Enterprise Validation Rules
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Product Name is required.' });
     }
 
-    const masterProduct = await Product.findByPk(targetMasterId);
-    if (!masterProduct) {
-      return res.status(404).json({ success: false, message: 'Selected Product Master record not found.' });
+    const numericPrice = Number(price !== undefined && price !== null ? price : 0);
+    if (isNaN(numericPrice) || numericPrice <= 0) {
+      return res.status(400).json({ success: false, message: 'Price must be a valid positive number.' });
     }
 
-    // Prevent duplicate WebsiteProduct for the same Product Master ID
-    const existingWp = await WebsiteProduct.findOne({ where: { managementProductId: targetMasterId } });
-    if (existingWp) {
-      return res.status(400).json({
-        success: false,
-        message: `Website product settings already exist for Product "${masterProduct.name}" (SKU: ${masterProduct.sku}). Please edit existing settings.`,
-        existingId: existingWp.id
-      });
+    const finalSku = sku?.trim() || `SKU-${Date.now()}`;
+    if (sku?.trim()) {
+      const existingSku = await Product.findOne({ where: { sku: sku.trim() } });
+      if (existingSku) {
+        return res.status(400).json({ success: false, message: `Duplicate SKU "${sku}" already exists. SKU must be unique.` });
+      }
     }
+
+    if (barcode?.trim()) {
+      const existingBarcode = await Product.findOne({ where: { barcode: barcode.trim() } });
+      if (existingBarcode) {
+        return res.status(400).json({ success: false, message: `Duplicate Barcode "${barcode}" already exists.` });
+      }
+    }
+
+    // 2. Automatic Slug Conflict Resolution
+    const uniqueSlug = await resolveUniqueSlug(slug || name);
 
     const formatArrayJson = (val) => {
       if (Array.isArray(val)) return JSON.stringify(val);
@@ -242,17 +290,49 @@ const createAdminProduct = async (req, res) => {
       return '[]';
     };
 
-    const finalSlug = slug ? generateSlug(slug) : generateSlug(`${masterProduct.name}-${masterProduct.sku || targetMasterId}`);
-    const galleryArrJson = formatArrayJson(galleryImages || images);
+    const galleryArr = Array.isArray(galleryImages || images)
+      ? (galleryImages || images)
+      : (() => {
+          try { return JSON.parse(galleryImages || images || '[]'); } catch { return []; }
+        })();
+    const galleryArrJson = JSON.stringify(galleryArr);
+    const primaryImgUrl = imageUrl || (galleryArr.length > 0 ? galleryArr[0] : '');
 
-    const newWp = await WebsiteProduct.create({
-      managementProductId: targetMasterId,
-      name: masterProduct.name,
-      sku: masterProduct.sku,
-      slug: finalSlug,
-      price: masterProduct.sellingPrice || masterProduct.price || 0,
-      stock: masterProduct.stock || 0,
-      category: masterProduct.category || 'General',
+    const finalIsPublished = isPublished !== undefined ? !!isPublished : (status === 'Published');
+    const finalIsActive = isActive !== undefined ? !!isActive : true;
+
+    // Initial Version Snapshot
+    const initialVersion = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      name,
+      price: numericPrice,
+      stock: Number(stock || 0),
+      isPublished: finalIsPublished,
+      status: status || (finalIsPublished ? 'Published' : 'Draft'),
+    };
+
+    // 3. Atomic Single Record Save into Core Product Model
+    const masterProduct = await Product.create({
+      name: name.trim(),
+      slug: uniqueSlug,
+      sku: finalSku,
+      barcode: barcode?.trim() || null,
+      category: category?.trim() || 'General',
+      brand: brand?.trim() || 'Blovit Organics',
+      price: numericPrice,
+      sellingPrice: numericPrice,
+      salePrice: numericPrice,
+      compareAtPrice: Number(compareAtPrice || mrp || 0),
+      mrp: Number(mrp || compareAtPrice || 0),
+      stock: Math.max(0, Number(stock || 0)),
+      unit: unit?.trim() || 'pcs',
+      gstPercent: Number(gstPercent || 5),
+      productType: 'trading',
+      imageUrl: primaryImgUrl,
+      image: primaryImgUrl,
+      images: galleryArrJson,
+      galleryImages: galleryArrJson,
       shortDescription: shortDescription || '',
       description: description || '',
       benefits: formatArrayJson(benefits),
@@ -260,21 +340,74 @@ const createAdminProduct = async (req, res) => {
       nutritionFacts: typeof nutritionFacts === 'object' ? JSON.stringify(nutritionFacts) : (nutritionFacts || '{}'),
       usageInstructions: usageInstructions || '',
       faqs: formatArrayJson(faqs),
-      seoTitle: seoTitle || '',
-      seoDescription: seoDescription || '',
+      seoTitle: seoTitle || name,
+      seoDescription: seoDescription || shortDescription || name,
       seoKeywords: seoKeywords || '',
       badges: formatArrayJson(badges),
       healthGoals: formatArrayJson(healthGoals),
       isFeatured: !!isFeatured,
       isBestseller: !!isBestseller,
       isTrending: !!isTrending,
-      isPublished: isPublished !== undefined ? !!isPublished : true,
-      isActive: true,
-      sortOrder: sortOrder ? Number(sortOrder) : 0,
+      isPublished: finalIsPublished,
+      publishToWebsite: finalIsPublished,
+      status: status || (finalIsPublished ? 'Published' : 'Draft'),
+      availabilityState: availabilityState || (Number(stock || 0) > 0 ? 'In Stock' : 'Out of Stock'),
+      sortOrder: Number(sortOrder || 0),
+      relatedProductIds: formatArrayJson(relatedProductIds),
+      upsellProductIds: formatArrayJson(upsellProductIds),
+      crossSellProductIds: formatArrayJson(crossSellProductIds),
+      versionHistory: JSON.stringify([initialVersion]),
+      isActive: finalIsActive,
+      isArchived: false,
+    });
+
+    // 4. Create / Link WebsiteProduct Setting Record
+    const newWp = await WebsiteProduct.create({
+      managementProductId: masterProduct.id,
+      name: masterProduct.name,
+      sku: masterProduct.sku,
+      slug: masterProduct.slug,
+      price: numericPrice,
+      compareAtPrice: masterProduct.mrp,
+      stock: masterProduct.stock,
+      category: masterProduct.category,
+      shortDescription: masterProduct.shortDescription,
+      description: masterProduct.description,
+      benefits: masterProduct.benefits,
+      ingredients: masterProduct.ingredients,
+      nutritionFacts: masterProduct.nutritionFacts,
+      usageInstructions: masterProduct.usageInstructions,
+      faqs: masterProduct.faqs,
+      seoTitle: masterProduct.seoTitle,
+      seoDescription: masterProduct.seoDescription,
+      seoKeywords: masterProduct.seoKeywords,
+      badges: masterProduct.badges,
+      healthGoals: masterProduct.healthGoals,
+      isFeatured: masterProduct.isFeatured,
+      isBestseller: masterProduct.isBestseller,
+      isTrending: masterProduct.isTrending,
+      isPublished: masterProduct.isPublished,
+      isActive: masterProduct.isActive,
+      sortOrder: masterProduct.sortOrder,
       images: galleryArrJson,
       galleryImages: galleryArrJson,
-      imageUrl: masterProduct.imageUrl || masterProduct.image || '',
+      imageUrl: primaryImgUrl,
     });
+
+    // 5. Audit Log Entry
+    try {
+      await ProductAuditLog.create({
+        productId: masterProduct.id,
+        userId: req.user?.id || 1,
+        userName: req.user?.name || 'Admin',
+        action: finalIsPublished ? 'publish' : 'create',
+        newValues: JSON.stringify(masterProduct.toJSON()),
+        ipAddress: req.ip || '127.0.0.1',
+        userAgent: req.headers['user-agent'] || 'Browser',
+      });
+    } catch (auditErr) {
+      console.warn('Audit log write skipped:', auditErr.message);
+    }
 
     try {
       const catalogController = require('../controllers/catalogController');
@@ -283,12 +416,16 @@ const createAdminProduct = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Website Product settings created and linked to Product Master',
-      data: newWp
+      message: `Product "${masterProduct.name}" created successfully!`,
+      data: {
+        ...newWp.toJSON(),
+        productId: masterProduct.id,
+        managementProductId: masterProduct.id,
+      }
     });
   } catch (err) {
-    console.error('Error creating admin website product:', err);
-    res.status(500).json({ success: false, message: 'Failed to create website product settings' });
+    console.error('Error creating unified product:', err);
+    res.status(500).json({ success: false, message: 'Failed to create product: ' + err.message });
   }
 };
 
@@ -296,9 +433,22 @@ const updateAdminProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const {
-      managementProductId,
-      productId,
+      name,
       slug,
+      sku,
+      barcode,
+      category,
+      brand,
+      price,
+      compareAtPrice,
+      mrp,
+      stock,
+      unit,
+      gstPercent,
+      status,
+      availabilityState,
+      isPublished,
+      isActive,
       shortDescription,
       description,
       benefits,
@@ -314,26 +464,56 @@ const updateAdminProduct = async (req, res) => {
       isFeatured,
       isBestseller,
       isTrending,
-      isPublished,
       sortOrder,
       images,
       galleryImages,
+      imageUrl,
+      relatedProductIds,
+      upsellProductIds,
+      crossSellProductIds,
+      managementProductId,
+      productId,
     } = req.body;
 
     let wp = await WebsiteProduct.findByPk(id);
-    if (!wp && (managementProductId || productId)) {
-      wp = await WebsiteProduct.findOne({ where: { managementProductId: managementProductId || productId } });
+    let targetMasterId = wp?.managementProductId || managementProductId || productId || id;
+    let masterProduct = await Product.findByPk(targetMasterId);
+
+    if (!masterProduct) {
+      // If master product doesn't exist, route to createAdminProduct
+      return createAdminProduct(req, res);
     }
 
-    if (!wp) {
-      // If website settings don't exist yet, check if Product Master exists and create them
-      const targetMasterId = managementProductId || productId || id;
-      const masterProduct = await Product.findByPk(targetMasterId);
-      if (masterProduct) {
-        req.body.managementProductId = targetMasterId;
-        return createAdminProduct(req, res);
+    // 1. Enterprise Validation Rules
+    if (name !== undefined && (!name || !name.trim())) {
+      return res.status(400).json({ success: false, message: 'Product Name cannot be empty.' });
+    }
+
+    if (price !== undefined) {
+      const numericPrice = Number(price);
+      if (isNaN(numericPrice) || numericPrice <= 0) {
+        return res.status(400).json({ success: false, message: 'Price must be a valid positive number.' });
       }
-      return res.status(404).json({ success: false, message: 'Website product settings record not found' });
+    }
+
+    if (sku && sku.trim() !== masterProduct.sku) {
+      const existingSku = await Product.findOne({ where: { sku: sku.trim(), id: { [Op.ne]: masterProduct.id } } });
+      if (existingSku) {
+        return res.status(400).json({ success: false, message: `Duplicate SKU "${sku}" already exists.` });
+      }
+    }
+
+    if (barcode && barcode.trim() !== masterProduct.barcode) {
+      const existingBarcode = await Product.findOne({ where: { barcode: barcode.trim(), id: { [Op.ne]: masterProduct.id } } });
+      if (existingBarcode) {
+        return res.status(400).json({ success: false, message: `Duplicate Barcode "${barcode}" already exists.` });
+      }
+    }
+
+    // 2. Automatic Slug Conflict Resolution if slug changed
+    let uniqueSlug = masterProduct.slug;
+    if (slug && slug !== masterProduct.slug) {
+      uniqueSlug = await resolveUniqueSlug(slug, masterProduct.id);
     }
 
     const formatArrayJson = (val) => {
@@ -346,41 +526,162 @@ const updateAdminProduct = async (req, res) => {
       return '[]';
     };
 
-    if (slug !== undefined && slug) wp.slug = generateSlug(slug);
-    if (shortDescription !== undefined) wp.shortDescription = shortDescription;
-    if (description !== undefined) wp.description = description;
-    if (benefits !== undefined) wp.benefits = formatArrayJson(benefits);
-    if (ingredients !== undefined) wp.ingredients = formatArrayJson(ingredients);
-    if (nutritionFacts !== undefined) wp.nutritionFacts = typeof nutritionFacts === 'object' ? JSON.stringify(nutritionFacts) : nutritionFacts;
-    if (usageInstructions !== undefined) wp.usageInstructions = usageInstructions;
-    if (faqs !== undefined) wp.faqs = formatArrayJson(faqs);
-    if (seoTitle !== undefined) wp.seoTitle = seoTitle;
-    if (seoDescription !== undefined) wp.seoDescription = seoDescription;
-    if (seoKeywords !== undefined) wp.seoKeywords = seoKeywords;
-    if (badges !== undefined) wp.badges = formatArrayJson(badges);
-    if (healthGoals !== undefined) wp.healthGoals = formatArrayJson(healthGoals);
-    if (isFeatured !== undefined) wp.isFeatured = !!isFeatured;
-    if (isBestseller !== undefined) wp.isBestseller = !!isBestseller;
-    if (isTrending !== undefined) wp.isTrending = !!isTrending;
-    if (isPublished !== undefined) wp.isPublished = !!isPublished;
-    if (sortOrder !== undefined) wp.sortOrder = Number(sortOrder) || 0;
-    if (galleryImages !== undefined || images !== undefined) {
-      const gJson = formatArrayJson(galleryImages || images);
-      wp.galleryImages = gJson;
-      wp.images = gJson;
+    const oldSnapshot = masterProduct.toJSON();
+
+    // 3. Update Unified Product Master
+    if (name !== undefined) masterProduct.name = name.trim();
+    masterProduct.slug = uniqueSlug;
+    if (sku !== undefined) masterProduct.sku = sku.trim();
+    if (barcode !== undefined) masterProduct.barcode = barcode ? barcode.trim() : null;
+    if (category !== undefined) masterProduct.category = category.trim();
+    if (brand !== undefined) masterProduct.brand = brand.trim();
+    if (price !== undefined) {
+      const numericPrice = Number(price);
+      masterProduct.price = numericPrice;
+      masterProduct.sellingPrice = numericPrice;
+      masterProduct.salePrice = numericPrice;
+    }
+    if (compareAtPrice !== undefined || mrp !== undefined) {
+      masterProduct.mrp = Number(mrp || compareAtPrice || 0);
+      masterProduct.compareAtPrice = Number(compareAtPrice || mrp || 0);
+    }
+    if (stock !== undefined) masterProduct.stock = Math.max(0, Number(stock || 0));
+    if (unit !== undefined) masterProduct.unit = unit.trim();
+    if (gstPercent !== undefined) masterProduct.gstPercent = Number(gstPercent);
+    if (shortDescription !== undefined) masterProduct.shortDescription = shortDescription;
+    if (description !== undefined) masterProduct.description = description;
+    if (benefits !== undefined) masterProduct.benefits = formatArrayJson(benefits);
+    if (ingredients !== undefined) masterProduct.ingredients = formatArrayJson(ingredients);
+    if (nutritionFacts !== undefined) masterProduct.nutritionFacts = typeof nutritionFacts === 'object' ? JSON.stringify(nutritionFacts) : (nutritionFacts || '{}');
+    if (usageInstructions !== undefined) masterProduct.usageInstructions = usageInstructions;
+    if (faqs !== undefined) masterProduct.faqs = formatArrayJson(faqs);
+    if (seoTitle !== undefined) masterProduct.seoTitle = seoTitle;
+    if (seoDescription !== undefined) masterProduct.seoDescription = seoDescription;
+    if (seoKeywords !== undefined) masterProduct.seoKeywords = seoKeywords;
+    if (badges !== undefined) masterProduct.badges = formatArrayJson(badges);
+    if (healthGoals !== undefined) masterProduct.healthGoals = formatArrayJson(healthGoals);
+    if (isFeatured !== undefined) masterProduct.isFeatured = !!isFeatured;
+    if (isBestseller !== undefined) masterProduct.isBestseller = !!isBestseller;
+    if (isTrending !== undefined) masterProduct.isTrending = !!isTrending;
+    if (sortOrder !== undefined) masterProduct.sortOrder = Number(sortOrder);
+    if (availabilityState !== undefined) masterProduct.availabilityState = availabilityState;
+    if (status !== undefined) masterProduct.status = status;
+
+    if (isPublished !== undefined) {
+      masterProduct.isPublished = !!isPublished;
+      masterProduct.publishToWebsite = !!isPublished;
+    } else if (status !== undefined) {
+      masterProduct.isPublished = (status === 'Published');
+      masterProduct.publishToWebsite = (status === 'Published');
     }
 
+    if (isActive !== undefined) masterProduct.isActive = !!isActive;
+
+    const galleryArr = Array.isArray(galleryImages || images)
+      ? (galleryImages || images)
+      : (() => {
+          try { return JSON.parse(galleryImages || images || '[]'); } catch { return []; }
+        })();
+    if (images !== undefined || galleryImages !== undefined) {
+      const galleryArrJson = JSON.stringify(galleryArr);
+      masterProduct.images = galleryArrJson;
+      masterProduct.galleryImages = galleryArrJson;
+      if (galleryArr.length > 0) {
+        masterProduct.imageUrl = imageUrl || galleryArr[0];
+        masterProduct.image = imageUrl || galleryArr[0];
+      }
+    }
+
+    // Versioning Snapshot
+    let versionList = [];
+    try { versionList = JSON.parse(masterProduct.versionHistory || '[]'); } catch {}
+    const newVersion = {
+      version: versionList.length + 1,
+      savedAt: new Date().toISOString(),
+      name: masterProduct.name,
+      price: masterProduct.price,
+      stock: masterProduct.stock,
+      isPublished: masterProduct.isPublished,
+      status: masterProduct.status,
+    };
+    versionList.push(newVersion);
+    masterProduct.versionHistory = JSON.stringify(versionList);
+
+    await masterProduct.save();
+
+    // 4. Update WebsiteProduct Settings Link Record
+    if (!wp) {
+      wp = await WebsiteProduct.findOne({ where: { managementProductId: masterProduct.id } });
+    }
+    if (!wp) {
+      wp = await WebsiteProduct.create({ managementProductId: masterProduct.id, name: masterProduct.name, slug: masterProduct.slug, price: masterProduct.price });
+    }
+
+    wp.name = masterProduct.name;
+    wp.slug = masterProduct.slug;
+    wp.sku = masterProduct.sku;
+    wp.price = masterProduct.price;
+    wp.compareAtPrice = masterProduct.mrp;
+    wp.stock = masterProduct.stock;
+    wp.category = masterProduct.category;
+    wp.shortDescription = masterProduct.shortDescription;
+    wp.description = masterProduct.description;
+    wp.benefits = masterProduct.benefits;
+    wp.ingredients = masterProduct.ingredients;
+    wp.nutritionFacts = masterProduct.nutritionFacts;
+    wp.usageInstructions = masterProduct.usageInstructions;
+    wp.faqs = masterProduct.faqs;
+    wp.seoTitle = masterProduct.seoTitle;
+    wp.seoDescription = masterProduct.seoDescription;
+    wp.seoKeywords = masterProduct.seoKeywords;
+    wp.badges = masterProduct.badges;
+    wp.healthGoals = masterProduct.healthGoals;
+    wp.isFeatured = masterProduct.isFeatured;
+    wp.isBestseller = masterProduct.isBestseller;
+    wp.isTrending = masterProduct.isTrending;
+    wp.isPublished = masterProduct.isPublished;
+    wp.isActive = masterProduct.isActive;
+    wp.sortOrder = masterProduct.sortOrder;
+    wp.images = masterProduct.images;
+    wp.galleryImages = masterProduct.galleryImages;
+    wp.imageUrl = masterProduct.imageUrl;
+
     await wp.save();
+
+    // 5. Audit Log Entry
+    try {
+      const actionType = isPublished !== undefined ? (isPublished ? 'publish' : 'unpublish') : 'update';
+      await ProductAuditLog.create({
+        productId: masterProduct.id,
+        userId: req.user?.id || 1,
+        userName: req.user?.name || 'Admin',
+        action: actionType,
+        oldValues: JSON.stringify(oldSnapshot),
+        newValues: JSON.stringify(masterProduct.toJSON()),
+        ipAddress: req.ip || '127.0.0.1',
+        userAgent: req.headers['user-agent'] || 'Browser',
+      });
+    } catch (auditErr) {
+      console.warn('Audit log write skipped:', auditErr.message);
+    }
 
     try {
       const catalogController = require('../controllers/catalogController');
       catalogController.clearCatalogCache();
     } catch (e) {}
 
-    res.json({ success: true, message: 'Website Product marketing settings updated successfully', data: wp });
+    res.json({
+      success: true,
+      message: `Product "${masterProduct.name}" updated successfully!`,
+      data: {
+        ...wp.toJSON(),
+        productId: masterProduct.id,
+        managementProductId: masterProduct.id,
+      }
+    });
   } catch (err) {
-    console.error('Error updating website admin product:', err);
-    res.status(500).json({ success: false, message: 'Failed to update website product settings' });
+    console.error('Error updating unified product:', err);
+    res.status(500).json({ success: false, message: 'Failed to update product: ' + err.message });
   }
 };
 
