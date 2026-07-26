@@ -222,14 +222,15 @@ exports.createEntry = async (req, res, next) => {
     return res.status(403).json({ message: 'Role is view-only.' });
   }
 
-  const { recipeId, productId, packSizeId, qtyToProduce, laborCost = 0, packingMaterialCost = 0, otherCost = 0, notes, status = 'completed', date } = req.body;
+  const { recipeId, productId, packSizeId, qtyToProduce, mfgEntryId, mfgBatchNumber, laborCost = 0, packingMaterialCost = 0, otherCost = 0, notes, status = 'completed', date } = req.body;
   const lossQty = Number(req.body.lossQty || 0);
 
   const ProductPackSize = require('../models/ProductPackSize');
   const RawMaterial = require('../models/RawMaterial');
   const RawMaterialMovement = require('../models/RawMaterialMovement');
+  const ManufacturingEntry = require('../models/ManufacturingEntry');
 
-  // Direct bulk-to-pack repack
+  // Direct bulk-to-pack repack / Packing Work Order
   if (packSizeId && productId) {
     const product = await Product.findByPk(productId);
     if (!product) return res.status(404).json({ message: 'Product not found' });
@@ -237,11 +238,37 @@ exports.createEntry = async (req, res, next) => {
     const packSize = await ProductPackSize.findByPk(packSizeId);
     if (!packSize) return res.status(404).json({ message: 'Pack size not found' });
 
+    let mfgEntry = null;
+    if (mfgEntryId) {
+      mfgEntry = await ManufacturingEntry.findByPk(mfgEntryId);
+    } else if (mfgBatchNumber) {
+      mfgEntry = await ManufacturingEntry.findOne({ where: { batchNumber: mfgBatchNumber } });
+    }
+
     const packQuantity = Number(qtyToProduce);
     const weightToConsume = (packQuantity * Number(packSize.weightInGrams)) / 1000;
     const totalBulkNeeded = weightToConsume + lossQty;
 
-    // Find pouch and label in raw materials matching pack size name (e.g. "500g")
+    // Available bulk stock calculation
+    const availableBulkStock = mfgEntry
+      ? Number(mfgEntry.remainingBulkStock !== null && mfgEntry.remainingBulkStock !== undefined ? mfgEntry.remainingBulkStock : mfgEntry.qtyToProduce)
+      : Number(product.stock || 0);
+
+    const singlePackWeightKg = Number(packSize.weightInGrams || 0) / 1000;
+    const maxPacksPossible = singlePackWeightKg > 0 ? Math.floor(availableBulkStock / singlePackWeightKg) : 0;
+
+    // Over-packing validation
+    if (status === 'completed' && totalBulkNeeded > availableBulkStock) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient Bulk Stock! Available: ${availableBulkStock.toFixed(3)} Kg. Requested: ${totalBulkNeeded.toFixed(3)} Kg (${packQuantity} Packs × ${packSize.packName}). Maximum Packs Possible: ${maxPacksPossible} Packs.`,
+        availableBulkStock,
+        totalBulkNeeded,
+        maxPacksPossible
+      });
+    }
+
+    // Find pouch and label in raw materials matching pack size
     const pouch = await RawMaterial.findOne({
       where: {
         category: { [Op.in]: ['Pouches', 'Packaging Materials'] },
@@ -256,13 +283,7 @@ exports.createEntry = async (req, res, next) => {
       }
     });
 
-    // Stock Validation
     if (status === 'completed') {
-      if (Number(product.stock) < totalBulkNeeded) {
-        return res.status(400).json({ 
-          message: `Insufficient bulk stock for: ${product.name}. Required: ${totalBulkNeeded.toFixed(2)} Kg, Available: ${Number(product.stock).toFixed(2)} Kg` 
-        });
-      }
       if (pouch && Number(pouch.stock) < packQuantity) {
         return res.status(400).json({
           message: `Insufficient stock for packaging pouch: ${pouch.name}. Required: ${packQuantity}, Available: ${Number(pouch.stock).toFixed(2)}`
@@ -286,6 +307,7 @@ exports.createEntry = async (req, res, next) => {
       const computedPackingCost = ((pouch ? Number(pouch.purchasePrice || 0) : 0) + (label ? Number(label.purchasePrice || 0) : 0)) * packQuantity;
       const totalCost = bulkCost + computedPackingCost + Number(laborCost) + Number(otherCost);
       const costPerUnit = packQuantity > 0 ? (totalCost / packQuantity) : 0;
+      const remainingBulkAfter = Math.max(0, availableBulkStock - totalBulkNeeded);
 
       const entry = await RepackEntry.create({
         repackNumber,
@@ -303,6 +325,10 @@ exports.createEntry = async (req, res, next) => {
         notes,
         status,
         lossQty,
+        mfgBatchNumber: mfgBatchNumber || mfgEntry?.batchNumber || mfgEntry?.mfgNumber || null,
+        mfgEntryId: mfgEntry?.id || null,
+        bulkConsumedKg: totalBulkNeeded,
+        remainingBulkKg: remainingBulkAfter,
         createdById: req.user.id
       }, { transaction: t });
 
@@ -316,7 +342,7 @@ exports.createEntry = async (req, res, next) => {
       }, { transaction: t });
 
       if (status === 'completed') {
-        // 1. Deduct bulk product
+        // 1. Deduct bulk stock from Product Master & ManufacturingEntry
         await updateStock(productId, -totalBulkNeeded, {
           type: 'repack',
           batchNumber: repackNumber,
@@ -325,6 +351,11 @@ exports.createEntry = async (req, res, next) => {
           userId: req.user.id,
           transaction: t
         });
+
+        if (mfgEntry) {
+          mfgEntry.remainingBulkStock = remainingBulkAfter;
+          await mfgEntry.save({ transaction: t });
+        }
 
         // 2. Add finished pack stock
         const dbPackSize = await ProductPackSize.findByPk(packSizeId, { transaction: t });
@@ -1171,6 +1202,306 @@ exports.getReport = async (req, res, next) => {
         costAnalysisReport
       }
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* =========================================================
+   PACKING WORK ORDER & PACK SIZE ENHANCEMENTS
+   ========================================================= */
+
+// GET /api/repack/available-bulk-batches
+exports.getAvailableBulkBatches = async (req, res, next) => {
+  try {
+    const ManufacturingEntry = require('../models/ManufacturingEntry');
+    const ProductPackSize = require('../models/ProductPackSize');
+
+    const mfgEntries = await ManufacturingEntry.findAll({
+      where: { status: 'completed' },
+      include: [
+        { model: Product, as: 'product' },
+        { model: ProductPackSize, as: 'packSize' }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    const bulkProducts = await Product.findAll({
+      where: {
+        isArchived: false,
+        [Op.or]: [
+          { productType: 'BULK_PRODUCT' },
+          { category: { [Op.like]: '%Bulk%' } },
+          { name: { [Op.like]: '%Bulk%' } },
+          { stock: { [Op.gt]: 0 } }
+        ]
+      }
+    });
+
+    const activeBatches = [];
+
+    mfgEntries.forEach(e => {
+      const remaining = Number(e.remainingBulkStock !== null && e.remainingBulkStock !== undefined ? e.remainingBulkStock : e.qtyToProduce);
+      if (remaining > 0) {
+        activeBatches.push({
+          id: e.id,
+          mfgNumber: e.mfgNumber,
+          batchNumber: e.batchNumber || e.mfgNumber,
+          productId: e.productId,
+          productName: e.product?.name || 'Bulk Production Batch',
+          sku: e.product?.sku || '',
+          availableBulkStock: remaining,
+          unit: e.product?.unit || 'Kg',
+          date: e.date,
+          packSizes: []
+        });
+      }
+    });
+
+    // Also include bulk products directly if available stock > 0
+    bulkProducts.forEach(p => {
+      if (Number(p.stock) > 0 && !activeBatches.some(b => b.productId === p.id)) {
+        activeBatches.push({
+          id: `prod-${p.id}`,
+          mfgNumber: `STOCK-${p.sku || p.id}`,
+          batchNumber: `STOCK-${p.sku || p.id}`,
+          productId: p.id,
+          productName: p.name,
+          sku: p.sku || '',
+          availableBulkStock: Number(p.stock),
+          unit: p.unit || 'Kg',
+          date: p.updatedAt,
+          packSizes: []
+        });
+      }
+    });
+
+    // Attach predefined pack sizes per product
+    for (const batch of activeBatches) {
+      batch.packSizes = await ProductPackSize.findAll({
+        where: { productId: batch.productId, status: 'Active' },
+        order: [['weightInGrams', 'ASC']]
+      });
+    }
+
+    res.json({ success: true, count: activeBatches.length, data: activeBatches });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/repack/pack-sizes/:productId
+exports.getProductPackSizes = async (req, res, next) => {
+  try {
+    const ProductPackSize = require('../models/ProductPackSize');
+    const packSizes = await ProductPackSize.findAll({
+      where: { productId: req.params.productId },
+      order: [['weightInGrams', 'ASC']]
+    });
+    res.json({ success: true, count: packSizes.length, data: packSizes });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/repack/pack-sizes
+exports.createProductPackSize = async (req, res, next) => {
+  try {
+    const ProductPackSize = require('../models/ProductPackSize');
+    const { productId, packName, weightInGrams, unit = 'g', sku, barcode, sellingPrice, mrp, packagingCost, pouchId, labelId, stickerId, cartonId, bomJson } = req.body;
+
+    if (!productId || !packName || !weightInGrams) {
+      return res.status(400).json({ success: false, message: 'Product, Pack Name, and Weight in grams are required.' });
+    }
+
+    const newPack = await ProductPackSize.create({
+      productId,
+      packName,
+      weightInGrams: Number(weightInGrams),
+      unit,
+      sku: sku || `SKU-${Date.now()}`,
+      barcode: barcode || '',
+      sellingPrice: Number(sellingPrice) || 0,
+      mrp: Number(mrp) || 0,
+      packagingCost: Number(packagingCost) || 0,
+      pouchId: pouchId || null,
+      labelId: labelId || null,
+      stickerId: stickerId || null,
+      cartonId: cartonId || null,
+      bomJson: typeof bomJson === 'object' ? JSON.stringify(bomJson) : (bomJson || '[]'),
+      status: 'Active',
+      stock: 0
+    });
+
+    res.status(201).json({ success: true, message: 'Predefined Pack Size configuration created', data: newPack });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PUT /api/repack/pack-sizes/:id
+exports.updateProductPackSize = async (req, res, next) => {
+  try {
+    const ProductPackSize = require('../models/ProductPackSize');
+    const { id } = req.params;
+    const pack = await ProductPackSize.findByPk(id);
+    if (!pack) return res.status(404).json({ success: false, message: 'Pack size configuration not found' });
+
+    const { packName, weightInGrams, unit, sku, barcode, sellingPrice, mrp, packagingCost, pouchId, labelId, stickerId, cartonId, bomJson, status } = req.body;
+
+    if (packName !== undefined) pack.packName = packName;
+    if (weightInGrams !== undefined) pack.weightInGrams = Number(weightInGrams);
+    if (unit !== undefined) pack.unit = unit;
+    if (sku !== undefined) pack.sku = sku;
+    if (barcode !== undefined) pack.barcode = barcode;
+    if (sellingPrice !== undefined) pack.sellingPrice = Number(sellingPrice);
+    if (mrp !== undefined) pack.mrp = Number(mrp);
+    if (packagingCost !== undefined) pack.packagingCost = Number(packagingCost);
+    if (pouchId !== undefined) pack.pouchId = pouchId;
+    if (labelId !== undefined) pack.labelId = labelId;
+    if (stickerId !== undefined) pack.stickerId = stickerId;
+    if (cartonId !== undefined) pack.cartonId = cartonId;
+    if (bomJson !== undefined) pack.bomJson = typeof bomJson === 'object' ? JSON.stringify(bomJson) : bomJson;
+    if (status !== undefined) pack.status = status;
+
+    await pack.save();
+    res.json({ success: true, message: 'Pack size configuration updated', data: pack });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// DELETE /api/repack/pack-sizes/:id
+exports.deleteProductPackSize = async (req, res, next) => {
+  try {
+    const ProductPackSize = require('../models/ProductPackSize');
+    const { id } = req.params;
+    const pack = await ProductPackSize.findByPk(id);
+    if (pack) {
+      pack.status = 'Inactive';
+      await pack.save();
+    }
+    res.json({ success: true, message: 'Pack size configuration deactivated' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/repack/:id/reverse (ATOMIC VOID / REVERSAL FLOW)
+exports.reverseEntry = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const ProductPackSize = require('../models/ProductPackSize');
+    const ManufacturingEntry = require('../models/ManufacturingEntry');
+    const RawMaterial = require('../models/RawMaterial');
+    const RawMaterialMovement = require('../models/RawMaterialMovement');
+
+    const entry = await RepackEntry.findByPk(id, {
+      include: [
+        { model: Product, as: 'finishedProduct' },
+        { model: ProductPackSize, as: 'packSize' }
+      ]
+    });
+
+    if (!entry) return res.status(404).json({ success: false, message: 'Packing entry not found' });
+    if (entry.status === 'reversed') {
+      return res.status(400).json({ success: false, message: 'This packing work order is already reversed/voided.' });
+    }
+
+    const t = await sequelize.transaction();
+    try {
+      const packQty = Number(entry.qtyToProduce || 0);
+      const singleWeightKg = entry.packSize ? (Number(entry.packSize.weightInGrams || 0) / 1000) : 0;
+      const bulkKgToRestore = Number(entry.bulkConsumedKg || (packQty * singleWeightKg));
+
+      // 1. Restore consumed bulk product stock in Product Master
+      if (entry.finishedProductId) {
+        await updateStock(entry.finishedProductId, bulkKgToRestore, {
+          type: 'reversal',
+          batchNumber: `VOID-${entry.repackNumber}`,
+          referenceId: entry.id,
+          referenceModel: 'RepackEntry',
+          userId: req.user.id,
+          transaction: t
+        });
+      }
+
+      // 2. Restore bulk stock in ManufacturingEntry (if linked)
+      if (entry.mfgEntryId) {
+        const mfgEntry = await ManufacturingEntry.findByPk(entry.mfgEntryId, { transaction: t });
+        if (mfgEntry) {
+          const currRemaining = Number(mfgEntry.remainingBulkStock !== null && mfgEntry.remainingBulkStock !== undefined ? mfgEntry.remainingBulkStock : mfgEntry.qtyToProduce);
+          mfgEntry.remainingBulkStock = currRemaining + bulkKgToRestore;
+          await mfgEntry.save({ transaction: t });
+        }
+      }
+
+      // 3. Decrement Finished Goods pack stock
+      if (entry.packSizeId) {
+        const dbPackSize = await ProductPackSize.findByPk(entry.packSizeId, { transaction: t });
+        if (dbPackSize) {
+          dbPackSize.stock = Math.max(0, Number(dbPackSize.stock || 0) - packQty);
+          await dbPackSize.save({ transaction: t });
+        }
+      }
+
+      // 4. Restore packaging raw materials (Pouches, Labels)
+      if (entry.packSize) {
+        const pouch = await RawMaterial.findOne({
+          where: { category: { [Op.in]: ['Pouches', 'Packaging Materials'] }, name: { [Op.like]: `%${entry.packSize.packName}%` } },
+          transaction: t
+        });
+        if (pouch) {
+          await RawMaterial.increment({ stock: packQty }, { where: { id: pouch.id }, transaction: t });
+          await RawMaterialMovement.create({
+            rawMaterialId: pouch.id,
+            type: 'reversal',
+            quantity: packQty,
+            notes: `Void/Reversal of Packing Order ${entry.repackNumber}: ${reason || 'Operator error reversal'}`,
+            referenceId: entry.id,
+            referenceModel: 'RepackEntry',
+            createdById: req.user.id
+          }, { transaction: t });
+        }
+
+        const label = await RawMaterial.findOne({
+          where: { category: { [Op.in]: ['Labels'] }, name: { [Op.like]: `%${entry.packSize.packName}%` } },
+          transaction: t
+        });
+        if (label) {
+          await RawMaterial.increment({ stock: packQty }, { where: { id: label.id }, transaction: t });
+          await RawMaterialMovement.create({
+            rawMaterialId: label.id,
+            type: 'reversal',
+            quantity: packQty,
+            notes: `Void/Reversal of Packing Order ${entry.repackNumber}: ${reason || 'Operator error reversal'}`,
+            referenceId: entry.id,
+            referenceModel: 'RepackEntry',
+            createdById: req.user.id
+          }, { transaction: t });
+        }
+      }
+
+      entry.status = 'reversed';
+      entry.reversedAt = new Date();
+      entry.reversedBy = req.user.id;
+      entry.reversalReason = reason || 'Operator void/reversal';
+      await entry.save({ transaction: t });
+
+      await t.commit();
+      await logActivity(req.user.id, 'reverse', 'repack_entry', `Reversed/Voided packing entry ${entry.repackNumber}`);
+
+      res.json({
+        success: true,
+        message: `Packing Work Order ${entry.repackNumber} voided successfully. Bulk stock (${bulkKgToRestore.toFixed(3)} Kg) and raw materials restored.`,
+        entry
+      });
+    } catch (err) {
+      await t.rollback();
+      throw err;
+    }
   } catch (err) {
     next(err);
   }

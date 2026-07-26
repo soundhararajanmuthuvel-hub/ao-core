@@ -32,6 +32,9 @@ exports.getProducts = async (req, res, next) => {
     if (category) {
       query.category = category;
     }
+    if (req.query.forSale === 'true') {
+      query.productType = { [Op.ne]: 'BULK_PRODUCT' };
+    }
 
     const { count: total, rows: products } = await Product.findAndCountAll({
       where: query,

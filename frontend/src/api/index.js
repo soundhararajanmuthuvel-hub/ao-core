@@ -183,7 +183,13 @@ export const repackApi = {
   create: (data) => client.post('/repack', data),
   update: (id, data) => client.put(`/repack/${id}`, data),
   remove: (id) => client.delete(`/repack/${id}`),
+  reverse: (id, data) => client.post(`/repack/${id}/reverse`, data),
   report: () => client.get('/repack/report'),
+  availableBulkBatches: () => client.get('/repack/available-bulk-batches'),
+  listPackSizes: (productId) => client.get(`/repack/pack-sizes/${productId}`),
+  createPackSize: (data) => client.post('/repack/pack-sizes', data),
+  updatePackSize: (id, data) => client.put(`/repack/pack-sizes/${id}`, data),
+  deletePackSize: (id) => client.delete(`/repack/pack-sizes/${id}`),
 };
 
 export const rawMaterialsApi = {

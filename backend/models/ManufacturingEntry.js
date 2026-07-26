@@ -76,6 +76,10 @@ const ManufacturingEntry = sequelize.define('ManufacturingEntry', {
     type: DataTypes.DATE,
     allowNull: true,
   },
+  remainingBulkStock: {
+    type: DataTypes.DECIMAL(10, 3),
+    allowNull: true,
+  },
 });
 
 ManufacturingEntry.belongsTo(ManufacturingRecipe, { as: 'recipe', foreignKey: 'recipeId' });

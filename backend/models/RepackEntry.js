@@ -73,6 +73,36 @@ const RepackEntry = sequelize.define('RepackEntry', {
     allowNull: false,
     defaultValue: 0.00,
   },
+  mfgBatchNumber: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  mfgEntryId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  bulkConsumedKg: {
+    type: DataTypes.DECIMAL(10, 3),
+    allowNull: true,
+    defaultValue: 0.000,
+  },
+  remainingBulkKg: {
+    type: DataTypes.DECIMAL(10, 3),
+    allowNull: true,
+    defaultValue: 0.000,
+  },
+  reversedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  reversedBy: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  reversalReason: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
 });
 
 // Associations

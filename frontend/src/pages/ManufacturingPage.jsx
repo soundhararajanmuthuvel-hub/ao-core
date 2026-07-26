@@ -1197,473 +1197,188 @@ function ProductionEntry({ products, rawMaterials, mfgRecipes, loadSystemData, s
   );
 }
 
+  // Helper for batch reversals
+  async function handleReverseBatch(id, type) {
+    const reason = prompt('Please enter a reason for voiding/reversing this batch run (e.g. Operator data entry error):');
+    if (reason === null) return; // User cancelled prompt
+    try {
+      if (type === 'manufacturing') {
+        await manufacturingApi.reverse(id);
+      } else {
+        await repackApi.reverse(id, { reason: reason || 'Operator reversal' });
+      }
+      toast('Batch run reversed successfully and inventory restored', 'success');
+      loadSystemData();
+    } catch (err) {
+      toast(err.response?.data?.message || 'Reversal failed', 'error');
+    }
+  }
+
 function RepackingEntry({ products, rawMaterials, loadSystemData, setTab }) {
   const { toast } = useToast();
-  const [step, setStep] = useState(1);
+  const [bulkBatches, setBulkBatches] = useState([]);
+  const [selectedBatchId, setSelectedBatchId] = useState('');
   const [productId, setProductId] = useState('');
+  const [packSizes, setPackSizes] = useState([]);
   const [packSizeId, setPackSizeId] = useState('');
   const [qty, setQty] = useState('');
   const [laborCost, setLaborCost] = useState(0);
   const [otherCost, setOtherCost] = useState(0);
   const [notes, setNotes] = useState('');
-  const [showDebug, setShowDebug] = useState(false);
   const [lossQty, setLossQty] = useState(0);
 
+  // Modal States
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [completedRunData, setCompletedRunData] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetchBulkBatches();
+  }, []);
+
+  const fetchBulkBatches = async () => {
+    try {
+      const res = await repackApi.availableBulkBatches();
+      if (res.data?.data) {
+        setBulkBatches(res.data.data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const resetEntry = () => {
-    setStep(1);
+    setSelectedBatchId('');
     setProductId('');
+    setPackSizes([]);
     setPackSizeId('');
     setQty('');
     setLaborCost(0);
     setOtherCost(0);
     setLossQty(0);
     setNotes('');
+    setCompletedRunData(null);
+    setShowConfirmModal(false);
+    fetchBulkBatches();
   };
 
-  const repackingProducts = products.filter(p => p.packSizes && p.packSizes.length > 0);
+  const activeBatch = bulkBatches.find(b => String(b.id) === String(selectedBatchId));
+  const availableBulkStock = activeBatch ? Number(activeBatch.availableBulkStock) : 0;
 
-  if (repackingProducts.length === 0) {
-    return (
-      <div style={{ maxWidth: '750px', margin: '0 auto', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '2.5rem', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', marginBottom: '1.5rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          🔄 Repacking Entry
-        </h2>
-        <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '1.5rem', borderRadius: '12px', margin: '1.5rem 0', fontSize: '0.95rem', fontWeight: 600, lineHeight: 1.5, textAlign: 'center' }}>
-          ⚠️ No bulk repacking products available.<br />
-          Please create a Product with Pack Sizes in Product Master.
-        </div>
-        
-        {/* Render debug panel even in empty state so admin can troubleshoot */}
-        <div style={{ marginTop: '2.5rem', borderTop: '1px dashed #cbd5e1', paddingTop: '1.5rem' }}>
-          <button
-            type="button"
-            onClick={() => setShowDebug(!showDebug)}
-            style={{
-              background: '#f8fafc',
-              border: '1px solid #cbd5e1',
-              borderRadius: '8px',
-              padding: '0.5rem 1rem',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              color: '#475569',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              margin: '0 auto'
-            }}
-          >
-            🔧 {showDebug ? 'Hide' : 'Show'} Admin Debugging Panel
-          </button>
-          
-          {showDebug && (
-            <div style={{ marginTop: '1rem', background: '#0f172a', color: '#e2e8f0', padding: '1.25rem', borderRadius: '12px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
-              <div style={{ fontWeight: 'bold', color: '#ff9800', marginBottom: '0.75rem', borderBottom: '1px solid #334155', paddingBottom: '0.5rem' }}>
-                Product Visibility Debugger (All Products)
-              </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #334155', color: '#94a3b8' }}>
-                    <th style={{ padding: '0.5rem 0' }}>Product Name</th>
-                    <th>Product Type</th>
-                    <th>Current Stock</th>
-                    <th>Supplier</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map(p => {
-                    const isVisible = p.packSizes && p.packSizes.length > 0;
-                    return (
-                      <tr key={p.id || p._id} style={{ borderBottom: '1px solid #1e293b', color: isVisible ? '#4ade80' : '#94a3b8' }}>
-                        <td style={{ padding: '0.5rem 0' }}>{p.name}</td>
-                        <td>{p.productType || 'NULL'}</td>
-                        <td>{p.stock} {p.unit}</td>
-                        <td>{p.supplier || '—'}</td>
-                        <td>
-                          <span style={{
-                            backgroundColor: isVisible ? '#064e3b' : '#312e81',
-                            color: isVisible ? '#6ee7b7' : '#c7d2fe',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            fontSize: '0.7rem'
-                          }}>
-                            {isVisible ? 'VISIBLE' : 'HIDDEN'}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <div style={{ marginTop: '1rem', color: '#94a3b8', fontSize: '0.75rem' }}>
-                * To make a product visible in Repacking Entry, it must have custom pack sizes configured in the Product Master.
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
+  const handleSelectBatch = async (batchId) => {
+    setSelectedBatchId(batchId);
+    setPackSizeId('');
+    setQty('');
+    const batch = bulkBatches.find(b => String(b.id) === String(batchId));
+    if (batch) {
+      setProductId(batch.productId);
+      try {
+        const res = await repackApi.listPackSizes(batch.productId);
+        setPackSizes(res.data?.data || batch.packSizes || []);
+      } catch (e) {
+        setPackSizes(batch.packSizes || []);
+      }
+    } else {
+      setProductId('');
+      setPackSizes([]);
+    }
+  };
+
+  const selectedPackSize = packSizes.find(ps => String(ps.id || ps._id) === String(packSizeId));
+  const packQuantity = Number(qty) || 0;
+  const singlePackWeightKg = selectedPackSize ? (Number(selectedPackSize.weightInGrams || 0) / 1000) : 0;
+  const bulkRequiredKg = (packQuantity * singleWeightKg(selectedPackSize)) + Number(lossQty || 0);
+  const remainingBulkKg = Math.max(0, availableBulkStock - bulkRequiredKg);
+  const maxPacksPossible = singlePackWeightKg > 0 ? Math.floor(availableBulkStock / singlePackWeightKg) : 0;
+  const isOverPacking = availableBulkStock > 0 && packQuantity > 0 && bulkRequiredKg > availableBulkStock;
+
+  function singleWeightKg(ps) {
+    return ps ? (Number(ps.weightInGrams || 0) / 1000) : 0;
   }
 
-  const selectedProduct = products.find(p => String(p.id || p._id) === String(productId));
-  const availablePackSizes = selectedProduct ? (selectedProduct.packSizes || []) : [];
-  const selectedPackSize = availablePackSizes.find(ps => String(ps.id || ps._id) === String(packSizeId));
+  // Calculate costs
+  const pouch = rawMaterials.find(rm => 
+    selectedPackSize && ['Pouches', 'Packaging Materials'].includes(rm.category) && 
+    rm.name.toLowerCase().includes(selectedPackSize.packName.toLowerCase())
+  );
+  const label = rawMaterials.find(rm => 
+    selectedPackSize && ['Labels'].includes(rm.category) && 
+    rm.name.toLowerCase().includes(selectedPackSize.packName.toLowerCase())
+  );
 
-  // Calculations
-  const calculateRepack = () => {
-    if (!qty || qty <= 0 || !selectedPackSize) return null;
-    const packQty = Number(qty);
-    const weightToConsumeKg = (packQty * Number(selectedPackSize.weightInGrams)) / 1000;
-    const totalBulkNeededKg = weightToConsumeKg + Number(lossQty || 0);
-    const bulkQtyNeeded = selectedProduct ? convertUnit(totalBulkNeededKg, 'kg', selectedProduct.unit) : 0;
+  const bulkCost = activeBatch ? (bulkRequiredKg * Number(activeBatch.product?.purchasePrice || 0)) : 0;
+  const pouchCost = pouch ? (Number(pouch.purchasePrice || 0) * packQuantity) : 0;
+  const labelCost = label ? (Number(label.purchasePrice || 0) * packQuantity) : 0;
+  const totalCost = bulkCost + pouchCost + labelCost + Number(laborCost) + Number(otherCost);
+  const costPerUnit = packQuantity > 0 ? (totalCost / packQuantity) : 0;
 
-    // Pouch and label matching by name
-    const packName = selectedPackSize.packName;
-    const pouch = rawMaterials.find(rm => 
-      ['Pouches', 'Packaging Materials'].includes(rm.category) && 
-      rm.name.toLowerCase().includes(packName.toLowerCase())
-    );
-    const label = rawMaterials.find(rm => 
-      ['Labels'].includes(rm.category) && 
-      rm.name.toLowerCase().includes(packName.toLowerCase())
-    );
-
-    const isBulkLow = selectedProduct ? (Number(selectedProduct.stock) < bulkQtyNeeded) : false;
-    const isPouchLow = pouch ? (Number(pouch.stock) < packQty) : false;
-    const isLabelLow = label ? (Number(label.stock) < packQty) : false;
-
-    const bulkCost = selectedProduct ? (bulkQtyNeeded * Number(selectedProduct.purchasePrice || 0)) : 0;
-    const pouchCost = pouch ? (Number(pouch.purchasePrice || 0) * packQty) : 0;
-    const labelCost = label ? (Number(label.purchasePrice || 0) * packQty) : 0;
-    const packingCostTotal = pouchCost + labelCost;
-    const totalCost = bulkCost + packingCostTotal + Number(laborCost || 0) + Number(otherCost || 0);
-    const costPerUnit = packQty > 0 ? (totalCost / packQty) : 0;
-
-    return {
-      bulkQtyNeeded,
-      weightToConsumeKg,
-      pouch,
-      label,
-      isBulkLow,
-      isPouchLow,
-      isLabelLow,
-      bulkCost,
-      pouchCost,
-      labelCost,
-      packingCostTotal,
-      totalCost,
-      costPerUnit
-    };
+  const handleOpenConfirm = (e) => {
+    e.preventDefault();
+    if (!selectedBatchId) return toast('Please select a Manufacturing Bulk Batch', 'warning');
+    if (!packSizeId) return toast('Please choose a predefined Pack Size', 'warning');
+    if (!qty || packQuantity <= 0) return toast('Please enter a valid Number of Packs', 'warning');
+    if (isOverPacking) {
+      return toast(`Over-packing blocked! Maximum packs possible: ${maxPacksPossible} Packs`, 'error');
+    }
+    setShowConfirmModal(true);
   };
 
-  const calc = calculateRepack();
-
-  const handleCompleteRepacking = async (e) => {
-    if (e) e.preventDefault();
-    if (calc?.isBulkLow || calc?.isPouchLow || calc?.isLabelLow) {
-      toast('Cannot execute repack due to stock shortages!', 'error');
-      return;
-    }
+  const handleCommitPackingWorkOrder = async () => {
+    setIsSubmitting(true);
     try {
       const payload = {
         productId,
         packSizeId,
-        qtyToProduce: qty,
+        qtyToProduce: packQuantity,
+        mfgEntryId: String(selectedBatchId).startsWith('prod-') ? null : selectedBatchId,
+        mfgBatchNumber: activeBatch ? activeBatch.batchNumber : null,
         laborCost,
-        packingMaterialCost: calc.packingCostTotal,
+        packingMaterialCost: pouchCost + labelCost,
         otherCost,
         lossQty,
-        notes: notes || 'Repack entry completed.',
+        notes: notes || `Packed ${packQuantity} units of ${selectedPackSize?.packName} from batch ${activeBatch?.batchNumber}`,
         status: 'completed',
         date: new Date().toISOString().substring(0, 10)
       };
-      await repackApi.create(payload);
-      toast('Repacking successfully completed!', 'success');
+
+      const res = await repackApi.create(payload);
+      toast('✅ Packing Work Order completed successfully!', 'success');
       loadSystemData();
-      setStep(5);
+      setShowConfirmModal(false);
+      setCompletedRunData({
+        entry: res.data,
+        batchNumber: activeBatch?.batchNumber,
+        productName: activeBatch?.productName,
+        packName: selectedPackSize?.packName,
+        mrp: selectedPackSize?.mrp,
+        sku: selectedPackSize?.sku,
+        barcode: selectedPackSize?.barcode,
+        packQuantity
+      });
     } catch (err) {
-      toast(err.response?.data?.message || 'Failed to complete repacking', 'error');
+      toast(err.response?.data?.message || 'Failed to complete packing work order', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div style={{ maxWidth: '750px', margin: '0 auto', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '2rem', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          🔄 Repacking Entry
-        </h2>
-        <span style={{ fontSize: '0.85rem', background: '#e0f2fe', color: '#0284c7', padding: '0.35rem 0.75rem', borderRadius: '8px', fontWeight: 700 }}>
-          Step {step} of 5
+    <div style={{ maxWidth: '900px', margin: '0 auto', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '20px', padding: '2rem', boxShadow: '0 10px 25px rgba(0,0,0,0.06)', fontFamily: 'Inter, sans-serif' }}>
+      
+      {/* Touchscreen Header Banner */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #f1f5f9', paddingBottom: '1rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            📦 Enterprise Packing Work Order
+          </h2>
+          <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+            Factory Floor Touchscreen Mode • Predefined Pack Sizes & Live Bulk Tracking
+          </p>
+        </div>
+        <span style={{ fontSize: '0.8rem', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '0.4rem 0.8rem', borderRadius: '20px', fontWeight: 800 }}>
+          📱 Tablet/Touch Ready
         </span>
       </div>
-
-      {/* STEP 1: Select Bulk Product */}
-      {step === 1 && (
-        <div>
-          <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label style={{ fontWeight: 700, fontSize: '1rem', color: '#334155', display: 'block', marginBottom: '0.5rem' }}>Select Bulk Source Product</label>
-            <select
-              className="form-control"
-              style={{ height: '52px', fontSize: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}
-              value={productId}
-              onChange={(e) => { setProductId(e.target.value); setPackSizeId(''); }}
-            >
-              <option value="">-- Choose Bulk Product --</option>
-              {repackingProducts.map(p => (
-                <option key={p.id || p._id} value={p.id || p._id}>
-                  {p.name} (Stock: {Number(p.stock).toFixed(2)} {p.unit} | Supplier: {p.supplier || 'N/A'})
-                </option>
-              ))}
-            </select>
-            <small style={{ color: '#64748b', marginTop: '0.5rem', display: 'block' }}>Only products configured with custom pack sizes are listed.</small>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
-            <button type="button" className="btn btn-primary" style={{ backgroundColor: '#ff9800', borderColor: '#ff9800', height: '48px', padding: '0 2rem', fontWeight: 600, borderRadius: '10px' }} disabled={!productId} onClick={() => setStep(2)}>
-              Next Step &rarr;
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 2: Select Pack Size */}
-      {step === 2 && (
-        <div>
-          <div style={{ marginBottom: '1.5rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase' }}>Source Bulk:</span>
-            <strong style={{ color: '#0f172a', display: 'block', fontSize: '1.15rem', marginTop: '0.25rem' }}>{selectedProduct?.name}</strong>
-          </div>
-
-          <label style={{ fontWeight: 700, fontSize: '1rem', color: '#334155', display: 'block', marginBottom: '1rem' }}>Select Target Pack Size</label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-            {availablePackSizes.map(ps => {
-              const isSelected = String(ps.id || ps._id) === String(packSizeId);
-              return (
-                <div
-                  key={ps.id || ps._id}
-                  onClick={() => setPackSizeId(ps.id || ps._id)}
-                  style={{
-                    border: isSelected ? '2px solid #ff9800' : '1px solid #cbd5e1',
-                    borderRadius: '12px',
-                    padding: '1.5rem 1rem',
-                    cursor: 'pointer',
-                    background: isSelected ? '#fffcf7' : '#fff',
-                    transition: 'all 0.15s ease-in-out',
-                    boxShadow: isSelected ? '0 4px 12px rgba(255,152,0,0.1)' : 'none',
-                    textAlign: 'center'
-                  }}
-                >
-                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: isSelected ? '#ff9800' : '#0f172a' }}>
-                    📦 {ps.packName}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
-                    Weight/Vol: {ps.weightInGrams} {ps.unit || 'g'}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.1rem' }}>
-                    Current stock: {ps.stock} packs
-                  </div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#10b981', marginTop: '0.5rem' }}>
-                    ₹{ps.sellingPrice}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem' }}>
-            <button type="button" className="btn btn-secondary" style={{ height: '48px', padding: '0 1.5rem', borderRadius: '10px' }} onClick={() => setStep(1)}>
-              &larr; Back
-            </button>
-            <button type="button" className="btn btn-primary" style={{ backgroundColor: '#ff9800', borderColor: '#ff9800', height: '48px', padding: '0 2rem', fontWeight: 600, borderRadius: '10px' }} disabled={!packSizeId} onClick={() => setStep(3)}>
-              Next Step &rarr;
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 3: Enter Number of Packs */}
-      {step === 3 && (
-        <div>
-          <div style={{ marginBottom: '1.5rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase' }}>Repacking:</span>
-            <strong style={{ color: '#0f172a', display: 'block', fontSize: '1.15rem', marginTop: '0.25rem' }}>
-              {selectedProduct?.name} &rarr; {selectedPackSize?.packName}
-            </strong>
-          </div>
-
-          <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label style={{ fontWeight: 700, fontSize: '1rem', color: '#334155', display: 'block', marginBottom: '0.5rem' }}>Number of Packs to Produce</label>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              className="form-control"
-              style={{ height: '52px', fontSize: '1.1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}
-              placeholder="e.g. 100"
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label style={{ fontWeight: 700, fontSize: '1rem', color: '#334155', display: 'block', marginBottom: '0.5rem' }}>Loss / Wastage Quantity (Kg)</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className="form-control"
-              style={{ height: '52px', fontSize: '1.1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}
-              placeholder="e.g. 0.5"
-              value={lossQty}
-              onChange={(e) => setLossQty(Number(e.target.value))}
-            />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem' }}>
-            <button type="button" className="btn btn-secondary" style={{ height: '48px', padding: '0 1.5rem', borderRadius: '10px' }} onClick={() => setStep(2)}>
-              &larr; Back
-            </button>
-            <button type="button" className="btn btn-primary" style={{ backgroundColor: '#ff9800', borderColor: '#ff9800', height: '48px', padding: '0 2rem', fontWeight: 600, borderRadius: '10px' }} disabled={!qty || Number(qty) <= 0} onClick={() => setStep(4)}>
-              Next Step &rarr;
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 4: Calculations & Completion */}
-      {step === 4 && calc && (
-        <div>
-          {/* Warnings */}
-          {calc.isBulkLow && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1rem', color: '#b91c1c', fontWeight: 700, fontSize: '0.9rem' }}>
-              ⚠ Raw Material Shortage
-            </div>
-          )}
-          {calc.isPouchLow && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1rem', color: '#d97706', fontWeight: 700, fontSize: '0.9rem' }}>
-              ⚠ Packaging Material Shortage
-            </div>
-          )}
-          {calc.isLabelLow && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1rem', color: '#d97706', fontWeight: 700, fontSize: '0.9rem' }}>
-              ⚠ Label Shortage
-            </div>
-          )}
-
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.75rem' }}>Asset Consumption Breakdown</h3>
-          <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px', marginBottom: '1.5rem' }}>
-            <table className="data-table" style={{ margin: 0, fontSize: '0.85rem' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc' }}>
-                  <th style={{ padding: '0.75rem' }}>Material Required</th>
-                  <th style={{ padding: '0.75rem' }}>Required Qty</th>
-                  <th style={{ padding: '0.75rem' }}>Stock Available</th>
-                  <th style={{ padding: '0.75rem' }}>Cost</th>
-                  <th style={{ padding: '0.75rem' }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '0.75rem', fontWeight: 600 }}>{selectedProduct?.name} (Bulk)</td>
-                  <td style={{ padding: '0.75rem' }}>{calc.bulkQtyNeeded.toFixed(2)} {selectedProduct?.unit}</td>
-                  <td style={{ padding: '0.75rem' }}>{Number(selectedProduct?.stock).toFixed(2)} {selectedProduct?.unit}</td>
-                  <td style={{ padding: '0.75rem' }}>{fmt(calc.bulkCost)}</td>
-                  <td style={{ padding: '0.75rem' }}>
-                    <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: calc.isBulkLow ? '#fef2f2' : '#f0fdf4', color: calc.isBulkLow ? '#dc2626' : '#16a34a' }}>
-                      {calc.isBulkLow ? 'Shortage' : 'Available'}
-                    </span>
-                  </td>
-                </tr>
-                {calc.pouch && (
-                  <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '0.75rem', fontWeight: 600 }}>{calc.pouch.name} (Pouch)</td>
-                    <td style={{ padding: '0.75rem' }}>{qty} pcs</td>
-                    <td style={{ padding: '0.75rem' }}>{Number(calc.pouch.stock).toFixed(0)} pcs</td>
-                    <td style={{ padding: '0.75rem' }}>{fmt(calc.pouchCost)}</td>
-                    <td style={{ padding: '0.75rem' }}>
-                      <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: calc.isPouchLow ? '#fef2f2' : '#f0fdf4', color: calc.isPouchLow ? '#dc2626' : '#16a34a' }}>
-                        {calc.isPouchLow ? 'Shortage' : 'Available'}
-                      </span>
-                    </td>
-                  </tr>
-                )}
-                {calc.label && (
-                  <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '0.75rem', fontWeight: 600 }}>{calc.label.name} (Label)</td>
-                    <td style={{ padding: '0.75rem' }}>{qty} pcs</td>
-                    <td style={{ padding: '0.75rem' }}>{Number(calc.label.stock).toFixed(0)} pcs</td>
-                    <td style={{ padding: '0.75rem' }}>{fmt(calc.labelCost)}</td>
-                    <td style={{ padding: '0.75rem' }}>
-                      <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: calc.isLabelLow ? '#fef2f2' : '#f0fdf4', color: calc.isLabelLow ? '#dc2626' : '#16a34a' }}>
-                        {calc.isLabelLow ? 'Shortage' : 'Available'}
-                      </span>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Overheads */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div className="form-group">
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Labor Cost (₹)</label>
-              <input type="number" min="0" step="1" className="form-control" style={{ borderRadius: '8px' }} value={laborCost} onChange={(e) => setLaborCost(Number(e.target.value))} />
-            </div>
-            <div className="form-group">
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Other Overhead (₹)</label>
-              <input type="number" min="0" step="1" className="form-control" style={{ borderRadius: '8px' }} value={otherCost} onChange={(e) => setOtherCost(Number(e.target.value))} />
-            </div>
-          </div>
-
-          {/* Costs box */}
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <div>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Repack Cost</span>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ff9800' }}>{fmt(calc.totalCost)}</div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Cost Per Pack</span>
-              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>{fmt(calc.costPerUnit)}</div>
-            </div>
-          </div>
-
-          <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Repacking Notes</label>
-            <textarea className="form-control" style={{ borderRadius: '8px' }} rows={2} placeholder="Optional notes..." value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem' }}>
-            <button type="button" className="btn btn-secondary" style={{ height: '48px', padding: '0 1.5rem', borderRadius: '10px' }} onClick={() => setStep(3)}>
-              &larr; Back
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              style={{ backgroundColor: '#ff9800', borderColor: '#ff9800', height: '48px', padding: '0 2.5rem', fontWeight: 700, borderRadius: '10px' }}
-              disabled={calc.isBulkLow || calc.isPouchLow || calc.isLabelLow}
-              onClick={handleCompleteRepacking}
-            >
-              COMPLETE REPACKING
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 5: Success screen */}
-      {step === 5 && (
-        <div style={{ textAlign: 'center', padding: '2rem 0' }}>
-          <span style={{ fontSize: '4.5rem', color: '#10b981', display: 'block', marginBottom: '1rem' }}>🎉</span>
-          <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', margin: '0 0 0.5rem 0' }}>Repacking Completed!</h3>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', maxWidth: '400px', margin: '0 auto 2rem' }}>
-            Bulk stock reduced and repacked target packages stock successfully updated in inventory.
-          </p>
-          <button type="button" className="btn btn-primary" style={{ backgroundColor: '#ff9800', borderColor: '#ff9800', height: '48px', padding: '0 2rem', fontWeight: 600, borderRadius: '10px' }} onClick={resetEntry}>
-            Repack Another Item
-          </button>
-        </div>
-      )}
 
       {/* Collapsible Admin Debugging Panel */}
       <div style={{ marginTop: '2.5rem', borderTop: '1px dashed #cbd5e1', paddingTop: '1.5rem' }}>

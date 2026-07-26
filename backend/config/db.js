@@ -523,8 +523,22 @@ const connectDB = async () => {
   await addColumnIfNotExist('WebsiteProduct', 'isFeatured', "TINYINT DEFAULT 0");
   await addColumnIfNotExist('WebsiteProduct', 'isTrending', "TINYINT DEFAULT 0");
   await addColumnIfNotExist('WebsiteProduct', 'isPublished', "TINYINT DEFAULT 1");
-  await addColumnIfNotExist('WebsiteProduct', 'sortOrder', "INTEGER DEFAULT 0");
   await addColumnIfNotExist('WebsiteProduct', 'galleryImages', "TEXT NULL");
+
+  // Packing Work Order & Pack Size BOM enhancements
+  await addColumnIfNotExist('ProductPackSize', 'pouchId', "INTEGER NULL");
+  await addColumnIfNotExist('ProductPackSize', 'labelId', "INTEGER NULL");
+  await addColumnIfNotExist('ProductPackSize', 'stickerId', "INTEGER NULL");
+  await addColumnIfNotExist('ProductPackSize', 'cartonId', "INTEGER NULL");
+  await addColumnIfNotExist('ProductPackSize', 'bomJson', "TEXT DEFAULT '[]'");
+  await addColumnIfNotExist('ManufacturingEntry', 'remainingBulkStock', "DECIMAL(10, 3) NULL");
+  await addColumnIfNotExist('RepackEntry', 'mfgBatchNumber', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('RepackEntry', 'mfgEntryId', "INTEGER NULL");
+  await addColumnIfNotExist('RepackEntry', 'bulkConsumedKg', "DECIMAL(10, 3) DEFAULT 0.000");
+  await addColumnIfNotExist('RepackEntry', 'remainingBulkKg', "DECIMAL(10, 3) DEFAULT 0.000");
+  await addColumnIfNotExist('RepackEntry', 'reversedAt', "DATETIME NULL");
+  await addColumnIfNotExist('RepackEntry', 'reversedBy', "INTEGER NULL");
+  await addColumnIfNotExist('RepackEntry', 'reversalReason', "TEXT NULL");
 
   // SFA Settings enhancements
   await addColumnIfNotExist('Settings', 'minOrderGreen', "DECIMAL(10, 2) DEFAULT 10000.00");

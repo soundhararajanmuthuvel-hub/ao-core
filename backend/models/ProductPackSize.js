@@ -49,6 +49,27 @@ const ProductPackSize = sequelize.define('ProductPackSize', {
     type: DataTypes.STRING,
     defaultValue: 'Active',
   },
+  pouchId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  labelId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  stickerId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  cartonId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  bomJson: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    defaultValue: '[]',
+  },
 });
 
 // Associations

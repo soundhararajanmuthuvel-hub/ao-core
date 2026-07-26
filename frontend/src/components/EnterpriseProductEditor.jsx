@@ -23,6 +23,7 @@ import NutritionCard from './product-editor/NutritionCard';
 import SEOCard from './product-editor/SEOCard';
 import PublishingCard from './product-editor/PublishingCard';
 import PreviewCard from './product-editor/PreviewCard';
+import PackingConfigurationCard from './product-editor/PackingConfigurationCard';
 
 export default function EnterpriseProductEditor({
   product = null,
@@ -486,6 +487,11 @@ export default function EnterpriseProductEditor({
               setFormData={setFormData}
               setIsDirty={setIsDirty}
               stockStatus={stockStatus}
+            />
+
+            <PackingConfigurationCard
+              productId={formData.id}
+              productName={formData.name}
             />
 
             <BenefitsCard
