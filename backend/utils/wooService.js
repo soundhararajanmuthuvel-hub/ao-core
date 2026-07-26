@@ -533,7 +533,11 @@ class WooCommerceService {
   }
 
   async fetchSingleProduct(wooId) {
-    if (!this.url) throw new Error('WooCommerce API not configured');
+    if (!this.url) {
+      const err = new Error('WooCommerce API not configured');
+      err.statusCode = 400;
+      throw err;
+    }
     const endpoint = `${this.url}/wp-json/wc/v3/products/${wooId}`;
     try {
       const response = await axios.get(endpoint, {
@@ -551,7 +555,11 @@ class WooCommerceService {
   }
 
   async syncProducts() {
-    if (!this.url) throw new Error('WooCommerce API not configured');
+    if (!this.url) {
+      const err = new Error('WooCommerce API not configured');
+      err.statusCode = 400;
+      throw err;
+    }
 
     if (this.settings.wooProductSyncMode === 'Website Master') {
       console.log('[Product Sync] Skipped pushing products because sync mode is set to Website Master.');
@@ -659,7 +667,11 @@ class WooCommerceService {
   }
 
   async syncCustomers() {
-    if (!this.url) throw new Error('WooCommerce API not configured');
+    if (!this.url) {
+      const err = new Error('WooCommerce API not configured');
+      err.statusCode = 400;
+      throw err;
+    }
 
     const startTime = Date.now();
     let successCount = 0;
@@ -735,7 +747,11 @@ class WooCommerceService {
   }
 
   async syncOrders(userId = 1) {
-    if (!this.url) throw new Error('WooCommerce API not configured');
+    if (!this.url) {
+      const err = new Error('WooCommerce API not configured');
+      err.statusCode = 400;
+      throw err;
+    }
 
     const startTime = Date.now();
     let successCount = 0;
@@ -1077,7 +1093,11 @@ class WooCommerceService {
   }
 
   async syncInventory() {
-    if (!this.url) throw new Error('WooCommerce API not configured');
+    if (!this.url) {
+      const err = new Error('WooCommerce API not configured');
+      err.statusCode = 400;
+      throw err;
+    }
 
     if (this.settings.wooInventorySyncMode === 'Website Master') {
       console.log('[Inventory Sync] Skipped pushing inventory because sync mode is set to Website Master.');

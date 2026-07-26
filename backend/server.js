@@ -1,4 +1,7 @@
+
 require('dotenv').config();
+
+
 
 const express = require('express');
 const cors = require('cors');
@@ -39,6 +42,7 @@ const corsOptions = {
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-API-Key", "x-api-key"]
 };
+
 
 const { profileMiddleware } = require('./middleware/profileMiddleware');
 
@@ -125,6 +129,7 @@ app.post('/api/client-error', (req, res) => {
 /* =========================
    API ROUTES
 ========================= */
+
 app.use('/api/test', require('./routes/testRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
@@ -173,18 +178,9 @@ app.use('/api/external', require('./routes/externalRoutes'));
 
 /* =========================
    WEBSITE MODULE ROUTES (BLOVIT ECOMMERCE)
+   (Moved into startServer to guarantee DB initialization before controller import)
    ========================= */
-app.get('/api/website/health', (req, res) => res.json({ success: true, status: 'OK', message: 'Website module is operational' }));
-try { app.use('/api/website/products', require('./routes/websiteProductRoutes')); } catch(e) { console.error('Failed to load websiteProductRoutes', e); }
-try { app.use('/api/website/auth', require('./routes/websiteAuthRoutes')); } catch(e) { console.error('Failed to load websiteAuthRoutes', e); }
-try { app.use('/api/website/account', require('./routes/websiteAccountRoutes')); } catch(e) { console.error('Failed to load websiteAccountRoutes', e); }
-try { app.use('/api/website/cart', require('./routes/websiteAccountRoutes')); } catch(e) { console.error('Failed to load websiteAccountRoutes (cart)', e); }
-try { app.use('/api/website/razorpay', require('./routes/websiteOrderRoutes')); } catch(e) { console.error('Failed to load websiteOrderRoutes (razorpay)', e); }
-try { app.use('/api/website/orders', require('./routes/websiteOrderRoutes')); } catch(e) { console.error('Failed to load websiteOrderRoutes', e); }
-try { app.use('/api/website', require('./routes/websiteReviewRoutes')); } catch(e) { console.error('Failed to load websiteReviewRoutes', e); }
-try { app.use('/api/website/referrals', require('./routes/websiteReferralRoutes')); } catch(e) { console.error('Failed to load websiteReferralRoutes', e); }
-try { app.use('/api/website', require('./routes/websiteShippingCouponRoutes')); } catch(e) { console.error('Failed to load websiteShippingCouponRoutes', e); }
-try { app.use('/api/website', require('./routes/websiteEventRoutes')); } catch(e) { console.error('Failed to load websiteEventRoutes', e); }
+
 const cloudinaryService = require('./services/cloudinaryService');
 
 app.get('/api/system/cloudinary-health', async (req, res) => {
@@ -227,7 +223,22 @@ app.use(errorHandler);
 
 const startServer = async () => {
   try {
+
     await connectDB();
+    
+    // Register Website Routes AFTER Database is fully initialized and models are registered
+
+    app.get('/api/website/health', (req, res) => res.json({ success: true, status: 'OK', message: 'Website module is operational' }));
+    app.use('/api/website/products', require('./routes/websiteProductRoutes'));
+    app.use('/api/website/auth', require('./routes/websiteAuthRoutes'));
+    app.use('/api/website/account', require('./routes/websiteAccountRoutes'));
+    app.use('/api/website/cart', require('./routes/websiteAccountRoutes'));
+    app.use('/api/website/razorpay', require('./routes/websiteOrderRoutes'));
+    app.use('/api/website/orders', require('./routes/websiteOrderRoutes'));
+    app.use('/api/website', require('./routes/websiteReviewRoutes'));
+    app.use('/api/website/referrals', require('./routes/websiteReferralRoutes'));
+    app.use('/api/website', require('./routes/websiteShippingCouponRoutes'));
+    app.use('/api/website', require('./routes/websiteEventRoutes'));
     
     // Clean up seeded ABC Malt data from database (one-time clean up on deployment)
     try {

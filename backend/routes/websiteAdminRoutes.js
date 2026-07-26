@@ -135,7 +135,8 @@ router.post('/upload-image', (req, res, next) => {
     } catch (error) {
       console.error('[Cloudinary Upload Route Error]', error);
       const errCode = error.type === 'CLOUDINARY_AUTH_ERROR' ? 'CLOUDINARY_AUTH_FAILED' : (error.type || 'CLOUDINARY_UPLOAD_ERROR');
-      res.status(200).json({
+      const statusCode = error.httpStatus || 500;
+      res.status(statusCode).json({
         success: false,
         error: error.message || 'Cloudinary upload failed',
         code: errCode,
