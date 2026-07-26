@@ -353,32 +353,66 @@ class WooCommerceService {
         receivedCount += products.length;
 
         for (const wpProd of products) {
+          // 1. Pre-mapping validation
+          if (!wpProd || typeof wpProd !== 'object') {
+            failedCount++;
+            errorsList.push({
+              productId: wpProd?.id || 'N/A',
+              sku: 'N/A',
+              productName: 'Unknown Product',
+              stage: 'Validation',
+              reason: 'Invalid product payload object',
+              sqlError: null,
+              sql: null,
+              stack: null
+            });
+            continue;
+          }
+
+          if (!wpProd.id) {
+            failedCount++;
+            errorsList.push({
+              productId: 'N/A',
+              sku: wpProd.sku || 'N/A',
+              productName: wpProd.name || 'Unnamed Product',
+              stage: 'Validation',
+              reason: 'Missing WooCommerce Product ID',
+              sqlError: null,
+              sql: null,
+              stack: null
+            });
+            continue;
+          }
+
           const sku = wpProd.sku || `WOO-PROD-${wpProd.id}`;
           const prodName = wpProd.name || 'WooCommerce Product';
 
-          // Transaction boundary per product
+          // 2. Transaction boundary per product
           const t = await sequelize.transaction();
 
           try {
+            // Category auto-assignment (never fail because category is missing)
             let categoryName = 'General';
-            if (wpProd.categories && wpProd.categories.length > 0) {
-              categoryName = wpProd.categories[0].name;
+            if (wpProd.categories && Array.isArray(wpProd.categories) && wpProd.categories.length > 0) {
+              categoryName = wpProd.categories[0].name || 'General';
               if (!categorySet.has(categoryName)) {
                 categorySet.add(categoryName);
                 categoriesImportedCount++;
               }
             }
 
+            // Image handling (Featured image, Gallery list, full Images array)
             let imageUrl = '';
-            if (wpProd.images && wpProd.images.length > 0) {
-              imageUrl = wpProd.images[0].src;
-              imagesImportedCount++;
-            }
-
+            let allImagesList = [];
             let galleryImagesList = [];
-            if (wpProd.images && wpProd.images.length > 1) {
-              galleryImagesList = wpProd.images.slice(1).map(img => img.src);
-              imagesImportedCount += galleryImagesList.length;
+            if (wpProd.images && Array.isArray(wpProd.images) && wpProd.images.length > 0) {
+              allImagesList = wpProd.images.map(img => img.src || img);
+              imageUrl = allImagesList[0] || '';
+              imagesImportedCount++;
+              if (allImagesList.length > 1) {
+                galleryImagesList = allImagesList.slice(1);
+                imagesImportedCount += galleryImagesList.length;
+              }
             }
 
             let dimensionsText = '';
@@ -390,8 +424,8 @@ class WooCommerceService {
             }
 
             let brandName = '';
-            if (wpProd.attributes && wpProd.attributes.length > 0) {
-              const brandAttr = wpProd.attributes.find(a => a.name.toLowerCase() === 'brand');
+            if (wpProd.attributes && Array.isArray(wpProd.attributes) && wpProd.attributes.length > 0) {
+              const brandAttr = wpProd.attributes.find(a => a.name && a.name.toLowerCase() === 'brand');
               if (brandAttr && brandAttr.options && brandAttr.options.length > 0) {
                 brandName = brandAttr.options[0];
               }
@@ -401,7 +435,7 @@ class WooCommerceService {
             const shortDescText = wpProd.short_description || '';
             
             let attributesText = '';
-            if (wpProd.attributes && wpProd.attributes.length > 0) {
+            if (wpProd.attributes && Array.isArray(wpProd.attributes) && wpProd.attributes.length > 0) {
               attributesText = '\n\nAttributes:\n' + wpProd.attributes.map(attr => {
                 const options = attr.options ? attr.options.join(', ') : '';
                 return `${attr.name}: ${options}`;
@@ -409,23 +443,30 @@ class WooCommerceService {
             }
 
             let tagsText = '';
-            if (wpProd.tags && wpProd.tags.length > 0) {
+            if (wpProd.tags && Array.isArray(wpProd.tags) && wpProd.tags.length > 0) {
               tagsText = '\n\nTags: ' + wpProd.tags.map(t => t.name).join(', ');
             }
 
             const fullDescription = `${shortDescText}\n\n${descriptionText}${attributesText}${tagsText}`.trim();
             const wpModified = wpProd.date_modified ? new Date(wpProd.date_modified) : null;
+            const regPrice = Number(wpProd.regular_price || wpProd.price || 0);
+            const salePrice = Number(wpProd.sale_price || 0);
+            const sellingPrice = salePrice > 0 ? salePrice : regPrice;
 
             const productData = {
               name: prodName,
               sku: sku,
+              slug: wpProd.slug || '',
               description: fullDescription,
               shortDescription: shortDescText,
               category: categoryName,
               image: imageUrl,
-              price: Number(wpProd.regular_price || wpProd.price || 0),
-              salePrice: Number(wpProd.sale_price || 0),
-              sellingPrice: Number(wpProd.price || wpProd.regular_price || 0),
+              imageUrl: imageUrl,
+              images: JSON.stringify(allImagesList),
+              galleryImages: JSON.stringify(galleryImagesList),
+              price: regPrice,
+              salePrice: salePrice,
+              sellingPrice: sellingPrice,
               stock: Math.max(0, Math.round(Number(wpProd.stock_quantity || 0))),
               status: wpProd.status || 'publish',
               weight: Number(wpProd.weight || 0.200),
@@ -438,12 +479,15 @@ class WooCommerceService {
               woocommerce_product_id: String(wpProd.id),
               wooProductId: String(wpProd.id),
               brand: brandName,
-              galleryImages: JSON.stringify(galleryImagesList),
               dimensions: dimensionsText,
               stockStatus: wpProd.stock_status || 'instock',
               woocommerce_last_modified: wpModified,
               woocommerce_sync_status: 'synced',
               woocommerce_permalink: wpProd.permalink || '',
+              seoTitle: wpProd.yoast_head_json?.title || prodName,
+              seoDescription: wpProd.yoast_head_json?.description || shortDescText || descriptionText,
+              publishToWebsite: true,
+              isActive: true,
             };
 
             // Enterprise Schema Compatibility Layer
@@ -489,15 +533,17 @@ class WooCommerceService {
             await t.commit();
           } catch (itemErr) {
             await t.rollback();
-            console.error(`[Woo Sync Failure] Item ${wpProd.id} (${prodName} / ${sku}):`, itemErr.message);
+            console.error(`[Woo Sync Failure] Item ${wpProd.id} (${prodName} / ${sku}):`, itemErr.stack || itemErr.message);
             failedCount++;
             errorsList.push({
               productId: wpProd.id,
               sku: sku,
               productName: prodName,
-              stage: 'Save Product',
+              stage: 'Database Insert/Update',
               reason: itemErr.message,
-              sqlError: itemErr.code || null
+              sqlError: itemErr.code || itemErr.original?.code || null,
+              sql: itemErr.sql || itemErr.parent?.sql || null,
+              stack: itemErr.stack || null
             });
           }
         }

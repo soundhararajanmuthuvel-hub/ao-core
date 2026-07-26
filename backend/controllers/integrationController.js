@@ -129,17 +129,37 @@ exports.triggerProductImport = async (req, res, next) => {
     const woo = new WooCommerceService(settings);
     const result = await woo.importProductsDetailed();
 
-    const totalProcessed = result.summary.imported + result.summary.updated;
-    await logActivity(req.user.id, 'sync', 'products', `Imported ${result.summary.imported} and updated ${result.summary.updated} products from WooCommerce`);
+    const summary = result.summary || {};
+    const receivedCount = summary.received || 0;
+    const importedCount = summary.imported || 0;
+    const updatedCount = summary.updated || 0;
+    const skippedCount = summary.skipped || 0;
+    const failedCount = summary.failed || 0;
+    const errors = summary.errors || [];
+
+    const totalProcessed = importedCount + updatedCount;
+    await logActivity(req.user.id, 'sync', 'products', `WooCommerce Sync: ${importedCount} imported, ${updatedCount} updated, ${failedCount} failed`);
 
     settings.wooLastSyncTime = new Date();
     await settings.save();
 
+    const isFullySuccessful = failedCount === 0;
+    let messageStr = `WooCommerce Sync Completed: Products Found: ${receivedCount}, Imported: ${importedCount}, Updated: ${updatedCount}, Skipped: ${skippedCount}, Failed: ${failedCount}`;
+    if (failedCount > 0) {
+      messageStr = `WooCommerce Sync Incomplete: ${importedCount} imported, ${updatedCount} updated, ${failedCount} failed. Click 'View Failed Products' for details.`;
+    }
+
     res.json({
-      success: true,
+      success: isFullySuccessful,
       count: totalProcessed,
-      summary: result.summary,
-      message: `Successfully imported ${result.summary.imported} and updated ${result.summary.updated} products from WooCommerce`,
+      receivedCount,
+      importedCount,
+      updatedCount,
+      skippedCount,
+      failedCount,
+      summary,
+      failures: errors,
+      message: messageStr,
     });
   } catch (err) {
     console.error('[WooCommerce Product Import Error]:', err);

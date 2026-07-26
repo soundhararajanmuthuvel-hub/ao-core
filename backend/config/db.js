@@ -552,6 +552,73 @@ const connectDB = async () => {
   await addColumnIfNotExist('WebsiteProduct', 'isPublished', "TINYINT DEFAULT 1");
   await addColumnIfNotExist('WebsiteProduct', 'galleryImages', "TEXT NULL");
 
+  // Dynamic Schema Alignment Helper comparing Sequelize Model attributes with DB Table columns
+  const syncModelAttributesToTable = async (model, tableName) => {
+    const resolvedTableName = (tableNameMap[tableName] || tableNameMap[tableName.replace(/s$/, '')] || tableName).toLowerCase();
+    const existingColumns = tableColumnsCache[resolvedTableName] || [];
+    const addedCols = [];
+    const existingCols = [];
+    const skippedCols = [];
+
+    const attributes = model.rawAttributes || {};
+    for (const [attrName, attrDef] of Object.entries(attributes)) {
+      if (attrDef.type && attrDef.type.key === 'VIRTUAL') {
+        skippedCols.push(`${attrName} (VIRTUAL)`);
+        continue;
+      }
+      
+      const colNameLower = attrName.toLowerCase();
+      if (existingColumns.includes(colNameLower)) {
+        existingCols.push(attrName);
+        continue;
+      }
+
+      let sqlTypeDef = 'TEXT NULL';
+      const typeKey = attrDef.type ? attrDef.type.key : 'STRING';
+      
+      if (typeKey === 'INTEGER') {
+        sqlTypeDef = 'INTEGER NULL';
+      } else if (typeKey === 'DECIMAL') {
+        const precision = attrDef.type._precision || 10;
+        const scale = attrDef.type._scale || 2;
+        sqlTypeDef = `DECIMAL(${precision}, ${scale}) DEFAULT 0.00`;
+      } else if (typeKey === 'BOOLEAN') {
+        const defaultVal = attrDef.defaultValue === true ? 1 : (attrDef.defaultValue === false ? 0 : 0);
+        sqlTypeDef = `TINYINT DEFAULT ${defaultVal}`;
+      } else if (typeKey === 'DATE' || typeKey === 'DATEONLY') {
+        sqlTypeDef = 'DATETIME NULL';
+      } else if (typeKey === 'STRING') {
+        const length = attrDef.type._length || 255;
+        sqlTypeDef = `VARCHAR(${length}) NULL`;
+      } else if (typeKey === 'TEXT') {
+        const defaultVal = attrDef.defaultValue !== undefined ? `'${attrDef.defaultValue}'` : 'NULL';
+        sqlTypeDef = `TEXT DEFAULT ${defaultVal}`;
+      }
+
+      try {
+        console.log(`[Schema Auto-Align] Adding missing column ${attrName} to ${resolvedTableName}...`);
+        await sequelize.query(`ALTER TABLE ${resolvedTableName} ADD COLUMN ${attrName} ${sqlTypeDef};`);
+        existingColumns.push(colNameLower);
+        addedCols.push(attrName);
+      } catch (err) {
+        console.error(`[Schema Auto-Align] Failed to add column ${attrName} to ${resolvedTableName}:`, err.message);
+        skippedCols.push(`${attrName} (Error: ${err.message})`);
+      }
+    }
+
+    console.log(`[Schema Auto-Align Summary for ${tableName}]:`);
+    console.log(`  Columns added (${addedCols.length}):`, addedCols.join(', ') || 'None');
+    console.log(`  Columns already existing (${existingCols.length}):`, existingCols.length);
+    console.log(`  Columns skipped (${skippedCols.length}):`, skippedCols.join(', ') || 'None');
+  };
+
+  try {
+    const ProductModel = require('../models/Product');
+    await syncModelAttributesToTable(ProductModel, 'Product');
+  } catch (syncErr) {
+    console.error('Failed to sync Product model attributes to table:', syncErr.message);
+  }
+
   // Packing Work Order & Pack Size BOM enhancements
   await addColumnIfNotExist('ProductPackSize', 'pouchId', "INTEGER NULL");
   await addColumnIfNotExist('ProductPackSize', 'labelId', "INTEGER NULL");

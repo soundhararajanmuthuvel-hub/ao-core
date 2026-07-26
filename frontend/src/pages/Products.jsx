@@ -105,22 +105,30 @@ export default function Products() {
     setWooSyncDiagnosticDetails(null);
     try {
       const { data } = await integrationsApi.importProducts();
-      if (data.success) {
-        toast(data.message || '✓ Synced all products successfully from WooCommerce', 'success');
+      const failed = data.failedCount || data.summary?.failed || 0;
+      const imported = data.importedCount || data.summary?.imported || 0;
+      const updated = data.updatedCount || data.summary?.updated || 0;
+      const received = data.receivedCount || data.summary?.received || (imported + updated + failed);
+
+      if (data.success && failed === 0) {
+        toast(data.message || `✓ WooCommerce Sync Completed: Products Found: ${received}, Imported: ${imported}, Updated: ${updated}, Failed: 0`, 'success');
         setPage(1);
         load();
       } else {
+        const firstFail = (data.failures && data.failures.length > 0) ? data.failures[0] : {};
         setWooSyncDiagnosticDetails({
-          stage: data.stage || 'WooCommerce Product Sync',
-          error: data.error || 'Products sync failed',
-          sku: data.sku || 'N/A',
-          productName: data.productName || 'N/A',
-          productId: data.productId,
-          sqlError: data.sqlError,
-          details: data.details || 'No error details provided',
-          fixSuggestion: data.fixSuggestion || 'Verify WooCommerce credentials in Settings -> Integration and retry.'
+          stage: firstFail.stage || data.stage || 'WooCommerce Product Sync',
+          error: firstFail.reason || data.error || 'Partial or total product import failure',
+          sku: firstFail.sku || data.sku || 'N/A',
+          productName: firstFail.productName || data.productName || 'N/A',
+          productId: firstFail.productId || data.productId,
+          sqlError: firstFail.sqlError || data.sqlError,
+          details: JSON.stringify(data.failures || data.details || data.summary, null, 2),
+          fixSuggestion: 'Check failed products breakdown below. Verify product SKUs, model columns, and network connection.'
         });
-        toast(`Sync Failed: ${data.error || 'Check diagnostic log'}`, 'error');
+        toast(data.message || `Sync Incomplete: ${imported} imported, ${updated} updated, ${failed} failed`, 'error');
+        setPage(1);
+        load();
       }
     } catch (err) {
       const resp = err.response?.data || {};
