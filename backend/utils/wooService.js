@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { Op } = require('sequelize');
+const { sequelize } = require('../config/db');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const Invoice = require('../models/Invoice');
