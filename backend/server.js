@@ -1,7 +1,7 @@
-console.log('[STARTUP TRACE] Loading Environment...');
+
 require('dotenv').config();
 
-console.log('[STARTUP TRACE] Loading Config...');
+
 
 const express = require('express');
 const cors = require('cors');
@@ -43,7 +43,7 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-API-Key", "x-api-key"]
 };
 
-console.log('[STARTUP TRACE] Loading Middleware...');
+
 const { profileMiddleware } = require('./middleware/profileMiddleware');
 
 /* =========================
@@ -129,7 +129,7 @@ app.post('/api/client-error', (req, res) => {
 /* =========================
    API ROUTES
 ========================= */
-console.log('[STARTUP TRACE] Loading Routes...');
+
 app.use('/api/test', require('./routes/testRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
@@ -223,11 +223,11 @@ app.use(errorHandler);
 
 const startServer = async () => {
   try {
-    console.log('[STARTUP TRACE] Starting HTTP Server Initialization...');
+
     await connectDB();
     
     // Register Website Routes AFTER Database is fully initialized and models are registered
-    console.log('[STARTUP TRACE] Registering Website API Routes...');
+
     app.get('/api/website/health', (req, res) => res.json({ success: true, status: 'OK', message: 'Website module is operational' }));
     app.use('/api/website/products', require('./routes/websiteProductRoutes'));
     app.use('/api/website/auth', require('./routes/websiteAuthRoutes'));
