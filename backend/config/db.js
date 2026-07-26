@@ -819,6 +819,39 @@ const connectDB = async () => {
     } else {
       console.log('✓ Database Data Migration: All product types are correct.');
     }
+
+    // Auto-migrate legacy WebsiteProduct data into unified Product master
+    try {
+      const ProductModel = require('../models/Product');
+      const WebsiteProductModel = require('../models/WebsiteProduct');
+      const websiteProds = await WebsiteProductModel.findAll();
+      for (const wp of websiteProds) {
+        const targetId = wp.managementProductId || wp.id;
+        const masterProd = await ProductModel.findByPk(targetId);
+        if (masterProd) {
+          let updated = false;
+          if (wp.slug && !masterProd.slug) { masterProd.slug = wp.slug; updated = true; }
+          if (wp.shortDescription && !masterProd.shortDescription) { masterProd.shortDescription = wp.shortDescription; updated = true; }
+          if (wp.description && !masterProd.description) { masterProd.description = wp.description; updated = true; }
+          if (wp.benefits && wp.benefits !== '[]' && (!masterProd.benefits || masterProd.benefits === '[]')) { masterProd.benefits = wp.benefits; updated = true; }
+          if (wp.ingredients && wp.ingredients !== '[]' && (!masterProd.ingredients || masterProd.ingredients === '[]')) { masterProd.ingredients = wp.ingredients; updated = true; }
+          if (wp.faqs && wp.faqs !== '[]' && (!masterProd.faqs || masterProd.faqs === '[]')) { masterProd.faqs = wp.faqs; updated = true; }
+          if (wp.seoTitle && !masterProd.seoTitle) { masterProd.seoTitle = wp.seoTitle; updated = true; }
+          if (wp.seoDescription && !masterProd.seoDescription) { masterProd.seoDescription = wp.seoDescription; updated = true; }
+          if (wp.seoKeywords && !masterProd.seoKeywords) { masterProd.seoKeywords = wp.seoKeywords; updated = true; }
+          if (wp.isPublished !== undefined) { masterProd.isPublished = !!wp.isPublished; masterProd.publishToWebsite = !!wp.isPublished; updated = true; }
+          if (wp.isFeatured !== undefined) { masterProd.isFeatured = !!wp.isFeatured; updated = true; }
+          if (wp.isBestseller !== undefined) { masterProd.isBestseller = !!wp.isBestseller; updated = true; }
+          if (wp.isTrending !== undefined) { masterProd.isTrending = !!wp.isTrending; updated = true; }
+          if (updated) {
+            await masterProd.save();
+            console.log(`[Data Migration] Migrated WebsiteProduct settings into master Product "${masterProd.name}" (ID: ${masterProd.id})`);
+          }
+        }
+      }
+    } catch (migErr) {
+      console.warn('WebsiteProduct data migration skipped:', migErr.message);
+    }
   } catch (err) {
     console.error('Error correcting product types on startup:', err);
   }
