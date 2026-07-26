@@ -6,6 +6,7 @@ const { uploadLogo } = require('../middleware/upload');
 const { getSettings, updateSettings, uploadLogo: uploadLogoCtrl, uploadLogoToWordPress, getSettingsLogo } = require('../controllers/settingsController');
 const {
   getCounts,
+  getDatabaseHealth,
   verifyPassword,
   backupDatabase,
   resetDemoData,
@@ -29,6 +30,7 @@ router.post('/upload-wp-logo', auth, authorize('admin'), uploadLogo, uploadLogoT
 
 // Database Management endpoints
 router.get('/database/counts', auth, isSuperAdmin, getCounts);
+router.get('/database/health', auth, getDatabaseHealth);
 router.get('/database/backup', auth, isSuperAdmin, backupDatabase);
 router.post('/database/verify-password', auth, isSuperAdmin, verifyPassword);
 router.post('/database/reset-demo', auth, isSuperAdmin, resetDemoData);

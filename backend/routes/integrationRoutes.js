@@ -16,8 +16,6 @@ const {
   getSyncLogs,
   handleWooWebhook,
   forceRefreshProduct,
-  getWooJobStatus,
-  retryFailedWooSync,
   
   createConnection,
   getConnections,
@@ -59,8 +57,6 @@ router.post('/sync/orders', auth, authorize('admin'), triggerOrderSync);
 router.post('/sync/inventory', auth, authorize('admin'), triggerInventorySync);
 router.post('/sync/all', auth, authorize('admin'), triggerSyncAll);
 router.post('/sync/product/:id', auth, authorize('admin'), forceRefreshProduct);
-router.get('/job-status/:jobId', auth, authorize('admin'), getWooJobStatus);
-router.post('/retry-failed', auth, authorize('admin'), retryFailedWooSync);
 router.get('/woo-stats', auth, authorize('admin'), getWooIntegrationStats);
 router.get('/sync-logs', auth, authorize('admin'), getSyncLogs);
 

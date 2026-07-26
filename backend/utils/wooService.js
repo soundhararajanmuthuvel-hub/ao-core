@@ -46,48 +46,9 @@ class WooCommerceService {
     }
   }
 
-  formatWooError(err) {
-    if (!err) return 'Unknown WooCommerce Error';
-    if (err.response) {
-      const status = err.response.status;
-      const data = err.response.data;
-      const serverMsg = data?.message || data?.code || '';
-      
-      if (status === 401) {
-        return `401 Authentication Failed: Invalid Consumer Key or Consumer Secret. ${serverMsg ? '(' + serverMsg + ')' : ''}`;
-      }
-      if (status === 403) {
-        return `403 API Permission Denied: Consumer Key lacks read/write permissions. ${serverMsg ? '(' + serverMsg + ')' : ''}`;
-      }
-      if (status === 404) {
-        return `404 WooCommerce REST API Not Found: Endpoint /wp-json/wc/v3 is missing or disabled on website.`;
-      }
-      if (status === 408) {
-        return `408 Timeout: WooCommerce server took too long to respond.`;
-      }
-      if (status === 429) {
-        return `429 Rate Limit Exceeded: Too many requests sent to WooCommerce.`;
-      }
-      if (status >= 500) {
-        return `${status} WooCommerce Internal Error: Website server encountered an exception. ${serverMsg ? '(' + serverMsg + ')' : ''}`;
-      }
-      return `${status} WooCommerce Error: ${serverMsg || 'API Error'}`;
-    }
-    if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND') {
-      return `Website Unreachable: Unable to establish connection to URL ${this.url}.`;
-    }
-    if (err.code === 'ETIMEDOUT' || (err.message && err.message.includes('timeout'))) {
-      return `Connection Timeout: WooCommerce server failed to respond within timeout period.`;
-    }
-    if (err.message && (err.message.includes('SSL') || err.message.includes('certificate'))) {
-      return `SSL Certificate Error: Unable to verify SSL certificate for ${this.url}.`;
-    }
-    return err.message || 'WooCommerce API Error';
-  }
-
   async testConnection() {
     if (!this.url || !this.consumerKey || !this.consumerSecret) {
-      throw new Error('Website URL, Consumer Key, and Consumer Secret are required to test connection');
+      throw new Error('Website URL, Consumer Key, and Consumer Secret are required');
     }
     const endpoint = `${this.url}/wp-json/wc/v3/products`;
     try {
@@ -96,11 +57,17 @@ class WooCommerceService {
           ...this.getCredentialsParams(),
           per_page: 1
         },
-        timeout: 15000,
+        timeout: 10000,
       });
       return response;
     } catch (err) {
-      throw new Error(this.formatWooError(err));
+      if (err.response) {
+        const errorData = err.response.data;
+        const errorMessage = errorData?.message || errorData?.code || 'WooCommerce API Error';
+        throw new Error(errorMessage);
+      } else {
+        throw err;
+      }
     }
   }
 
@@ -437,6 +404,20 @@ class WooCommerceService {
               woocommerce_permalink: wpProd.permalink || '',
             };
 
+            // Enterprise Schema Compatibility Layer: Sanitize productData against Product.rawAttributes
+            const sanitizeForModel = (model, data) => {
+              const allowedKeys = Object.keys(model.rawAttributes || {});
+              const sanitized = {};
+              for (const key of allowedKeys) {
+                if (data[key] !== undefined) {
+                  sanitized[key] = data[key];
+                }
+              }
+              return sanitized;
+            };
+
+            const safeProductData = sanitizeForModel(Product, productData);
+
             // Match by WooCommerce Product ID
             let existingProduct = await Product.findOne({
               where: {
@@ -469,7 +450,7 @@ class WooCommerceService {
                   isChanged = true;
                 }
 
-                await existingProduct.update(productData);
+                await existingProduct.update(safeProductData);
 
                 if (isChanged) {
                   await createNotification({
@@ -483,7 +464,7 @@ class WooCommerceService {
             } else {
               // Create new trading product
               await Product.create({
-                ...productData,
+                ...safeProductData,
                 productType: 'trading',
                 unit: 'pcs',
               });

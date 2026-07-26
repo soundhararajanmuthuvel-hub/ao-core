@@ -9,25 +9,6 @@ const { Op } = require('sequelize');
 exports.testWooConnection = async (req, res, next) => {
   try {
     const settings = await getSettings();
-    
-    // Apply body overrides if provided
-    if (req.body && (req.body.wooUrl || req.body.wooConsumerKey || req.body.baseUrl || req.body.apiKey)) {
-      const wooUrl = req.body.wooUrl || req.body.baseUrl;
-      const wooConsumerKey = req.body.wooConsumerKey || req.body.apiKey;
-      const wooConsumerSecret = req.body.wooConsumerSecret || req.body.apiSecret || req.body.password;
-      if (wooUrl) settings.wooUrl = wooUrl;
-      if (wooConsumerKey) settings.wooConsumerKey = wooConsumerKey;
-      if (wooConsumerSecret) settings.wooConsumerSecret = wooConsumerSecret;
-    }
-
-    if (!settings.wooUrl) {
-      return res.status(400).json({
-        success: false,
-        connected: false,
-        message: 'WooCommerce Store URL is required. Please enter or save your Store URL.'
-      });
-    }
-
     const woo = new WooCommerceService(settings);
 
     let connected = false;
@@ -35,7 +16,7 @@ exports.testWooConnection = async (req, res, next) => {
 
     try {
       const response = await woo.testConnection();
-      if (response && (response.status === 200 || response.status === 201)) {
+      if (response && response.status === 200) {
         connected = true;
       }
     } catch (err) {
@@ -43,40 +24,15 @@ exports.testWooConnection = async (req, res, next) => {
     }
 
     const diagnostics = await woo.runDiagnostics();
-    const metadata = await woo.fetchStoreMetadata();
-
-    const isConnected = connected || diagnostics.connectionStatus === 'Connected' || diagnostics.productAccessSuccessful;
-
-    let userFacingMessage = '✓ Connected Successfully to WooCommerce REST API';
-    if (!isConnected) {
-      if (wooError) {
-        userFacingMessage = wooError;
-      } else if (diagnostics.errorDetails) {
-        userFacingMessage = diagnostics.errorDetails;
-      } else if (!diagnostics.siteReachable) {
-        userFacingMessage = `Website Unreachable: Unable to connect to ${settings.wooUrl}. Check domain URL & SSL certificate.`;
-      } else if (!diagnostics.wpApiReachable) {
-        userFacingMessage = `404 WordPress REST API Not Found: Endpoint ${settings.wooUrl}/wp-json is missing or blocked.`;
-      } else if (!diagnostics.wooApiReachable) {
-        userFacingMessage = `404 WooCommerce REST API Not Found: Endpoint /wp-json/wc/v3 is not enabled.`;
-      } else if (!diagnostics.credentialsValid) {
-        userFacingMessage = `401 Invalid Credentials: Consumer Key or Consumer Secret is invalid or unauthorized.`;
-      }
-    }
 
     res.json({
-      success: isConnected,
-      connected: isConnected,
-      message: userFacingMessage,
+      success: connected,
+      connected,
+      message: connected ? '✓ Connected Successfully' : (wooError || 'Failed to connect to WooCommerce'),
       diagnostics,
-      metadata,
     });
   } catch (err) {
-    res.status(400).json({
-      success: false,
-      connected: false,
-      message: err.message || 'Failed to connect to WooCommerce REST API'
-    });
+    next(err);
   }
 };
 
@@ -139,111 +95,21 @@ exports.connectWooWebsite = async (req, res, next) => {
   }
 };
 
-const wooSyncJobs = new Map();
-
-exports.getWooJobStatus = async (req, res) => {
-  try {
-    const { jobId } = req.params;
-    const job = wooSyncJobs.get(jobId);
-    if (!job) {
-      return res.status(404).json({ success: false, message: 'Sync job not found' });
-    }
-    res.json({ success: true, job });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to fetch job status', error: err.message });
-  }
-};
-
-exports.retryFailedWooSync = async (req, res, next) => {
-  try {
-    const SyncLog = require('../models/SyncLog');
-    const failedLogs = await SyncLog.findAll({
-      where: { failed: { [Op.gt]: 0 } },
-      order: [['createdAt', 'DESC']],
-      limit: 5
-    });
-
-    const settings = await getSettings();
-    const woo = new WooCommerceService(settings);
-    
-    let retriedCount = 0;
-    for (const log of failedLogs) {
-      try {
-        if (log.module === 'Products') {
-          const count = await woo.importProducts();
-          retriedCount += count;
-        } else if (log.module === 'Orders') {
-          const count = await woo.syncOrders();
-          retriedCount += count;
-        } else if (log.module === 'Customers') {
-          const count = await woo.syncCustomers();
-          retriedCount += count;
-        }
-      } catch (logErr) {
-        console.error(`Retry error for ${log.module}:`, logErr.message);
-      }
-    }
-
-    res.json({
-      success: true,
-      retriedCount,
-      message: `Successfully retried failed sync records. Synced ${retriedCount} items.`
-    });
-  } catch (err) {
-    res.status(400).json({ success: false, message: err.message || 'Retry engine execution failed' });
-  }
-};
-
 exports.triggerProductSync = async (req, res, next) => {
   try {
     const settings = await getSettings();
     const woo = new WooCommerceService(settings);
+    const count = await woo.syncProducts();
 
-    const jobId = `woo_job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const jobState = {
-      jobId,
-      module: 'Products',
-      action: 'Export (Push)',
-      status: 'Running',
-      progress: 15,
-      currentObject: 'Pushing local products to WooCommerce...',
-      recordsProcessed: 0,
-      totalRecords: 100,
-      recordsImported: 0,
-      recordsFailed: 0,
-      error: null,
-      startTime: Date.now(),
-      endTime: null
-    };
-
-    wooSyncJobs.set(jobId, jobState);
+    await logActivity(req.user.id, 'sync', 'products', `Synced ${count} products to WooCommerce`);
 
     res.json({
       success: true,
-      jobId,
-      message: 'WooCommerce product export job started in background'
-    });
-
-    setImmediate(async () => {
-      try {
-        jobState.progress = 50;
-        const count = await woo.syncProducts();
-        await logActivity(req.user?.id || 1, 'sync', 'products', `Synced ${count} products to WooCommerce`);
-
-        jobState.status = 'Completed';
-        jobState.progress = 100;
-        jobState.recordsProcessed = count;
-        jobState.recordsImported = count;
-        jobState.currentObject = `Successfully pushed ${count} products`;
-        jobState.endTime = Date.now();
-      } catch (err) {
-        jobState.status = 'Failed';
-        jobState.error = err.message;
-        jobState.endTime = Date.now();
-      }
+      count,
+      message: `Successfully synced ${count} products to WooCommerce`,
     });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message || 'Failed to initiate product sync' });
+    next(err);
   }
 };
 
@@ -251,55 +117,21 @@ exports.triggerProductImport = async (req, res, next) => {
   try {
     const settings = await getSettings();
     const woo = new WooCommerceService(settings);
+    const count = await woo.importProducts();
 
-    const jobId = `woo_job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const jobState = {
-      jobId,
-      module: 'Products',
-      action: 'Import',
-      status: 'Running',
-      progress: 15,
-      currentObject: 'Importing products from WooCommerce...',
-      recordsProcessed: 0,
-      totalRecords: 100,
-      recordsImported: 0,
-      recordsFailed: 0,
-      error: null,
-      startTime: Date.now(),
-      endTime: null
-    };
+    await logActivity(req.user.id, 'sync', 'products', `Imported ${count} products from WooCommerce`);
 
-    wooSyncJobs.set(jobId, jobState);
+    // Update last sync time
+    settings.wooLastSyncTime = new Date();
+    await settings.save();
 
     res.json({
       success: true,
-      jobId,
-      message: 'WooCommerce product import job started in background'
-    });
-
-    setImmediate(async () => {
-      try {
-        jobState.progress = 40;
-        const count = await woo.importProducts();
-        
-        settings.wooLastSyncTime = new Date();
-        await settings.save();
-        await logActivity(req.user?.id || 1, 'sync', 'products', `Imported ${count} products from WooCommerce`);
-
-        jobState.status = 'Completed';
-        jobState.progress = 100;
-        jobState.recordsProcessed = count;
-        jobState.recordsImported = count;
-        jobState.currentObject = `Successfully imported ${count} products`;
-        jobState.endTime = Date.now();
-      } catch (err) {
-        jobState.status = 'Failed';
-        jobState.error = err.message;
-        jobState.endTime = Date.now();
-      }
+      count,
+      message: `Successfully imported/updated ${count} products from WooCommerce`,
     });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message || 'Failed to initiate product import' });
+    next(err);
   }
 };
 
@@ -307,55 +139,21 @@ exports.triggerCustomerSync = async (req, res, next) => {
   try {
     const settings = await getSettings();
     const woo = new WooCommerceService(settings);
+    const count = await woo.syncCustomers();
 
-    const jobId = `woo_job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const jobState = {
-      jobId,
-      module: 'Customers',
-      action: 'Sync',
-      status: 'Running',
-      progress: 15,
-      currentObject: 'Importing customers from WooCommerce...',
-      recordsProcessed: 0,
-      totalRecords: 100,
-      recordsImported: 0,
-      recordsFailed: 0,
-      error: null,
-      startTime: Date.now(),
-      endTime: null
-    };
+    await logActivity(req.user.id, 'sync', 'customers', `Synced ${count} customers from WooCommerce`);
 
-    wooSyncJobs.set(jobId, jobState);
+    // Update last sync time
+    settings.wooLastSyncTime = new Date();
+    await settings.save();
 
     res.json({
       success: true,
-      jobId,
-      message: 'WooCommerce customer sync job started in background'
-    });
-
-    setImmediate(async () => {
-      try {
-        jobState.progress = 40;
-        const count = await woo.syncCustomers();
-        
-        settings.wooLastSyncTime = new Date();
-        await settings.save();
-        await logActivity(req.user?.id || 1, 'sync', 'customers', `Synced ${count} customers from WooCommerce`);
-
-        jobState.status = 'Completed';
-        jobState.progress = 100;
-        jobState.recordsProcessed = count;
-        jobState.recordsImported = count;
-        jobState.currentObject = `Successfully synced ${count} customers`;
-        jobState.endTime = Date.now();
-      } catch (err) {
-        jobState.status = 'Failed';
-        jobState.error = err.message;
-        jobState.endTime = Date.now();
-      }
+      count,
+      message: `Successfully synced ${count} customers from WooCommerce`,
     });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message || 'Failed to initiate customer sync' });
+    next(err);
   }
 };
 
@@ -1260,7 +1058,7 @@ exports.deleteConnection = async (req, res, next) => {
 
 exports.testConnection = async (req, res, next) => {
   try {
-    const config = req.body || {};
+    const config = req.body;
     
     // Decrypt credentials if retrieving saved connection configuration
     if (config.id && !config.password) {
@@ -1276,14 +1074,7 @@ exports.testConnection = async (req, res, next) => {
     }
 
     if (!config.baseUrl) {
-      const settings = await getSettings();
-      config.baseUrl = settings.wooUrl || settings.wooApiUrl || settings.websiteUrl;
-      config.apiKey = config.apiKey || settings.wooConsumerKey;
-      config.apiSecret = config.apiSecret || settings.wooConsumerSecret;
-    }
-
-    if (!config.baseUrl) {
-      return res.status(400).json({ success: false, message: 'Website Store URL is required to run connection test. Please configure your Store URL.' });
+      return res.status(400).json({ success: false, message: 'Base API URL is required to run connection test.' });
     }
 
     let connected = false;

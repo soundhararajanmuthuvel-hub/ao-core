@@ -271,7 +271,7 @@ export const integrationsApi = {
   regenerateCredential: (id) => client.post(`/external/credentials/${id}/regenerate`),
   
   // Legacy WooCommerce endpoints (kept for compatibility)
-  testWooConnection: (data) => client.post('/integrations/test-connection', data),
+  testWooConnection: () => client.post('/integrations/test-connection'),
   connect: (data) => client.post('/integrations/connect', data),
   syncProducts: () => client.post('/integrations/sync/products'),
   importProducts: () => client.post('/integrations/sync/products-import'),
@@ -279,8 +279,6 @@ export const integrationsApi = {
   syncOrders: () => client.post('/integrations/sync/orders'),
   syncInventory: () => client.post('/integrations/sync/inventory'),
   syncAll: () => client.post('/integrations/sync/all'),
-  getWooJobStatus: (jobId) => client.get(`/integrations/job-status/${jobId}`),
-  retryFailedWooSync: () => client.post('/integrations/retry-failed'),
   forceRefreshWooProduct: (id) => client.post(`/integrations/sync/product/${id}`),
   getWooStats: () => client.get('/integrations/woo-stats'),
   disconnect: () => client.post('/integrations/disconnect'),

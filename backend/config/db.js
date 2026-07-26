@@ -503,14 +503,24 @@ const connectDB = async () => {
   await addColumnIfNotExist('CrmNotes', 'leadId', "INTEGER NULL");
   await addColumnIfNotExist('Visits', 'leadId', "INTEGER NULL");
 
-  // SFA Product enhancements
-  await addColumnIfNotExist('Products', 'mrp', "DECIMAL(10, 2) DEFAULT 0.00");
-  await addColumnIfNotExist('Products', 'greenPrice', "DECIMAL(10, 2) DEFAULT 0.00");
-  await addColumnIfNotExist('Products', 'yellowPrice', "DECIMAL(10, 2) DEFAULT 0.00");
-  await addColumnIfNotExist('Products', 'redPrice', "DECIMAL(10, 2) DEFAULT 0.00");
-  await addColumnIfNotExist('Products', 'ingredients', "TEXT NULL");
-  await addColumnIfNotExist('Products', 'benefits', "TEXT NULL");
-  await addColumnIfNotExist('Products', 'imageUrl', "TEXT NULL");
+  // Product enhancements & WooCommerce Schema Compatibility
+  await addColumnIfNotExist('Product', 'mrp', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Product', 'greenPrice', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Product', 'yellowPrice', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Product', 'redPrice', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Product', 'ingredients', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'benefits', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'nutritionFacts', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'usageInstructions', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'shortDescription', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'slug', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Product', 'imageUrl', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'woocommerce_product_id', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Product', 'wooProductId', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Product', 'lastModifiedDate', "DATETIME NULL");
+  await addColumnIfNotExist('Product', 'lastSyncTimestamp', "DATETIME NULL");
+  await addColumnIfNotExist('Product', 'lastWooUpdateTimestamp', "DATETIME NULL");
+  await addColumnIfNotExist('Product', 'stockStatus', "VARCHAR(100) DEFAULT 'instock'");
   await addColumnIfNotExist('WebsiteProduct', 'imageUrl', "TEXT NULL");
   await addColumnIfNotExist('WebsiteProduct', 'imagePublicId', "VARCHAR(255) NULL");
   await addColumnIfNotExist('WebsiteProduct', 'managementProductId', "INTEGER NULL");
