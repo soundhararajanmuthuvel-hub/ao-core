@@ -1,6 +1,7 @@
 const { Op, col } = require('sequelize');
 const Product = require('../models/Product');
 const ProductPackSize = require('../models/ProductPackSize');
+const WebsiteProduct = require('../models/WebsiteProduct');
 const StockMovement = require('../models/StockMovement');
 const User = require('../models/User');
 const { logActivity } = require('../utils/helpers');
