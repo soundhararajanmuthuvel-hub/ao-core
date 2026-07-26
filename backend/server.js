@@ -178,8 +178,19 @@ app.use('/api/external', require('./routes/externalRoutes'));
 
 /* =========================
    WEBSITE MODULE ROUTES (BLOVIT ECOMMERCE)
-   (Moved into startServer to guarantee DB initialization before controller import)
    ========================= */
+
+app.get('/api/website/health', (req, res) => res.json({ success: true, status: 'OK', message: 'Website module is operational' }));
+app.use('/api/website/products', require('./routes/websiteProductRoutes'));
+app.use('/api/website/auth', require('./routes/websiteAuthRoutes'));
+app.use('/api/website/account', require('./routes/websiteAccountRoutes'));
+app.use('/api/website/cart', require('./routes/websiteAccountRoutes'));
+app.use('/api/website/razorpay', require('./routes/websiteOrderRoutes'));
+app.use('/api/website/orders', require('./routes/websiteOrderRoutes'));
+app.use('/api/website', require('./routes/websiteReviewRoutes'));
+app.use('/api/website/referrals', require('./routes/websiteReferralRoutes'));
+app.use('/api/website', require('./routes/websiteShippingCouponRoutes'));
+app.use('/api/website', require('./routes/websiteEventRoutes'));
 
 const cloudinaryService = require('./services/cloudinaryService');
 
@@ -225,20 +236,6 @@ const startServer = async () => {
   try {
 
     await connectDB();
-    
-    // Register Website Routes AFTER Database is fully initialized and models are registered
-
-    app.get('/api/website/health', (req, res) => res.json({ success: true, status: 'OK', message: 'Website module is operational' }));
-    app.use('/api/website/products', require('./routes/websiteProductRoutes'));
-    app.use('/api/website/auth', require('./routes/websiteAuthRoutes'));
-    app.use('/api/website/account', require('./routes/websiteAccountRoutes'));
-    app.use('/api/website/cart', require('./routes/websiteAccountRoutes'));
-    app.use('/api/website/razorpay', require('./routes/websiteOrderRoutes'));
-    app.use('/api/website/orders', require('./routes/websiteOrderRoutes'));
-    app.use('/api/website', require('./routes/websiteReviewRoutes'));
-    app.use('/api/website/referrals', require('./routes/websiteReferralRoutes'));
-    app.use('/api/website', require('./routes/websiteShippingCouponRoutes'));
-    app.use('/api/website', require('./routes/websiteEventRoutes'));
     
     // Clean up seeded ABC Malt data from database (one-time clean up on deployment)
     try {
