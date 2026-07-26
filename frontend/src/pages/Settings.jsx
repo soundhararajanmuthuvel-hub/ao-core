@@ -564,24 +564,25 @@ export default function SettingsPage() {
   };
 
   // WooCommerce Integration Handlers
+  const [wooJobProgress, setWooJobProgress] = useState(null);
+
   const handleTestConnection = async () => {
-    if (!form.wooUrl || !form.wooConsumerKey || !form.wooConsumerSecret) {
-      toast('Website URL, Consumer Key, and Consumer Secret are required', 'error');
+    if (!form.wooUrl) {
+      toast('Website URL is required to run connection test', 'error');
       return;
     }
     setTestingConnection(true);
     setDiagnostics(null);
     try {
-      // First save the settings form so credentials on server are up to date
       await updateSettings(form);
-      const { data } = await integrationsApi.testConnection();
+      const { data } = await integrationsApi.testWooConnection(form);
       if (data.success) {
-        toast('✓ Connected Successfully', 'success');
+        toast('✓ Connected Successfully to WooCommerce', 'success');
         if (data.diagnostics) {
           setDiagnostics(data.diagnostics);
         }
       } else {
-        toast(data.message || 'Connection failed', 'error');
+        toast(data.message || 'Connection test failed', 'error');
         if (data.diagnostics) {
           setDiagnostics(data.diagnostics);
         }
@@ -589,7 +590,7 @@ export default function SettingsPage() {
       loadSettings();
       loadStats();
     } catch (err) {
-      const errMsg = err.response?.data?.message || 'Connection test failed';
+      const errMsg = err.response?.data?.message || err.message || 'Connection test failed';
       toast(errMsg, 'error');
       if (err.response?.data?.diagnostics) {
         setDiagnostics(err.response.data.diagnostics);
@@ -640,8 +641,20 @@ export default function SettingsPage() {
     }
   };
 
+  const handleRetryFailedWoo = async () => {
+    try {
+      const { data } = await integrationsApi.retryFailedWooSync();
+      toast(data.message || 'Retried failed sync records', 'success');
+      loadStats();
+      loadSyncLogs();
+    } catch (err) {
+      toast(err.response?.data?.message || 'Failed to retry records', 'error');
+    }
+  };
+
   const handleSync = async (type) => {
     setSyncingType(type);
+    setWooJobProgress({ progress: 10, currentObject: `Starting ${type} sync...`, recordsProcessed: 0, totalRecords: 100 });
     try {
       let res;
       if (type === 'products') {
@@ -657,13 +670,49 @@ export default function SettingsPage() {
       } else if (type === 'all') {
         res = await integrationsApi.syncAll();
       }
-      toast(res.data.message || 'Sync successful', 'success');
-      loadStats();
-      loadSyncLogs();
+
+      if (res.data?.jobId) {
+        toast(`WooCommerce ${type} sync started in background`, 'info');
+        
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusRes = await integrationsApi.getWooJobStatus(res.data.jobId);
+            const job = statusRes.data?.job;
+            if (job) {
+              setWooJobProgress(job);
+              if (job.status === 'Completed') {
+                clearInterval(pollInterval);
+                setSyncingType('');
+                setWooJobProgress(null);
+                toast(`✓ ${job.currentObject || 'Sync completed successfully'}`, 'success');
+                loadStats();
+                loadSyncLogs();
+              } else if (job.status === 'Failed') {
+                clearInterval(pollInterval);
+                setSyncingType('');
+                setWooJobProgress(null);
+                toast(`Sync Failed: ${job.error || 'Unknown Error'}`, 'error');
+                loadStats();
+                loadSyncLogs();
+              }
+            }
+          } catch (pollErr) {
+            console.error('Job polling error:', pollErr);
+          }
+        }, 2000);
+
+      } else {
+        toast(res.data.message || 'Sync initiated successfully', 'success');
+        setSyncingType('');
+        setWooJobProgress(null);
+        loadStats();
+        loadSyncLogs();
+      }
     } catch (err) {
-      toast(`${type.charAt(0).toUpperCase() + type.slice(1)} sync failed`, 'error');
-    } finally {
       setSyncingType('');
+      setWooJobProgress(null);
+      const errMsg = err.response?.data?.message || err.message || `${type} sync failed`;
+      toast(errMsg, 'error');
     }
   };
 
