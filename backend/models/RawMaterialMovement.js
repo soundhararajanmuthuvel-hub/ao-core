@@ -49,11 +49,11 @@ const RawMaterialMovement = sequelize.define('RawMaterialMovement', {
   },
 });
 
-RawMaterialMovement.belongsTo(RawMaterial, { as: 'rawMaterial', foreignKey: 'rawMaterialId', onDelete: 'CASCADE' });
-RawMaterial.hasMany(RawMaterialMovement, { as: 'movements', foreignKey: 'rawMaterialId', onDelete: 'CASCADE' });
+RawMaterialMovement.belongsTo(RawMaterial, { as: 'rawMaterial', foreignKey: 'rawMaterialId', onDelete: 'RESTRICT' });
+RawMaterial.hasMany(RawMaterialMovement, { as: 'movements', foreignKey: 'rawMaterialId', onDelete: 'RESTRICT' });
 
-RawMaterialMovement.belongsTo(Supplier, { as: 'supplier', foreignKey: 'supplierId', onDelete: 'CASCADE' });
-RawMaterialMovement.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById', onDelete: 'CASCADE' });
+RawMaterialMovement.belongsTo(Supplier, { as: 'supplier', foreignKey: 'supplierId', onDelete: 'RESTRICT' });
+RawMaterialMovement.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById', onDelete: 'RESTRICT' });
 
 makeMongooseCompatible(RawMaterialMovement, {
   rawMaterial: 'rawMaterialId',

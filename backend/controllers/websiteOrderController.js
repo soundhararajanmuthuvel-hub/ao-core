@@ -30,8 +30,13 @@ const createRazorpayOrder = async (req, res) => {
     let subtotal = 0;
     const verifiedItems = [];
 
+    const productIds = items.map(i => i.productId);
+    const { Op } = require('sequelize'); // ensure Op is available
+    const products = await WebsiteProduct.findAll({ where: { id: { [Op.in]: productIds } } });
+    const productMap = new Map(products.map(p => [p.id.toString(), p]));
+
     for (const item of items) {
-      const product = await WebsiteProduct.findByPk(item.productId);
+      const product = productMap.get(item.productId.toString());
       if (!product || !product.isActive) {
         return res.status(400).json({
           success: false,
@@ -289,11 +294,25 @@ const handleWebhook = async (req, res) => {
           // Auto-decrement central Management & Billing product stock
           try {
             const items = JSON.parse(order.items || '[]');
+            const { Op } = require('sequelize');
+            const websiteProductIds = items.map(i => i.productId).filter(Boolean);
+            const websiteProducts = await WebsiteProduct.findAll({ where: { id: { [Op.in]: websiteProductIds } } });
+            const wpMap = new Map(websiteProducts.map(p => [p.id.toString(), p]));
+
+            // First resolve all masterIds
+            const masterIds = items.map(item => {
+              const wp = wpMap.get(item.productId?.toString());
+              return wp?.managementProductId || item.managementProductId || item.productId;
+            }).filter(Boolean);
+            
+            const masterProducts = await Product.findAll({ where: { id: { [Op.in]: masterIds } } });
+            const mpMap = new Map(masterProducts.map(p => [p.id.toString(), p]));
+
             for (const item of items) {
               if ((item.productId || item.managementProductId) && item.qty) {
-                const websiteProduct = await WebsiteProduct.findByPk(item.productId);
+                const websiteProduct = wpMap.get(item.productId?.toString());
                 const masterId = websiteProduct?.managementProductId || item.managementProductId || item.productId;
-                const masterProduct = await Product.findByPk(masterId);
+                const masterProduct = mpMap.get(masterId?.toString());
                 
                 if (masterProduct) {
                   const oldStock = Number(masterProduct.stock || 0);

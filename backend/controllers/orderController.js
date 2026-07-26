@@ -62,8 +62,14 @@ exports.createOrder = async (req, res, next) => {
     // Compute initial totalAmount based on current product prices (using Tier Pricing)
     let totalAmount = resolvedLogisticsCharge;
     const orderItems = [];
+    
+    // N+1 Optimization: Fetch all products in one query
+    const productIds = items.map(i => i.productId);
+    const products = await Product.findAll({ where: { id: { [Op.in]: productIds } } });
+    const productMap = new Map(products.map(p => [p.id.toString(), p]));
+
     for (const item of items) {
-      const product = await Product.findByPk(item.productId);
+      const product = productMap.get(item.productId.toString());
       if (!product) {
         return res.status(404).json({ message: `Product not found with ID: ${item.productId}` });
       }

@@ -577,6 +577,14 @@ exports.qcInspect = async (req, res) => {
     returnReq.kanbanColumn = 'QC Passed';
 
     // Process individual item dispositions & route stock
+    const prodIds = itemsInspection.map(insp => {
+      const item = returnReq.items.find(i => i.id === insp.itemId);
+      return item ? item.productId : null;
+    }).filter(Boolean);
+    const { Op } = require('sequelize');
+    const products = await Product.findAll({ where: { id: { [Op.in]: prodIds } } });
+    const productMap = new Map(products.map(p => [p.id.toString(), p]));
+
     for (const insp of itemsInspection) {
       const item = returnReq.items.find(i => i.id === insp.itemId);
       if (item) {
@@ -588,7 +596,7 @@ exports.qcInspect = async (req, res) => {
 
         // ROUTE INVENTORY BASED ON DISPOSITION
         if (insp.disposition === 'Return to Saleable Stock') {
-          const prod = await Product.findByPk(item.productId);
+          const prod = productMap.get(item.productId?.toString());
           if (prod) {
             prod.stock = (parseFloat(prod.stock || 0) + parseFloat(item.quantity || 0));
             await prod.save();

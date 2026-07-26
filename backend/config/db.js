@@ -306,6 +306,10 @@ const connectDB = async () => {
   
 
   // Dynamically require all models to register them with Sequelize before syncing.
+  require('../models/AccountCategory');
+  require('../models/LedgerAccount');
+  require('../models/JournalEntry');
+  require('../models/JournalLine');
   require('../models/User');
   require('../models/Customer');
   require('../models/Supplier');

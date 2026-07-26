@@ -1,29 +1,26 @@
-const cache = {};
+const NodeCache = require('node-cache');
+
+// Initialize with a default standard TTL of 5 minutes (300s) 
+// and check for expired keys every 60 seconds.
+const cache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
 
 exports.get = (key) => {
-  const item = cache[key];
-  if (!item) return null;
-  
-  if (Date.now() > item.expiry) {
-    delete cache[key];
-    return null;
-  }
-  return item.value;
+  return cache.get(key) || null;
 };
 
-exports.set = (key, value, ttlMs = 300000) => { // Default TTL: 5 minutes
-  cache[key] = {
-    value,
-    expiry: Date.now() + ttlMs
-  };
+// If ttlMs is passed, convert to seconds, otherwise rely on stdTTL
+exports.set = (key, value, ttlMs) => {
+  if (ttlMs) {
+    cache.set(key, value, Math.floor(ttlMs / 1000));
+  } else {
+    cache.set(key, value);
+  }
 };
 
 exports.delete = (key) => {
-  delete cache[key];
+  cache.del(key);
 };
 
 exports.clear = () => {
-  for (const key of Object.keys(cache)) {
-    delete cache[key];
-  }
+  cache.flushAll();
 };

@@ -1,5 +1,6 @@
 
 require('dotenv').config();
+require('express-async-errors');
 
 const validateCriticalEnv = () => {
   const missing = [];
@@ -99,13 +100,29 @@ app.use((req, res, next) => {
 });
 
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'tiny' : 'dev'));
+
+// Request timeout middleware
+app.use((req, res, next) => {
+  req.setTimeout(30000, () => {
+    let err = new Error('Request Timeout');
+    err.status = 408;
+    next(err);
+  });
+  res.setTimeout(30000, () => {
+    let err = new Error('Service Unavailable');
+    err.status = 503;
+    next(err);
+  });
+  next();
+});
+
 app.use(express.json({ 
-  limit: '2mb',
+  limit: '500kb',
   verify: (req, res, buf) => {
     req.rawBody = buf;
   }
 }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '500kb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/api/assets/company-logo', require('./controllers/settingsController').getCompanyLogoImage);
 app.get('/api/company/logo', require('./controllers/settingsController').getCompanyLogoImage);
@@ -125,15 +142,32 @@ app.get('/', (req, res) => {
    HEALTH CHECK
 ========================= */
 app.get('/api/health', async (req, res) => {
+  const os = require('os');
   let dbStatus = 'Disconnected';
   try {
     await connectDB.sequelize.authenticate();
     dbStatus = 'Connected';
   } catch {}
+
+  const memUsage = process.memoryUsage();
+  
   res.json({
     success: true,
     status: 'OK',
     database: dbStatus,
+    telemetry: {
+      uptimeSeconds: process.uptime(),
+      memory: {
+        rss: `${Math.round(memUsage.rss / 1024 / 1024)} MB`,
+        heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)} MB`,
+        heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)} MB`,
+        external: `${Math.round(memUsage.external / 1024 / 1024)} MB`,
+      },
+      cpu: {
+        loadAvg: os.loadavg(),
+        cores: os.cpus().length,
+      }
+    },
     aiStatus: {
       gemini: process.env.GEMINI_API_KEY ? 'Active' : 'Disabled (Key Missing)',
       cerebras: process.env.CEREBRAS_API_KEY ? 'Active' : 'Disabled (Key Missing)',
@@ -158,6 +192,8 @@ app.post('/api/client-error', (req, res) => {
 /* =========================
    API ROUTES
 ========================= */
+const { globalApiLimiter } = require('./middleware/adminRateLimiter');
+app.use('/api', globalApiLimiter);
 
 app.use('/api/test', require('./routes/testRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));

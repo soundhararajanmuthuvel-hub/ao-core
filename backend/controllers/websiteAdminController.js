@@ -707,19 +707,22 @@ const getAdminReferrals = async (req, res) => {
       order: [['createdAt', 'DESC']],
     });
 
-    const data = await Promise.all(
-      referrals.map(async (ref) => {
-        const referrer = await WebsiteCustomer.findByPk(ref.referrerCustomerId);
-        const referred = await WebsiteCustomer.findByPk(ref.referredCustomerId);
-        return {
-          ...ref.toJSON(),
-          referrerName: referrer?.fullName || 'Unknown',
-          referrerMobile: referrer?.mobile || '',
-          referredName: referred?.fullName || 'Unknown',
-          referredMobile: referred?.mobile || '',
-        };
-      })
-    );
+    const customerIds = [...new Set(referrals.flatMap(r => [r.referrerCustomerId, r.referredCustomerId]).filter(Boolean))];
+    const { Op } = require('sequelize');
+    const customers = await WebsiteCustomer.findAll({ where: { id: { [Op.in]: customerIds } } });
+    const customerMap = new Map(customers.map(c => [c.id.toString(), c]));
+
+    const data = referrals.map(ref => {
+      const referrer = customerMap.get(ref.referrerCustomerId?.toString());
+      const referred = customerMap.get(ref.referredCustomerId?.toString());
+      return {
+        ...ref.toJSON(),
+        referrerName: referrer?.fullName || 'Unknown',
+        referrerMobile: referrer?.mobile || '',
+        referredName: referred?.fullName || 'Unknown',
+        referredMobile: referred?.mobile || '',
+      };
+    });
 
     res.json({ success: true, count: data.length, data });
   } catch (err) {

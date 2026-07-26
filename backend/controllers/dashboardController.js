@@ -143,21 +143,34 @@ exports.getHomeDashboard = async (req, res, next) => {
     const connectedConnections = wooStatsConnections.filter(c => c.connectionStatus === 'Connected').length;
     const failedConnections = wooStatsConnections.filter(c => c.connectionStatus === 'Failed').length;
 
-    // Get live salesman tracking details
+    const salesmanIds = salesmenList.map(s => s.id);
+
+    // N+1 Optimization for Locations (get all in last 24h, group by salesman)
+    const recentLocations = await SalesmanLocation.findAll({
+      where: { salesmanId: { [Op.in]: salesmanIds } },
+      order: [['timestamp', 'DESC']],
+      raw: true
+    });
+    const locationMap = new Map();
+    for (const loc of recentLocations) {
+      if (!locationMap.has(loc.salesmanId)) {
+        locationMap.set(loc.salesmanId, loc); // Keeps the newest because of DESC order
+      }
+    }
+
+    // N+1 Optimization for Visit Counts
+    const visitCounts = await Visit.findAll({
+      where: { salesmanId: { [Op.in]: salesmanIds }, checkInTime: { [Op.gte]: today } },
+      attributes: ['salesmanId', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+      group: ['salesmanId'],
+      raw: true
+    });
+    const visitCountMap = new Map(visitCounts.map(vc => [vc.salesmanId, Number(vc.count)]));
+
     const liveTrackingSalesmen = [];
     for (const s of salesmenList) {
-      const lastPing = await SalesmanLocation.findOne({
-        where: { salesmanId: s.id },
-        order: [['timestamp', 'DESC']],
-        raw: true
-      });
-
-      const salesmanVisits = await Visit.count({
-        where: {
-          salesmanId: s.id,
-          checkInTime: { [Op.gte]: today }
-        }
-      });
+      const lastPing = locationMap.get(s.id);
+      const salesmanVisits = visitCountMap.get(s.id) || 0;
 
       let lastActivity = 'No activity today';
       if (lastPing) {

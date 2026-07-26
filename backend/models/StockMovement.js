@@ -47,9 +47,9 @@ const StockMovement = sequelize.define('StockMovement', {
 });
 
 // Associations
-StockMovement.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'CASCADE' });
-StockMovement.belongsTo(Supplier, { as: 'supplier', foreignKey: 'supplierId', onDelete: 'CASCADE' });
-StockMovement.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById', onDelete: 'CASCADE' });
+StockMovement.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'RESTRICT' });
+StockMovement.belongsTo(Supplier, { as: 'supplier', foreignKey: 'supplierId', onDelete: 'RESTRICT' });
+StockMovement.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById', onDelete: 'RESTRICT' });
 
 makeMongooseCompatible(StockMovement, {
   product: 'productId',

@@ -24,6 +24,34 @@ const purchaseInvoiceFileFilter = (req, file, cb) => {
   else cb(new Error('Only PDF files are allowed for purchase invoices'));
 };
 
+const dataFileFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const mime = file.mimetype.toLowerCase();
+
+  // Explicitly reject dangerous extensions
+  const dangerousExts = ['.php', '.exe', '.dll', '.js', '.ts', '.sh', '.bat', '.cmd', '.ps1', '.asp', '.aspx', '.jsp'];
+  if (dangerousExts.includes(ext)) {
+    return cb(new Error('Dangerous file types are strictly prohibited.'));
+  }
+
+  // Allow list: PDF, CSV, Excel, Zip
+  const allowedExts = ['.pdf', '.csv', '.xls', '.xlsx', '.zip'];
+  const allowedMimes = [
+    'application/pdf',
+    'text/csv',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/zip',
+    'application/x-zip-compressed'
+  ];
+
+  if (allowedExts.includes(ext) && allowedMimes.includes(mime)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only PDF, CSV, Excel, or ZIP files up to 10MB are allowed.'));
+  }
+};
+
 const uploadLogo = multer({
   storage: memoryStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB Max
@@ -48,9 +76,16 @@ const uploadPurchaseInvoice = multer({
   fileFilter: purchaseInvoiceFileFilter,
 }).single('invoicePdf');
 
+const uploadDataFile = multer({
+  storage: memoryStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB Max
+  fileFilter: dataFileFilter,
+}).single('file');
+
 module.exports = {
   uploadLogo,
   uploadProduct,
   uploadMultipleProductImages,
   uploadPurchaseInvoice,
+  uploadDataFile,
 };

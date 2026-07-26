@@ -47,6 +47,15 @@ const calcLineTotal = (qty, unitPrice, gstPercent = 0) => {
   const gst = (base * gstPercent) / 100;
   return { base, gst, total: base + gst };
 };
+const bankersRound = (num, decimalPlaces = 2) => {
+  const d = decimalPlaces || 0;
+  const m = Math.pow(10, d);
+  const n = +(d ? num * m : num).toFixed(8);
+  const i = Math.floor(n), f = n - i;
+  const e = 1e-8;
+  const r = (f > 0.5 - e && f < 0.5 + e) ? ((i % 2 === 0) ? i : i + 1) : Math.round(n);
+  return d ? r / m : r;
+};
 
 const calcInvoiceTotals = (items, discount = 0, gstMode = 'exclusive', charges = {}) => {
   let subtotal = 0;
@@ -69,17 +78,17 @@ const calcInvoiceTotals = (items, discount = 0, gstMode = 'exclusive', charges =
 
     if (gstMode === 'inclusive') {
       const lineTotal = qty * unitPrice;
-      const base = Math.round((lineTotal / (1 + gstPercent / 100)) * 100) / 100;
-      const gst = Math.round((lineTotal - base) * 100) / 100;
+      const base = bankersRound(lineTotal / (1 + gstPercent / 100));
+      const gst = bankersRound(lineTotal - base);
       subtotal += base;
       gstTotal += gst;
     } else if (gstMode === 'no_gst') {
-      const base = Math.round((qty * unitPrice) * 100) / 100;
+      const base = bankersRound(qty * unitPrice);
       subtotal += base;
       gstTotal += 0;
     } else { // default 'exclusive'
-      const base = Math.round((qty * unitPrice) * 100) / 100;
-      const gst = Math.round((base * gstPercent / 100) * 100) / 100;
+      const base = bankersRound(qty * unitPrice);
+      const gst = bankersRound(base * gstPercent / 100);
       subtotal += base;
       gstTotal += gst;
     }
@@ -90,13 +99,15 @@ const calcInvoiceTotals = (items, discount = 0, gstMode = 'exclusive', charges =
   const roundOff = Number((grandTotal - grandTotalBeforeRound).toFixed(2));
 
   return {
-    subtotal: Number(subtotal.toFixed(2)),
-    gstTotal: Number(gstTotal.toFixed(2)),
+    subtotal: bankersRound(subtotal),
+    gstTotal: bankersRound(gstTotal),
     grandTotal,
     roundOff,
     ...parsedCharges,
   };
 };
+
+module.exports.bankersRound = bankersRound;
 
 const getNextInvoiceNumber = async (opts = {}) => {
   const queryOpts = opts && opts.commit ? { transaction: opts.commit } : opts;
@@ -205,6 +216,7 @@ module.exports = {
   createNotification,
   calcLineTotal,
   calcInvoiceTotals,
+  bankersRound,
   getNextInvoiceNumber,
   getNextPurchaseNumber,
   getNextShipmentNumber,

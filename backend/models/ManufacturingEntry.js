@@ -82,11 +82,11 @@ const ManufacturingEntry = sequelize.define('ManufacturingEntry', {
   },
 });
 
-ManufacturingEntry.belongsTo(ManufacturingRecipe, { as: 'recipe', foreignKey: 'recipeId', onDelete: 'CASCADE' });
-ManufacturingEntry.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'CASCADE' });
-ManufacturingEntry.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById', onDelete: 'CASCADE' });
+ManufacturingEntry.belongsTo(ManufacturingRecipe, { as: 'recipe', foreignKey: 'recipeId', onDelete: 'RESTRICT' });
+ManufacturingEntry.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'RESTRICT' });
+ManufacturingEntry.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById', onDelete: 'RESTRICT' });
 const ProductPackSize = require('./ProductPackSize');
-ManufacturingEntry.belongsTo(ProductPackSize, { as: 'packSize', foreignKey: 'packSizeId', onDelete: 'CASCADE' });
+ManufacturingEntry.belongsTo(ProductPackSize, { as: 'packSize', foreignKey: 'packSizeId', onDelete: 'RESTRICT' });
 
 makeMongooseCompatible(ManufacturingEntry, {
   recipe: 'recipeId',

@@ -240,33 +240,110 @@ const processWebhookRetries = async () => {
   }
 };
 
+const runAutomatedBackup = async () => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const AdmZip = require('adm-zip');
+    const { sequelize } = require('../config/db');
+
+    const backupDir = path.join(__dirname, '..', '.backups');
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true });
+    }
+
+    const backupData = {};
+    for (const modelName of Object.keys(sequelize.models)) {
+      try {
+        const model = sequelize.models[modelName];
+        if (typeof model.findAll === 'function') {
+          if (modelName === 'User') {
+            try {
+              backupData[modelName] = await model.scope('withPassword').findAll({ raw: true });
+            } catch {
+              backupData[modelName] = await model.findAll({ raw: true });
+            }
+          } else {
+            backupData[modelName] = await model.findAll({ raw: true });
+          }
+        }
+      } catch (modelErr) {
+        console.warn(`[Scheduler Backup] Model ${modelName} fetch skipped:`, modelErr.message);
+        backupData[modelName] = [];
+      }
+    }
+
+    const zip = new AdmZip();
+    zip.addFile('db_backup.json', Buffer.from(JSON.stringify(backupData, null, 2), 'utf8'));
+
+    const fileName = `AO_Core_Backup_Auto_${Date.now()}.zip`;
+    const fullPath = path.join(backupDir, fileName);
+    
+    zip.writeZip(fullPath);
+    console.log(`[Scheduler Backup] Successfully created daily backup at ${fullPath}`);
+    
+    // Optional: Prune backups older than 7 days
+    const files = fs.readdirSync(backupDir);
+    const now = Date.now();
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+    for (const file of files) {
+      if (file.endsWith('.zip')) {
+        const fp = path.join(backupDir, file);
+        const stats = fs.statSync(fp);
+        if (now - stats.mtimeMs > SEVEN_DAYS) {
+          fs.unlinkSync(fp);
+          console.log(`[Scheduler Backup] Pruned old backup: ${file}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Scheduler Backup] Automated backup failed:', err.message);
+  }
+};
+
+const runSequentialLoop = (fn, delayMs) => {
+  const loop = async () => {
+    try {
+      await fn();
+    } catch (e) {
+      console.error(`[Scheduler] Error in ${fn.name}:`, e.message);
+    } finally {
+      setTimeout(loop, delayMs);
+    }
+  };
+  setTimeout(loop, delayMs);
+};
+
 const startScheduler = () => {
   console.log('[Scheduler] Initializing WooCommerce background auto-sync runner (every 1 minute)...');
-  setInterval(runAutoSync, 60 * 1000);
+  runSequentialLoop(runAutoSync, 60 * 1000);
   
   console.log('[Scheduler] Initializing Courier Tracking background auto-check runner (every 1 minute)...');
-  setInterval(runTrackingAutoCheck, 60 * 1000);
+  runSequentialLoop(runTrackingAutoCheck, 60 * 1000);
 
   console.log('[Scheduler] Initializing Customer Re-Engagement background runner (every 1 hour)...');
-  setInterval(runReEngagementCheck, 60 * 60 * 1000);
+  runSequentialLoop(runReEngagementCheck, 60 * 60 * 1000);
 
   console.log('[Scheduler] Initializing Auto Payment Reminders background runner (every 1 hour)...');
-  setInterval(runAutoPaymentRemindersCheck, 60 * 60 * 1000);
+  runSequentialLoop(runAutoPaymentRemindersCheck, 60 * 60 * 1000);
 
   console.log('[Scheduler] Initializing Integrations scheduled jobs checker (every 1 minute)...');
-  setInterval(checkAndEnqueueScheduledJobs, 60 * 1000);
+  runSequentialLoop(checkAndEnqueueScheduledJobs, 60 * 1000);
 
   console.log('[Scheduler] Initializing Integrations queue worker loop (every 15 seconds)...');
-  setInterval(processIntegrationJobs, 15 * 1000);
+  runSequentialLoop(processIntegrationJobs, 15 * 1000);
 
   console.log('[Scheduler] Initializing Webhook Retry queue worker loop (every 30 seconds)...');
-  setInterval(processWebhookRetries, 30 * 1000);
+  runSequentialLoop(processWebhookRetries, 30 * 1000);
+
+  console.log('[Scheduler] Initializing Daily Database Backup runner (every 24 hours)...');
+  runSequentialLoop(runAutomatedBackup, 24 * 60 * 60 * 1000);
 
   // Run once shortly after startup
-  setTimeout(runReEngagementCheck, 5000);
-  setTimeout(runAutoPaymentRemindersCheck, 10000);
-  setTimeout(checkAndEnqueueScheduledJobs, 15000);
-  setTimeout(processWebhookRetries, 8000);
+  setTimeout(runAutoSync, 10000);
+  setTimeout(runTrackingAutoCheck, 15000);
+  setTimeout(runReEngagementCheck, 20000);
+  setTimeout(runAutoPaymentRemindersCheck, 25000);
 };
 
 module.exports = {

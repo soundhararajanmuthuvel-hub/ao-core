@@ -327,7 +327,7 @@ exports.analyzeUploadedFiles = async (req, res) => {
     let extractedData = {};
 
     if (ext === '.zip') {
-      const zip = new AdmZip(req.file.path);
+      const zip = new AdmZip(req.file.buffer);
       const zipEntries = zip.getEntries();
 
       for (const entry of zipEntries) {
@@ -390,14 +390,14 @@ exports.analyzeUploadedFiles = async (req, res) => {
       let records = [];
 
       if (ext === '.csv') {
-        const text = fs.readFileSync(req.file.path, 'utf8');
+        const text = req.file.buffer.toString("utf8");
         records = parseCSV(text);
         if (!fileType) {
           const headers = extractCSVHeaders(text);
           fileType = detectModuleFromHeaders(headers);
         }
       } else {
-        const buffer = fs.readFileSync(req.file.path);
+        const buffer = req.file.buffer;
         records = await parseExcel(buffer);
         if (!fileType) {
           const headers = await extractExcelHeaders(buffer);
@@ -435,7 +435,7 @@ exports.analyzeUploadedFiles = async (req, res) => {
 
     // Clean up uploaded file
     try {
-      fs.unlinkSync(req.file.path);
+      
     } catch {}
 
     res.json({
@@ -2019,7 +2019,7 @@ exports.restoreBackup = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Backup file missing' });
   }
 
-  const zipPath = req.file.path;
+  const zipPath = req.file.buffer;
   const dialect = sequelize.getDialect();
   const useTransaction = dialect !== 'sqlite';
   const t = useTransaction ? await sequelize.transaction() : null;
@@ -2030,7 +2030,6 @@ exports.restoreBackup = async (req, res) => {
     const entry = zip.getEntry('db_backup.json');
     if (!entry) {
       if (t) await t.rollback();
-      try { fs.unlinkSync(zipPath); } catch {}
       return res.status(400).json({ success: false, message: 'Invalid AO Core backup: missing db_backup.json file' });
     }
 
@@ -2105,13 +2104,11 @@ exports.restoreBackup = async (req, res) => {
     }
 
     if (t) await t.commit();
-    try { fs.unlinkSync(zipPath); } catch {}
 
     res.json({ success: true, message: 'Database successfully restored from backup ZIP archive snapshot' });
   } catch (err) {
     if (t) await t.rollback();
     console.error('Database restore crashed:', err);
-    try { fs.unlinkSync(zipPath); } catch {}
     res.status(500).json({ success: false, message: 'Backup restoration failed', error: err.message });
   }
 };

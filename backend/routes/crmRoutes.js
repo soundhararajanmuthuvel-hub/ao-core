@@ -2,8 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const crmController = require('../controllers/crmController');
-const multer = require('multer');
-const upload = multer({ storage: multer.memoryStorage() });
+const { uploadDataFile } = require('../middleware/upload');
 
 router.use(auth);
 
@@ -18,7 +17,7 @@ router.put('/leads/:id', crmController.updateLead);
 router.delete('/leads/:id', crmController.deleteLead);
 
 // AI Lead Importer Endpoints
-router.post('/leads/import/extract-text', upload.single('file'), crmController.extractTextFromLeadFile);
+router.post('/leads/import/extract-text', uploadDataFile, crmController.extractTextFromLeadFile);
 router.post('/leads/import/analyze', crmController.analyzeLeadsText);
 router.post('/leads/import/execute', crmController.importLeadsList);
 

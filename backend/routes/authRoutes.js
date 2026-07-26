@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const { login, me, updateTourStatus, changePassword } = require('../controllers/authController');
+const { loginRateLimiter } = require('../middleware/adminRateLimiter');
 
-router.post('/login', login);
+router.post('/login', loginRateLimiter, login);
 router.get('/me', auth, me);
 router.put('/me/tour', auth, updateTourStatus);
 router.put('/me/change-password', auth, changePassword);

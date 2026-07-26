@@ -463,6 +463,31 @@ exports.createEntry = async (req, res, next) => {
         await product.save({ transaction: t });
       }
 
+      // GL Shadow Post
+      try {
+        const { postJournalEntry, getSystemAccount } = require('../services/ledgerService');
+        const invFgAccountId = await getSystemAccount('Inventory_FG');
+        const invRmAccountId = await getSystemAccount('Inventory_RM');
+
+        const lines = [];
+        // Debit FG Inventory for total cost of goods manufactured
+        lines.push({ accountId: invFgAccountId, debit: totalCost, credit: 0, description: `Manufactured ${mfgNumber}` });
+        // Credit RM Inventory for raw material cost
+        lines.push({ accountId: invRmAccountId, debit: 0, credit: rawMaterialCost, description: `Consumed RM for ${mfgNumber}` });
+
+        await postJournalEntry({
+          entryDate,
+          referenceId: entry.id,
+          referenceModel: 'ManufacturingEntry',
+          referenceNumber: mfgNumber,
+          description: 'Auto-posted Manufacturing Run',
+          lines
+        }, t);
+      } catch (glError) {
+        console.error('[GL SHADOW MODE] Failed to post mfg entry to ledger:', glError);
+      }
+
+
       // Allocate finished stock to oldest Waiting For Stock invoices
       const { Op } = require('sequelize');
       const InvoiceItem = require('../models/InvoiceItem');

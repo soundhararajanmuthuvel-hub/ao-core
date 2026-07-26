@@ -49,7 +49,7 @@ const Payment = sequelize.define('Payment', {
 });
 
 const Customer = require('./Customer');
-Payment.belongsTo(Customer, { as: 'customer', foreignKey: 'customerId', onDelete: 'CASCADE' });
+Payment.belongsTo(Customer, { as: 'customer', foreignKey: 'customerId', onDelete: 'RESTRICT' });
 
 makeMongooseCompatible(Payment, { customer: 'customerId' });
 

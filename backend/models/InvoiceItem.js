@@ -67,7 +67,7 @@ const InvoiceItem = sequelize.define('InvoiceItem', {
   ]
 });
 
-InvoiceItem.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'CASCADE' });
+InvoiceItem.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'RESTRICT' });
 
 makeMongooseCompatible(InvoiceItem, { product: 'productId' });
 

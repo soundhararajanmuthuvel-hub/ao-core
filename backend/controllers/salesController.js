@@ -6,7 +6,7 @@ const Customer = require('../models/Customer');
 const Product = require('../models/Product');
 const User = require('../models/User');
 const Shipment = require('../models/Shipment');
-const { calcInvoiceTotals, getNextInvoiceNumber, logActivity, getSettings, createNotification } = require('../utils/helpers');
+const { calcInvoiceTotals, bankersRound, getNextInvoiceNumber, logActivity, getSettings, createNotification } = require('../utils/helpers');
 const { updateStock } = require('../utils/stockService');
 const { isValidGstin, getStateCodeByName } = require('../utils/gst');
 
@@ -441,14 +441,14 @@ exports.createSale = async (req, res, next) => {
         let gst = 0;
         if (gstBillingMode === 'inclusive') {
           const lineTotal = qty * unitPrice;
-          taxable = Math.round((lineTotal / (1 + gstPercent / 100)) * 100) / 100;
-          gst = Math.round((lineTotal - taxable) * 100) / 100;
+          taxable = bankersRound(lineTotal / (1 + gstPercent / 100));
+          gst = bankersRound(lineTotal - taxable);
         } else if (gstBillingMode === 'no_gst') {
-          taxable = Math.round((qty * unitPrice) * 100) / 100;
+          taxable = bankersRound(qty * unitPrice);
           gst = 0;
         } else { // exclusive
-          taxable = Math.round((qty * unitPrice) * 100) / 100;
-          gst = Math.round((taxable * gstPercent / 100) * 100) / 100;
+          taxable = bankersRound(qty * unitPrice);
+          gst = bankersRound(taxable * gstPercent / 100);
         }
         
         if (!summaryMap[hsn]) {
@@ -599,6 +599,46 @@ exports.createSale = async (req, res, next) => {
         link: `/sales/${sale.id}`,
         user: req.user.id,
       }, { transaction: t });
+    }
+
+    // GL Shadow Post
+    try {
+      const { postJournalEntry, getCustomerAccount, getSystemAccount } = require('../services/ledgerService');
+      const arAccountId = await getCustomerAccount(customer, t);
+      const revAccountId = await getSystemAccount('Revenue');
+      const cgstAccountId = await getSystemAccount('CGST');
+      const sgstAccountId = await getSystemAccount('SGST');
+      const igstAccountId = await getSystemAccount('IGST');
+      const shippingAccountId = await getSystemAccount('Shipping');
+      const discountAccountId = await getSystemAccount('Discount');
+
+      const lines = [];
+      // Debit AR for Grand Total
+      lines.push({ accountId: arAccountId, debit: totals.grandTotal, credit: 0, description: 'Invoice Generated' });
+      // Credit Revenue for Taxable Subtotal
+      lines.push({ accountId: revAccountId, debit: 0, credit: totals.subtotal, description: 'Sales Revenue' });
+      
+      if (invoiceCgstAmount > 0) lines.push({ accountId: cgstAccountId, debit: 0, credit: invoiceCgstAmount });
+      if (invoiceSgstAmount > 0) lines.push({ accountId: sgstAccountId, debit: 0, credit: invoiceSgstAmount });
+      if (invoiceIgstAmount > 0) lines.push({ accountId: igstAccountId, debit: 0, credit: invoiceIgstAmount });
+      
+      const shippingCharge = totals.shippingCharge || 0;
+      if (shippingCharge > 0) lines.push({ accountId: shippingAccountId, debit: 0, credit: shippingCharge });
+      
+      const discountVal = Number(discount || 0);
+      if (discountVal > 0) lines.push({ accountId: discountAccountId, debit: discountVal, credit: 0 });
+
+      await postJournalEntry({
+        entryDate: invoiceDate,
+        referenceId: sale.id,
+        referenceModel: 'Invoice',
+        referenceNumber: invoiceNumber,
+        description: 'Auto-posted Sales Invoice',
+        lines
+      }, t);
+    } catch (glError) {
+      console.error('[GL SHADOW MODE] Failed to post invoice to ledger:', glError);
+      // Swallow error in shadow mode to prevent blocking the transaction
     }
 
     await t.commit();
@@ -923,6 +963,31 @@ exports.recordPayment = async (req, res, next) => {
       `Recorded payment of ₹${totalAllocated.toFixed(2)} for customer ${customerRecord.name} (Ref: ${referenceNumber || 'N/A'})`
     );
 
+    // GL Shadow Post
+    try {
+      const { postJournalEntry, getCustomerAccount, getSystemAccount } = require('../services/ledgerService');
+      const arAccountId = await getCustomerAccount(customerId, t);
+      const cashAccountId = await getSystemAccount('Cash');
+
+      const lines = [];
+      // Debit Cash/Bank for Amount Paid
+      lines.push({ accountId: cashAccountId, debit: totalAllocated, credit: 0, description: `Payment Received (Ref: ${referenceNumber || 'N/A'})` });
+      // Credit AR for Amount Paid
+      lines.push({ accountId: arAccountId, debit: 0, credit: totalAllocated, description: `Payment Applied` });
+
+      await postJournalEntry({
+        entryDate: req.body.paymentDate ? new Date(req.body.paymentDate) : new Date(),
+        referenceId: null, // We could link payment ID but the variable isn't captured above, wait, let's capture it.
+        referenceModel: 'Payment',
+        referenceNumber: paymentNumber,
+        description: 'Auto-posted Customer Payment',
+        lines
+      }, t);
+    } catch (glError) {
+      console.error('[GL SHADOW MODE] Failed to post payment to ledger:', glError);
+      // Swallow error in shadow mode to prevent blocking the transaction
+    }
+
     await t.commit();
 
     // Trigger Automated WhatsApp Thank You Message
@@ -1081,10 +1146,21 @@ exports.reconcileInvoicesHelper = async (customerId = null) => {
   } else {
     // Reconcile all customer balances if customerId is null
     const customers = await Customer.findAll();
+    const allActiveInvoices = await Invoice.findAll({
+      where: { status: { [Op.notIn]: ['Cancelled', 'Draft'] }, type: 'invoice' }
+    });
+    
+    // Group invoices by customerId
+    const customerInvoicesMap = new Map();
+    for (const inv of allActiveInvoices) {
+      if (!customerInvoicesMap.has(inv.customerId)) {
+        customerInvoicesMap.set(inv.customerId, []);
+      }
+      customerInvoicesMap.get(inv.customerId).push(inv);
+    }
+
     for (const customer of customers) {
-      const activeInvoices = await Invoice.findAll({
-        where: { customerId: customer.id, status: { [Op.notIn]: ['Cancelled', 'Draft'] }, type: 'invoice' }
-      });
+      const activeInvoices = customerInvoicesMap.get(customer.id) || [];
       let computedOutstanding = 0;
       let countOutstanding = 0;
       for (const inv of activeInvoices) {

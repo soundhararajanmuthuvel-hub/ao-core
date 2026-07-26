@@ -137,12 +137,12 @@ const Purchase = sequelize.define('Purchase', {
 });
 
 // Associations
-Purchase.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById', onDelete: 'CASCADE' });
-Purchase.belongsTo(require('./Supplier'), { as: 'supplierRelation', foreignKey: 'supplierId', onDelete: 'CASCADE' });
+Purchase.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById', onDelete: 'RESTRICT' });
+Purchase.belongsTo(require('./Supplier'), { as: 'supplierRelation', foreignKey: 'supplierId', onDelete: 'RESTRICT' });
 
 // A purchase has many items, which will be cascaded on deletion
-Purchase.hasMany(PurchaseItem, { as: 'items', foreignKey: 'purchaseId', onDelete: 'CASCADE' });
-PurchaseItem.belongsTo(Purchase, { as: 'purchase', foreignKey: 'purchaseId', onDelete: 'CASCADE' });
+Purchase.hasMany(PurchaseItem, { as: 'items', foreignKey: 'purchaseId', onDelete: 'RESTRICT' });
+PurchaseItem.belongsTo(Purchase, { as: 'purchase', foreignKey: 'purchaseId', onDelete: 'RESTRICT' });
 
 makeMongooseCompatible(Purchase, {
   createdBy: 'createdById',
