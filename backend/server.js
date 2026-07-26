@@ -175,16 +175,16 @@ app.use('/api/external', require('./routes/externalRoutes'));
    WEBSITE MODULE ROUTES (BLOVIT ECOMMERCE)
    ========================= */
 app.get('/api/website/health', (req, res) => res.json({ success: true, status: 'OK', message: 'Website module is operational' }));
-app.use('/api/website/products', require('./routes/websiteProductRoutes'));
-app.use('/api/website/auth', require('./routes/websiteAuthRoutes'));
-app.use('/api/website/account', require('./routes/websiteAccountRoutes'));
-app.use('/api/website/cart', require('./routes/websiteAccountRoutes'));
-app.use('/api/website/razorpay', require('./routes/websiteOrderRoutes'));
-app.use('/api/website/orders', require('./routes/websiteOrderRoutes'));
-app.use('/api/website', require('./routes/websiteReviewRoutes'));
-app.use('/api/website/referrals', require('./routes/websiteReferralRoutes'));
-app.use('/api/website', require('./routes/websiteShippingCouponRoutes'));
-app.use('/api/website', require('./routes/websiteEventRoutes'));
+try { app.use('/api/website/products', require('./routes/websiteProductRoutes')); } catch(e) { console.error('Failed to load websiteProductRoutes', e); }
+try { app.use('/api/website/auth', require('./routes/websiteAuthRoutes')); } catch(e) { console.error('Failed to load websiteAuthRoutes', e); }
+try { app.use('/api/website/account', require('./routes/websiteAccountRoutes')); } catch(e) { console.error('Failed to load websiteAccountRoutes', e); }
+try { app.use('/api/website/cart', require('./routes/websiteAccountRoutes')); } catch(e) { console.error('Failed to load websiteAccountRoutes (cart)', e); }
+try { app.use('/api/website/razorpay', require('./routes/websiteOrderRoutes')); } catch(e) { console.error('Failed to load websiteOrderRoutes (razorpay)', e); }
+try { app.use('/api/website/orders', require('./routes/websiteOrderRoutes')); } catch(e) { console.error('Failed to load websiteOrderRoutes', e); }
+try { app.use('/api/website', require('./routes/websiteReviewRoutes')); } catch(e) { console.error('Failed to load websiteReviewRoutes', e); }
+try { app.use('/api/website/referrals', require('./routes/websiteReferralRoutes')); } catch(e) { console.error('Failed to load websiteReferralRoutes', e); }
+try { app.use('/api/website', require('./routes/websiteShippingCouponRoutes')); } catch(e) { console.error('Failed to load websiteShippingCouponRoutes', e); }
+try { app.use('/api/website', require('./routes/websiteEventRoutes')); } catch(e) { console.error('Failed to load websiteEventRoutes', e); }
 const cloudinaryService = require('./services/cloudinaryService');
 
 app.get('/api/system/cloudinary-health', async (req, res) => {
