@@ -92,6 +92,16 @@ if (dialect === 'postgres') {
     }
   );
 } else {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('\n======================================================');
+    console.error('CRITICAL STARTUP FAILURE - DATA LOSS PREVENTION');
+    console.error('======================================================');
+    console.error('DATABASE_URL or MYSQL_URL is not set.');
+    console.error('Silent fallback to SQLite is disabled in production to prevent data loss.');
+    console.error('======================================================\n');
+    process.exit(1);
+  }
+  
   console.log('Using local SQLite database configuration (zero-setup)...');
   sequelize = new Sequelize({
     dialect: 'sqlite',

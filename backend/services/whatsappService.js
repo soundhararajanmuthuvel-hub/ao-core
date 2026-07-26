@@ -8,7 +8,7 @@ const Customer = require('../models/Customer');
 const Invoice = require('../models/Invoice');
 const IntegrationCatalogue = require('../models/IntegrationCatalogue');
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'amudhasurabiyorganicssecretkey99'; // 32 characters
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 const IV_LENGTH = 16;
 
 function encrypt(text) {

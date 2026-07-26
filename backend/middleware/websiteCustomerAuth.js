@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const WebsiteCustomer = require('../models/WebsiteCustomer');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'ao_core_secret_key_2026_prod';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const websiteCustomerAuth = async (req, res, next) => {
   try {

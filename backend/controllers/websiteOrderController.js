@@ -109,9 +109,18 @@ const createRazorpayOrder = async (req, res) => {
     const keyId = getRazorpayKeyId();
     const keySecret = getRazorpayKeySecret();
 
+    // Validate Razorpay configuration for production
+    const isMockKey = !keyId || !keySecret || keyId.includes('placeholder') || keyId.includes('mock');
+    if (process.env.NODE_ENV === 'production' && isMockKey) {
+      return res.status(500).json({
+        success: false,
+        message: 'Payment gateway configuration is missing. Checkout is currently unavailable.'
+      });
+    }
+
     // Create Razorpay Order ID
     let razorpayOrderId = `order_${Math.random().toString(36).substring(2, 15)}`;
-    if (keyId && keySecret && !keyId.includes('placeholder') && !keyId.includes('mock')) {
+    if (!isMockKey) {
       try {
         const instance = new Razorpay({
           key_id: keyId,

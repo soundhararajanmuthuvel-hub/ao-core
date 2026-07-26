@@ -232,8 +232,31 @@ app.use((req, res) => {
 ========================= */
 app.use(errorHandler);
 
+const validateCriticalEnv = () => {
+  const missing = [];
+  
+  if (!process.env.JWT_SECRET) missing.push('JWT_SECRET (Critical for Auth Security)');
+  if (!process.env.ENCRYPTION_KEY) missing.push('ENCRYPTION_KEY (Critical for Credential Security)');
+  
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.DATABASE_URL && !process.env.MYSQL_URL) {
+      missing.push('DATABASE_URL (Required in Production to prevent SQLite data loss)');
+    }
+  }
+
+  if (missing.length > 0) {
+    console.error('\n======================================================');
+    console.error('CRITICAL STARTUP FAILURE - MISSING ENVIRONMENT VARIABLES');
+    console.error('======================================================');
+    missing.forEach(v => console.error(`- ${v}`));
+    console.error('======================================================\n');
+    process.exit(1); // Fail immediately.
+  }
+};
+
 const startServer = async () => {
   try {
+    validateCriticalEnv();
 
     await connectDB();
     

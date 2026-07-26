@@ -2,7 +2,7 @@ const WebsiteCustomer = require('../models/WebsiteCustomer');
 const WebsiteReferral = require('../models/WebsiteReferral');
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'ao_core_secret_key_2026_prod';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // POST /api/website/auth/register
 const register = async (req, res) => {

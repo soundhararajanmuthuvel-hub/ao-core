@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'amudhasurabiyorganicssecretkey99'; // 32 characters
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 const IV_LENGTH = 16;
 
 function encryptCredential(text) {
