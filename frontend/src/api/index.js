@@ -413,6 +413,8 @@ export const returnsApi = {
   qcInspect: (id, data) => client.post(`/returns/${id}/qc-inspect`, data),
   close: (id) => client.put(`/returns/${id}/close`),
   scanLookup: (barcode) => client.post('/returns/scan-lookup', { barcode }),
+  getDashboardMetrics: () => client.get('/returns/analytics/dashboard'),
+  getAiInsights: () => client.get('/returns/ai/insights'),
 };
 
 

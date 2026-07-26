@@ -5,6 +5,8 @@ const WebsiteProduct = require('../models/WebsiteProduct');
 const WebsiteCoupon = require('../models/WebsiteCoupon');
 const WebsiteShippingRule = require('../models/WebsiteShippingRule');
 const WebsiteEvent = require('../models/WebsiteEvent');
+const Product = require('../models/Product');
+const StockMovement = require('../models/StockMovement');
 
 const getRazorpayKeyId = () => process.env.RAZORPAY_KEY_ID || 'rzp_test_blovit_mock_key';
 const getRazorpayKeySecret = () => process.env.RAZORPAY_KEY_SECRET || 'rzp_test_blovit_mock_secret';
@@ -256,17 +258,39 @@ const handleWebhook = async (req, res) => {
           try {
             const items = JSON.parse(order.items || '[]');
             for (const item of items) {
-              if (item.productId && item.qty) {
+              if ((item.productId || item.managementProductId) && item.qty) {
                 const websiteProduct = await WebsiteProduct.findByPk(item.productId);
-                if (websiteProduct) {
-                  websiteProduct.stock = Math.max(0, websiteProduct.stock - Number(item.qty));
-                  await websiteProduct.save();
-                  console.log(`✓ Website product stock decremented for Product ID ${websiteProduct.id} (${websiteProduct.name}) by ${item.qty}`);
+                const masterId = websiteProduct?.managementProductId || item.managementProductId || item.productId;
+                const masterProduct = await Product.findByPk(masterId);
+                
+                if (masterProduct) {
+                  const oldStock = Number(masterProduct.stock || 0);
+                  const qtyNum = Number(item.qty || 1);
+                  const newStock = Math.max(0, oldStock - qtyNum);
+                  masterProduct.stock = newStock;
+                  await masterProduct.save();
+
+                  if (websiteProduct) {
+                    websiteProduct.stock = newStock;
+                    await websiteProduct.save();
+                  }
+
+                  try {
+                    await StockMovement.create({
+                      productId: masterProduct.id,
+                      type: 'OUT',
+                      quantity: qtyNum,
+                      referenceId: order.id,
+                      referenceModel: 'WebsiteOrder',
+                      notes: `eCommerce Sale (Order #${order.orderNumber || order.id})`,
+                    });
+                  } catch (e) {}
+                  console.log(`✓ Product Master stock decremented for Product ID ${masterProduct.id} (${masterProduct.name}) by ${qtyNum}. New stock: ${newStock}`);
                 }
               }
             }
           } catch (stockErr) {
-            console.error('Error updating stock on webhook:', stockErr);
+            console.error('Error updating Product Master stock on order completion:', stockErr);
           }
 
           // If a coupon code was used, increment coupon used count

@@ -582,18 +582,18 @@ export default function ReturnRecoveryModule() {
       {/* 12 EQUAL-HEIGHT ENTERPRISE KPI CARDS BAR */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
         {[
-          { label: 'Returns Today', val: loading ? '...' : `${metrics.todaysReturns} Pks`, color: '#3b82f6', bg: '#eff6ff', icon: RotateCcw },
-          { label: 'Recovery %', val: loading ? '...' : `${metrics.recoveryPercentage}%`, color: '#10b981', bg: '#ecfdf5', icon: TrendingUp },
-          { label: 'Pending QC', val: loading ? '...' : `${metrics.pendingQc}`, color: '#f59e0b', bg: '#fffbeb', icon: CheckSquare },
-          { label: 'Repacking Queue', val: loading ? '...' : `${metrics.repackingQueue}`, color: '#06b6d4', bg: '#ecfeff', icon: Factory },
-          { label: 'Near Expiry', val: loading ? '...' : `${nearExpiryItems.length} Batches`, color: '#8b5cf6', bg: '#f5f3ff', icon: Clock },
-          { label: 'Credit Notes', val: loading ? '...' : `₹${metrics.stockRestoredVal.toLocaleString('en-IN')}`, color: '#10b981', bg: '#ecfdf5', icon: DollarSign },
-          { label: 'Loss Value', val: loading ? '...' : `₹${metrics.destroyedVal.toLocaleString('en-IN')}`, color: '#ef4444', bg: '#fef2f2', icon: AlertTriangle },
-          { label: 'Recovered Value', val: loading ? '...' : `₹${metrics.stockRestoredVal.toLocaleString('en-IN')}`, color: '#10b981', bg: '#ecfdf5', icon: ShieldCheck },
-          { label: 'Active Recalls', val: loading ? '...' : `${metrics.activeRecalls}`, color: '#dc2626', bg: '#fef2f2', icon: AlertOctagon },
-          { label: 'Open NCRs', val: loading ? '...' : `${metrics.openNcrs}`, color: '#f59e0b', bg: '#fffbeb', icon: ShieldAlert },
-          { label: 'Open CAPAs', val: loading ? '...' : `${ncrs.length} Active`, color: '#3b82f6', bg: '#eff6ff', icon: UserCheck },
-          { label: 'Transfer Orders', val: loading ? '...' : `${fastSellingShops.length} Stores`, color: '#059669', bg: '#ecfdf5', icon: Truck },
+          { label: 'Returns Today', val: loading ? <span className="skeleton-loader">...</span> : `${metrics.todaysReturns || 0} Pks`, color: '#3b82f6', bg: '#eff6ff', icon: RotateCcw },
+          { label: 'Recovery %', val: loading ? <span className="skeleton-loader">...</span> : `${metrics.recoveryRate ?? metrics.recoveryPercentage ?? 0}%`, color: '#10b981', bg: '#ecfdf5', icon: TrendingUp },
+          { label: 'Pending QC', val: loading ? <span className="skeleton-loader">...</span> : `${metrics.pendingQc || 0}`, color: '#f59e0b', bg: '#fffbeb', icon: CheckSquare },
+          { label: 'Repacking Queue', val: loading ? <span className="skeleton-loader">...</span> : `${metrics.repackingQueue || 0}`, color: '#06b6d4', bg: '#ecfeff', icon: Factory },
+          { label: 'Near Expiry', val: loading ? <span className="skeleton-loader">...</span> : `${nearExpiryItems.length} Batches`, color: '#8b5cf6', bg: '#f5f3ff', icon: Clock },
+          { label: 'Credit Notes', val: loading ? <span className="skeleton-loader">...</span> : `₹${(metrics.stockRestoredVal || 0).toLocaleString('en-IN')}`, color: '#10b981', bg: '#ecfdf5', icon: DollarSign },
+          { label: 'Loss Value', val: loading ? <span className="skeleton-loader">...</span> : `₹${(metrics.destroyedVal || 0).toLocaleString('en-IN')}`, color: '#ef4444', bg: '#fef2f2', icon: AlertTriangle },
+          { label: 'Recovered Value', val: loading ? <span className="skeleton-loader">...</span> : `₹${(metrics.recoveryValue ?? metrics.stockRestoredVal ?? 0).toLocaleString('en-IN')}`, color: '#10b981', bg: '#ecfdf5', icon: ShieldCheck },
+          { label: 'Active Recalls', val: loading ? <span className="skeleton-loader">...</span> : `${metrics.activeRecalls || 0}`, color: '#dc2626', bg: '#fef2f2', icon: AlertOctagon },
+          { label: 'Open NCRs', val: loading ? <span className="skeleton-loader">...</span> : `${metrics.openNcrs || 0}`, color: '#f59e0b', bg: '#fffbeb', icon: ShieldAlert },
+          { label: 'Open CAPAs', val: loading ? <span className="skeleton-loader">...</span> : `${ncrs.length} Active`, color: '#3b82f6', bg: '#eff6ff', icon: UserCheck },
+          { label: 'Transfer Orders', val: loading ? <span className="skeleton-loader">...</span> : `${fastSellingShops.length} Stores`, color: '#059669', bg: '#ecfdf5', icon: Truck },
         ].map((kpi, idx) => {
           const IconComp = kpi.icon;
           return (
@@ -620,7 +620,7 @@ export default function ReturnRecoveryModule() {
                 </div>
               </div>
               <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
-                {loading ? <span style={{ opacity: 0.5 }}>...</span> : kpi.val}
+                {kpi.val}
               </div>
             </div>
           );
@@ -697,9 +697,9 @@ export default function ReturnRecoveryModule() {
                 ))}
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '2rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px border #e2e8f0' }}>
+              <div style={{ textAlign: 'center', padding: '2rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <Sparkles size={32} style={{ color: '#cbd5e1', marginBottom: '0.5rem' }} />
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', margin: 0 }}>No AI Insights Available</h3>
+                <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', margin: 0 }}>No AI recommendations available.</h3>
                 <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '0.2rem 0 0 0' }}>AI predictive algorithms require active return transaction history to calculate risk forecasts.</p>
               </div>
             )}
@@ -727,10 +727,10 @@ export default function ReturnRecoveryModule() {
             </div>
           ) : (
             <div style={{ backgroundColor: '#ffffff', padding: '3rem 2rem', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-              <BarChart2 size={48} style={{ color: '#cbd5e1', marginBottom: '0.75rem' }} />
-              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>No Return Analytics Available Yet</h3>
+              <RotateCcw size={48} style={{ color: '#cbd5e1', marginBottom: '0.75rem' }} />
+              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>No return records available.</h3>
               <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.35rem', marginBottom: '1.25rem' }}>
-                Analytics and trend charts will automatically populate once return transactions are recorded in the system.
+                No data available. Return analytics and trend charts will automatically populate once return transactions are recorded.
               </p>
               <button
                 onClick={() => { setShowCreateModal(true); setWizardStep(1); }}

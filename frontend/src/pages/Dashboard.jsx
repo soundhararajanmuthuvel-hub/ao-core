@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
-import { analyticsApi, productsApi, manufacturingApi, rawMaterialsApi, salesApi, customersApi, inventoryApi, shippingApi, integrationsApi, sfaApi, aiApi } from '../api';
+import { analyticsApi, productsApi, manufacturingApi, rawMaterialsApi, salesApi, customersApi, inventoryApi, shippingApi, integrationsApi, sfaApi, aiApi, returnsApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { usePWA } from '../context/PWAContext';
 import { resolveAssetUrl } from '../utils/url';
@@ -178,6 +178,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
+  const [returnsMetrics, setReturnsMetrics] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -254,6 +255,15 @@ export default function Dashboard() {
             setBackordersCount(data.analytics?.delayedOrdersCount || 0);
             setWooStats(data.wooStats);
           }
+        }
+
+        try {
+          const retRes = await returnsApi.getDashboardMetrics();
+          if (retRes.data?.success) {
+            setReturnsMetrics(retRes.data.metrics || retRes.data.data || null);
+          }
+        } catch (e) {
+          console.error('Error loading returns metrics on dashboard:', e);
         }
 
         if (role === 'Manufacturing Manager') {
@@ -564,10 +574,34 @@ export default function Dashboard() {
                   <StatCard label="Pending Website Orders" value={dataLoading ? <span className="skeleton-loader" /> : cards.pendingWebsiteOrders || 0} onClick={() => navigate('/website?tab=orders')} className={!dataLoading && cards.pendingWebsiteOrders > 0 ? 'warning' : ''} />
                   <StatCard label="Pending Dispatch Orders" value={dataLoading ? <span className="skeleton-loader" /> : cards.pendingDispatchOrders || 0} />
                   <StatCard label="Low Stock Products" value={dataLoading ? <span className="skeleton-loader" /> : cards.lowStockCount || 0} className={!dataLoading && cards.lowStockCount > 0 ? 'danger' : ''} />
-                  <StatCard label="Today's Returns 🛡️" value="12 Pks" subtext="86.4% Recovery Rate" onClick={() => navigate('/sales/returns')} style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', labelStyle: { color: '#166534' }, valueStyle: { color: '#16a34a' } }} />
-                  <StatCard label="Pending QC Returns" value="3" subtext="Awaiting Inspection" onClick={() => navigate('/sales/returns')} style={{ backgroundColor: '#fff7ed', border: '1px solid #fed7aa', labelStyle: { color: '#c2410c' }, valueStyle: { color: '#ea580c' } }} />
-                  <StatCard label="Return Recovery Value" value="₹48,500" subtext="Restored Goods" onClick={() => navigate('/sales/returns')} style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', labelStyle: { color: '#047857' }, valueStyle: { color: '#10b981' } }} />
-                  <StatCard label="Active Batch Recalls 🚨" value="1" subtext="Internal Hold" onClick={() => navigate('/sales/returns')} style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', labelStyle: { color: '#b91c1c' }, valueStyle: { color: '#ef4444' } }} />
+                  <StatCard
+                    label="Today's Returns 🛡️"
+                    value={dataLoading ? <span className="skeleton-loader" /> : `${returnsMetrics?.todaysReturns || 0} Pks`}
+                    subtext={!dataLoading ? `${returnsMetrics?.recoveryRate ?? returnsMetrics?.recoveryPercentage ?? 0}% Recovery Rate` : ''}
+                    onClick={() => navigate('/sales/returns')}
+                    style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', labelStyle: { color: '#166534' }, valueStyle: { color: '#16a34a' } }}
+                  />
+                  <StatCard
+                    label="Pending QC Returns"
+                    value={dataLoading ? <span className="skeleton-loader" /> : (returnsMetrics?.pendingQc || 0)}
+                    subtext="Awaiting Inspection"
+                    onClick={() => navigate('/sales/returns')}
+                    style={{ backgroundColor: '#fff7ed', border: '1px solid #fed7aa', labelStyle: { color: '#c2410c' }, valueStyle: { color: '#ea580c' } }}
+                  />
+                  <StatCard
+                    label="Return Recovery Value"
+                    value={dataLoading ? <span className="skeleton-loader" /> : fmt(returnsMetrics?.recoveryValue ?? returnsMetrics?.stockRestoredVal ?? 0)}
+                    subtext="Restored Goods"
+                    onClick={() => navigate('/sales/returns')}
+                    style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', labelStyle: { color: '#047857' }, valueStyle: { color: '#10b981' } }}
+                  />
+                  <StatCard
+                    label="Active Batch Recalls 🚨"
+                    value={dataLoading ? <span className="skeleton-loader" /> : (returnsMetrics?.activeRecalls || 0)}
+                    subtext="Internal Hold"
+                    onClick={() => navigate('/sales/returns')}
+                    style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', labelStyle: { color: '#b91c1c' }, valueStyle: { color: '#ef4444' } }}
+                  />
                   <StatCard
                     label="Top Selling Product"
                     value={dataLoading ? <span className="skeleton-loader" /> : (charts.topProducts?.[0]?.name || 'N/A')}

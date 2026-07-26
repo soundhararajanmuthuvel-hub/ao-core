@@ -76,13 +76,58 @@ const WebsiteProduct = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    faqs: {
+      type: DataTypes.TEXT,
+      allowNull: true, // JSON array of FAQ objects
+    },
+    seoTitle: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    seoDescription: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    seoKeywords: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    badges: {
+      type: DataTypes.TEXT,
+      allowNull: true, // JSON array of badge strings
+    },
+    healthGoals: {
+      type: DataTypes.TEXT,
+      allowNull: true, // JSON array of goal strings
+    },
+    isFeatured: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
     isBestseller: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    isTrending: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    isPublished: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
     isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
+    },
+    sortOrder: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    galleryImages: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      defaultValue: '[]',
     },
     sku: {
       type: DataTypes.STRING,
@@ -91,6 +136,7 @@ const WebsiteProduct = sequelize.define(
     managementProductId: {
       type: DataTypes.INTEGER,
       allowNull: true,
+      unique: true,
     },
   },
   {

@@ -274,8 +274,9 @@ export default function EnterpriseProductEditor({
 
   // Save Product Handler
   const handleSaveProduct = async (statusOverride = null) => {
-    if (!formData.name.trim()) {
-      setMsg({ type: 'error', text: 'Product name is required.' });
+    const targetMasterId = formData.managementProductId || formData.productId;
+    if (!targetMasterId) {
+      setMsg({ type: 'error', text: 'Please select an active product from Billing Product Master.' });
       return;
     }
 
@@ -284,17 +285,13 @@ export default function EnterpriseProductEditor({
 
     const finalStatus = statusOverride || formData.status;
     const payload = {
-      name: formData.name,
+      managementProductId: targetMasterId,
+      productId: targetMasterId,
       slug: formData.slug,
-      price: parseFloat(formData.price) || 0,
-      compareAtPrice: parseFloat(formData.mrp) || parseFloat(formData.compareAtPrice) || null,
-      stock: parseInt(formData.stock, 10) || 0,
-      category: formData.category,
-      brand: formData.brand,
       description: formData.description,
       shortDescription: formData.shortDescription,
+      galleryImages: JSON.stringify(formData.images),
       images: JSON.stringify(formData.images),
-      imageUrl: formData.images[0] || '',
       benefits: JSON.stringify(formData.benefits),
       ingredients: JSON.stringify(formData.ingredients),
       nutritionFacts: JSON.stringify(
@@ -303,9 +300,16 @@ export default function EnterpriseProductEditor({
           return acc;
         }, {})
       ),
-      isBestseller: formData.isBestseller,
-      isActive: finalStatus === 'published',
-      sku: formData.sku,
+      faqs: JSON.stringify(formData.faqs || []),
+      seoTitle: formData.metaTitle || formData.seoTitle || '',
+      seoDescription: formData.metaDescription || formData.seoDescription || '',
+      seoKeywords: formData.keywords || formData.seoKeywords || '',
+      badges: JSON.stringify(formData.badges || []),
+      healthGoals: JSON.stringify(formData.healthGoals || []),
+      isFeatured: !!formData.isFeatured,
+      isBestseller: !!formData.isBestseller,
+      isTrending: !!formData.isTrending,
+      isPublished: finalStatus === 'published',
     };
 
     try {
@@ -318,12 +322,12 @@ export default function EnterpriseProductEditor({
 
       if (res.data.success) {
         setIsDirty(false);
-        setMsg({ type: 'success', text: `Product ${formData.id ? 'updated' : 'created'} successfully!` });
+        setMsg({ type: 'success', text: `Website Product settings ${formData.id ? 'updated' : 'configured'} successfully!` });
         onSaveSuccess();
         setTimeout(() => onClose(), 800);
       }
     } catch (err) {
-      setMsg({ type: 'error', text: err.response?.data?.message || 'Failed to save product.' });
+      setMsg({ type: 'error', text: err.response?.data?.message || 'Failed to save website product settings.' });
     } finally {
       setSaving(false);
     }
@@ -374,7 +378,7 @@ export default function EnterpriseProductEditor({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
-                  {formData.id ? `Edit Product: ${formData.name}` : 'Create Website Storefront Product'}
+                  {formData.id ? `Edit Storefront Product: ${formData.name}` : 'Configure Storefront Product Settings'}
                 </h2>
                 {isDirty && (
                   <span style={{ background: '#FEF3C7', color: '#92400E', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -383,7 +387,7 @@ export default function EnterpriseProductEditor({
                 )}
               </div>
               <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
-                Enterprise Shopify-Level Modular Product Editor
+                Enrich Product Master with Storefront Descriptions, SEO & Marketing Media
               </span>
             </div>
           </div>
@@ -429,7 +433,7 @@ export default function EnterpriseProductEditor({
                 </>
               ) : (
                 <>
-                  <Check size={16} /> Save Product
+                  <Check size={16} /> Save Product Settings
                 </>
               )}
             </button>
@@ -467,6 +471,7 @@ export default function EnterpriseProductEditor({
               setIsDirty={setIsDirty}
               triggerAiGenerator={triggerAiGenerator}
               aiLoadingField={aiLoadingField}
+              managementProductsList={managementProductsList}
             />
 
             <PricingCard

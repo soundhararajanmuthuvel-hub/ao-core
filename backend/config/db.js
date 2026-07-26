@@ -511,9 +511,20 @@ const connectDB = async () => {
   await addColumnIfNotExist('Products', 'ingredients', "TEXT NULL");
   await addColumnIfNotExist('Products', 'benefits', "TEXT NULL");
   await addColumnIfNotExist('Products', 'imageUrl', "TEXT NULL");
-  await addColumnIfNotExist('Products', 'imagePublicId', "VARCHAR(255) NULL");
   await addColumnIfNotExist('WebsiteProduct', 'imageUrl', "TEXT NULL");
   await addColumnIfNotExist('WebsiteProduct', 'imagePublicId', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('WebsiteProduct', 'managementProductId', "INTEGER NULL");
+  await addColumnIfNotExist('WebsiteProduct', 'faqs', "TEXT NULL");
+  await addColumnIfNotExist('WebsiteProduct', 'seoTitle', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('WebsiteProduct', 'seoDescription', "TEXT NULL");
+  await addColumnIfNotExist('WebsiteProduct', 'seoKeywords', "TEXT NULL");
+  await addColumnIfNotExist('WebsiteProduct', 'badges', "TEXT NULL");
+  await addColumnIfNotExist('WebsiteProduct', 'healthGoals', "TEXT NULL");
+  await addColumnIfNotExist('WebsiteProduct', 'isFeatured', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('WebsiteProduct', 'isTrending', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('WebsiteProduct', 'isPublished', "TINYINT DEFAULT 1");
+  await addColumnIfNotExist('WebsiteProduct', 'sortOrder', "INTEGER DEFAULT 0");
+  await addColumnIfNotExist('WebsiteProduct', 'galleryImages', "TEXT NULL");
 
   // SFA Settings enhancements
   await addColumnIfNotExist('Settings', 'minOrderGreen', "DECIMAL(10, 2) DEFAULT 10000.00");

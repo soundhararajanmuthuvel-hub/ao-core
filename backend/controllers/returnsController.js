@@ -80,8 +80,8 @@ exports.scanLookup = async (req, res) => {
           date: invoice.date,
           items: invoice.items.map(item => ({
             productId: item.productId,
-            productName: item.product?.name || item.productName || 'ABC Malt 500g',
-            sku: item.product?.sku || 'ABC-MALT-500',
+            productName: item.product?.name || item.productName || 'Product Item',
+            sku: item.product?.sku || 'SKU-001',
             quantity: item.quantity,
             price: item.price || item.unitPrice,
             batchNumber: item.batchNumber || `BATCH-${new Date().toISOString().slice(2,7).replace('-', '')}`,
@@ -113,27 +113,17 @@ exports.scanLookup = async (req, res) => {
           sku: product.sku,
           price: product.price,
           unit: product.unit || 'Pks',
-          batchNumber: `BATCH-${product.id}240715`,
+          batchNumber: `BATCH-${product.id}`,
           mfgDate: new Date(Date.now() - 25 * 24 * 3600 * 1000),
           expDate: new Date(Date.now() + 155 * 24 * 3600 * 1000),
         }
       });
     }
 
-    // Default mock response for demonstration barcode
-    return res.json({
-      success: true,
-      type: 'MOCK_SCANNED',
-      data: {
-        productId: 1,
-        productName: 'ABC Malt 500g Pouch',
-        sku: 'ABC-MALT-500',
-        price: 250,
-        unit: 'Pks',
-        batchNumber: queryTerm.startsWith('BATCH') ? queryTerm : 'ABC240715',
-        mfgDate: new Date(Date.now() - 30 * 24 * 3600 * 1000),
-        expDate: new Date(Date.now() + 150 * 24 * 3600 * 1000),
-      }
+    // Product or Invoice not found -> HTTP 404
+    return res.status(404).json({
+      success: false,
+      message: 'Return record not found.'
     });
   } catch (error) {
     console.error('Scan lookup error:', error);
@@ -436,6 +426,8 @@ exports.createReturnRequest = async (req, res) => {
 
     await t.commit();
 
+    invalidateReturnsCache();
+
     res.status(201).json({
       success: true,
       message: `Return Authorization (${rmaNumber}) created successfully`,
@@ -551,6 +543,8 @@ exports.approveReturn = async (req, res) => {
     returnReq.kanbanColumn = 'Approved';
     returnReq.warehouseZone = 'Receiving';
     await returnReq.save();
+
+    invalidateReturnsCache();
 
     res.json({ success: true, message: 'Return Request Approved (RMA Active)', data: returnReq });
   } catch (error) {
@@ -689,6 +683,8 @@ exports.qcInspect = async (req, res) => {
       }
     }
 
+    invalidateReturnsCache();
+
     res.json({
       success: true,
       message: 'QC Inspection completed and stock/disposition processed',
@@ -725,6 +721,8 @@ exports.closeReturn = async (req, res) => {
     returnReq.kanbanColumn = 'Closed';
     await returnReq.save();
 
+    invalidateReturnsCache();
+
     res.json({ success: true, message: 'Return Request closed successfully', data: returnReq });
   } catch (error) {
     console.error('Close Return error:', error);
@@ -738,7 +736,7 @@ exports.getNearExpiryScan = async (req, res) => {
     const products = await Product.findAll();
 
     const result = products.map(p => {
-      const remainingDays = Math.floor(Math.random() * 80) + 10;
+      const remainingDays = Number(p.shelfLifeDays || 30);
       let action = 'Normal Sale';
       if (remainingDays <= 15) action = 'Factory Outlet / Employee Sale';
       else if (remainingDays <= 30) action = 'Apply Discount Campaign';
@@ -771,12 +769,12 @@ exports.recommendFastSellingShops = async (req, res) => {
     const ranked = customers.map((c, index) => ({
       customerId: c.id,
       customerName: c.name || `Store #${c.id}`,
-      customerType: c.customerType || 'Supermarket',
-      salesVolumeMonthly: 450 - index * 30,
-      repeatFrequencyScore: 95 - index * 5,
-      distanceKm: (index + 1) * 3.5,
+      customerType: c.customerType || 'Retail Shop',
+      salesVolumeMonthly: 0,
+      repeatFrequencyScore: 0,
+      distanceKm: 0,
       rank: index + 1,
-      recommendation: `Top #${index + 1} Shop for Near Expiry Transfer`
+      recommendation: `Recommended Store #${index + 1}`
     }));
 
     res.json({ success: true, count: ranked.length, data: ranked });
@@ -817,6 +815,7 @@ exports.completeRepackWorkOrder = async (req, res) => {
       await prod.save();
     }
 
+    invalidateReturnsCache();
     res.json({ success: true, message: 'Repack Work Order completed & stock moved to Finished Goods', data: wo });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -852,83 +851,66 @@ exports.getBatchRecalls = async (req, res) => {
 // 13. AI PREDICTIONS & INSIGHTS ENGINE
 exports.getAiInsights = async (req, res) => {
   try {
-    const totalReturnsCount = await ReturnRequest.count();
-    const insights = [
-      {
-        id: 1,
-        insightType: 'HIGH_RISK_PRODUCT',
-        severity: 'High',
-        title: 'Product Return Risk Alert',
-        description: `Active Returns tracked: ${totalReturnsCount}. Beetroot Malt 250g shows a 4.2% return trend due to seal failure.`
-      },
-      {
-        id: 2,
-        insightType: 'BATCH_FAILURE_PREDICTION',
-        severity: 'Critical',
-        title: 'Batch Defect Warning',
-        description: 'Batch ABC240715 reached active threshold. Predicted to exceed failure limit.'
-      },
-      {
-        id: 3,
-        insightType: 'NEAR_EXPIRY_RISK',
-        severity: 'Medium',
-        title: 'Near-Expiry Stock Forecast',
-        description: '140 units of Nendran Banana Malt 500g reaching 45-day threshold in 4 days.'
-      },
-      {
-        id: 4,
-        insightType: 'PACKAGING_TREND',
-        severity: 'Medium',
-        title: 'Packaging Failure Trend',
-        description: 'Zip Lock Failure increased by 18% on Packing Line 2 during morning shifts.'
-      },
-      {
-        id: 5,
-        insightType: 'SUPPLIER_DEFECT',
-        severity: 'High',
-        title: 'Supplier Material Defect',
-        description: 'Pouch Lot #P882 from Packaging Supplier ABC exhibits 12% seal tearing under pressure.'
-      },
-      {
-        id: 6,
-        insightType: 'SEASONAL_PATTERN',
-        severity: 'Low',
-        title: 'Seasonal Return Pattern',
-        description: 'Monsoon humidity increases moisture return complaints by 22% in coastal retail hubs.'
-      }
-    ];
-
+    const insights = await ReturnAiInsight.findAll({
+      where: { status: 'Active' },
+      order: [['createdAt', 'DESC']]
+    });
     res.json({ success: true, count: insights.length, data: insights });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// 14. EXECUTIVE DASHBOARD & METRICS API
+// 14. EXECUTIVE DASHBOARD & METRICS API (CACHED 45s)
+let metricsCache = null;
+let metricsCacheTimestamp = 0;
+const CACHE_TTL_MS = 45000;
+
+function invalidateReturnsCache() {
+  metricsCache = null;
+  metricsCacheTimestamp = 0;
+}
+exports.invalidateReturnsCache = invalidateReturnsCache;
+
 exports.getDashboardMetrics = async (req, res) => {
   try {
+    const forceRefresh = req.query?.refresh === 'true';
+    const now = Date.now();
+
+    if (!forceRefresh && metricsCache && (now - metricsCacheTimestamp < CACHE_TTL_MS)) {
+      return res.json(metricsCache);
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const todaysReturnsCount = await ReturnRequest.count({
-      where: { createdAt: { [Op.gte]: today } }
-    });
-    const totalReturnsCount = await ReturnRequest.count();
-    const pendingQc = await ReturnRequest.count({
-      where: { status: { [Op.in]: ['Requested', 'Pending QC', 'QC Pending'] } }
-    });
-    const repackingCount = await RepackWorkOrder.count({ where: { status: 'In Progress' } });
-    const ncrCount = await ManufacturingNcr.count({ where: { status: 'Open' } });
-    const recallCount = await BatchRecall.count({ where: { isRecalled: true } });
-    const creditNotesCount = await ReturnCreditNote.count();
-
-    const allReturns = await ReturnRequest.findAll({
-      attributes: ['totalValue', 'recoveredValue', 'status', 'returnType']
-    });
+    const [
+      todaysReturnsCount,
+      totalReturnsCount,
+      pendingQc,
+      repackingCount,
+      ncrCount,
+      recallCount,
+      creditNotesCount,
+      allReturns
+    ] = await Promise.all([
+      ReturnRequest.count({ where: { createdAt: { [Op.gte]: today } } }),
+      ReturnRequest.count(),
+      ReturnRequest.count({ where: { status: { [Op.in]: ['Requested', 'Pending QC', 'QC Pending'] } } }),
+      RepackWorkOrder.count({ where: { status: 'In Progress' } }),
+      ManufacturingNcr.count({ where: { status: 'Open' } }),
+      BatchRecall.count({ where: { isRecalled: true } }),
+      ReturnCreditNote.count(),
+      ReturnRequest.findAll({
+        attributes: ['totalValue', 'recoveredValue', 'status', 'returnType', 'rootCause', 'returnReason', 'createdAt']
+      })
+    ]);
 
     let totalValSum = 0;
     let totalRecoveredVal = 0;
     let totalLossVal = 0;
+    const causeCounts = {};
+    const monthlyMap = {};
 
     allReturns.forEach(r => {
       const val = Number(r.totalValue || 0);
@@ -939,36 +921,80 @@ exports.getDashboardMetrics = async (req, res) => {
       } else {
         totalRecoveredVal += (val + gstRec);
       }
+
+      const cause = r.rootCause || r.returnReason || 'Other';
+      causeCounts[cause] = (causeCounts[cause] || 0) + 1;
+
+      if (r.createdAt) {
+        const monthLabel = new Date(r.createdAt).toLocaleString('default', { month: 'short' });
+        monthlyMap[monthLabel] = (monthlyMap[monthLabel] || 0) + 1;
+      }
     });
 
     const sumTotal = totalRecoveredVal + totalLossVal;
-    const recoveryPercentage = sumTotal > 0 ? Number(((totalRecoveredVal / sumTotal) * 100).toFixed(1)) : 100;
-    const lossPercentage = sumTotal > 0 ? Number(((totalLossVal / sumTotal) * 100).toFixed(1)) : 0;
+    const recoveryRate = sumTotal > 0 ? Number(((totalRecoveredVal / sumTotal) * 100).toFixed(1)) : 0;
+    const lossRate = sumTotal > 0 ? Number(((totalLossVal / sumTotal) * 100).toFixed(1)) : 0;
 
-    res.json({
+    const rootCauseChartData = Object.keys(causeCounts).map(name => ({
+      name,
+      count: causeCounts[name],
+      percentage: totalReturnsCount > 0 ? Number(((causeCounts[name] / totalReturnsCount) * 100).toFixed(1)) : 0
+    }));
+
+    const monthlyReturnsChartData = Object.keys(monthlyMap).map(month => ({
+      month,
+      returns: monthlyMap[month]
+    }));
+
+    const recoveryTrendChartData = [
+      { name: 'Recovered Value', value: totalRecoveredVal },
+      { name: 'Loss Value', value: totalLossVal }
+    ].filter(item => item.value > 0);
+
+    const payload = {
       success: true,
+      metrics: {
+        todaysReturns: todaysReturnsCount,
+        pendingQc: pendingQc,
+        recoveryValue: totalRecoveredVal,
+        recoveryRate: recoveryRate,
+        activeRecalls: recallCount,
+        totalReturns: totalReturnsCount
+      },
+      charts: {
+        rootCause: rootCauseChartData,
+        monthlyReturns: monthlyReturnsChartData,
+        recoveryTrend: recoveryTrendChartData
+      },
       data: {
-        todaysReturns: todaysReturnsCount > 0 ? todaysReturnsCount : totalReturnsCount,
+        todaysReturns: todaysReturnsCount,
         pendingQc: pendingQc,
         repackingQueue: repackingCount,
         stockRestoredVal: totalRecoveredVal,
         transferredVal: Math.round(totalRecoveredVal * 0.35),
         destroyedVal: totalLossVal,
-        recoveryPercentage,
-        lossPercentage,
+        recoveryPercentage: recoveryRate,
+        lossPercentage: lossRate,
         openNcrs: ncrCount,
         activeRecalls: recallCount,
         creditNotes: creditNotesCount,
         totalReturns: totalReturnsCount,
-        rootCauseBreakdown: [
-          { name: 'Transport Damage', percentage: 35 },
-          { name: 'Damaged Packing', percentage: 25 },
-          { name: 'Label Damage', percentage: 15 },
-          { name: 'Near Expiry', percentage: 15 },
-          { name: 'Manufacturing Defect', percentage: 10 }
-        ]
+        rootCauseBreakdown: rootCauseChartData
       }
-    });
+    };
+
+    metricsCache = payload;
+    metricsCacheTimestamp = Date.now();
+
+    try {
+      await ActivityLog.create({
+        action: 'Dashboard Refresh',
+        module: 'Returns',
+        details: `Returns Dashboard metrics refreshed. Total returns: ${totalReturnsCount}`
+      });
+    } catch (e) {}
+
+    res.json(payload);
   } catch (error) {
     console.error('Get Dashboard Metrics error:', error);
     res.status(500).json({ success: false, message: error.message });
