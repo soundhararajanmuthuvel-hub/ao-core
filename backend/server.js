@@ -5,6 +5,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const compression = require('compression');
 const path = require('path');
+const helmet = require('helmet');
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -44,6 +45,13 @@ const { profileMiddleware } = require('./middleware/profileMiddleware');
 /* =========================
    MIDDLEWARE
  ========================= */
+// Helmet sets secure HTTP headers.
+// TODO (follow-up): Enable contentSecurityPolicy after auditing all
+// inline scripts, style-src, img-src, and connect-src directives.
+app.use(helmet({
+  contentSecurityPolicy: false, // Temporary — see follow-up task
+  crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow image assets to be served cross-origin
+}));
 app.use(cors(corsOptions));
 app.use(compression());
 app.use(profileMiddleware);
@@ -105,9 +113,12 @@ app.get('/api/health', async (req, res) => {
 });
 
 app.post('/api/client-error', (req, res) => {
-  console.log('\n=== CLIENT-SIDE ERROR RECEIVED ===');
-  console.log(JSON.stringify(req.body, null, 2));
-  console.log('==================================\n');
+  // Only log client errors in development — avoid logging arbitrary client JSON to stdout in production
+  if (process.env.NODE_ENV !== 'production') {
+    console.error('\n=== CLIENT-SIDE ERROR RECEIVED ===');
+    console.error(JSON.stringify(req.body, null, 2));
+    console.error('==================================\n');
+  }
   res.json({ success: true });
 });
 
@@ -245,29 +256,34 @@ const startServer = async () => {
     // Seed CRM API Key
     try {
       const IntegrationExportCredential = require('./models/IntegrationExportCredential');
-      const crmApiKey = 'ao_live_2b2ff0efaa001a57a4fbd643ec64c121eff339f4f2067464';
-      const existingKey = await IntegrationExportCredential.findOne({ where: { apiKey: crmApiKey } });
-      if (!existingKey) {
-        await IntegrationExportCredential.create({
-          name: 'Cusman CRM Integration',
-          description: 'Auto-generated key for Cusman CRM sync',
-          apiKey: crmApiKey,
-          apiSecret: 'whsec_2b2ff0efaa001a57a4fbd643ec64c121eff339f4f2067464',
-          status: 'Active',
-          environment: 'Live',
-          permissions: JSON.stringify({
-            Products: ['Read', 'Create', 'Update', 'Delete'],
-            Customers: ['Read', 'Create', 'Update', 'Delete'],
-            Orders: ['Read', 'Create', 'Update', 'Delete'],
-            Invoices: ['Read', 'Create', 'Update', 'Delete']
-          }),
-          tenantId: 1
-        });
-        console.log('✓ Seeded CRM Integration API Key successfully');
+      const crmApiKey = process.env.CRM_SEED_API_KEY;
+      if (!crmApiKey) {
+        console.warn('CRM_SEED_API_KEY not set — skipping CRM integration key seed. Set this env var to seed a default CRM key.');
+      } else {
+        const existingKey = await IntegrationExportCredential.findOne({ where: { apiKey: crmApiKey } });
+        if (!existingKey) {
+          await IntegrationExportCredential.create({
+            name: 'Cusman CRM Integration',
+            description: 'Auto-generated key for Cusman CRM sync',
+            apiKey: crmApiKey,
+            apiSecret: 'whsec_' + require('crypto').randomBytes(20).toString('hex'),
+            status: 'Active',
+            environment: 'Live',
+            permissions: JSON.stringify({
+              Products: ['Read', 'Create', 'Update', 'Delete'],
+              Customers: ['Read', 'Create', 'Update', 'Delete'],
+              Orders: ['Read', 'Create', 'Update', 'Delete'],
+              Invoices: ['Read', 'Create', 'Update', 'Delete']
+            }),
+            tenantId: 1
+          });
+          console.log('✓ Seeded CRM Integration API Key successfully');
+        }
       }
     } catch (seedCrmErr) {
       console.error('CRM API Key seeding failed:', seedCrmErr);
     }
+
     
     // Initialize background WooCommerce auto-sync scheduler
     const { startScheduler } = require('./utils/scheduler');

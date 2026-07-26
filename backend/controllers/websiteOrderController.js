@@ -177,14 +177,35 @@ const verifyPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Payment verification details missing.' });
     }
 
+    const keySecret = getRazorpayKeySecret();
+    const isLiveMode = keySecret && !keySecret.includes('mock') && !keySecret.includes('placeholder');
+
+    // SECURITY: In live mode, signature is mandatory — no exceptions.
+    // Allowing a missing signature to pass would let anyone mark any order as Paid
+    // by simply omitting the field, bypassing HMAC verification entirely.
+    if (isLiveMode) {
+      if (!razorpaySignature) {
+        return res.status(400).json({
+          success: false,
+          message: 'Payment signature is required.',
+        });
+      }
+      if (!razorpayOrderId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Razorpay order ID is required for payment verification.',
+        });
+      }
+    }
+
     const order = await WebsiteOrder.findByPk(websiteOrderId);
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    const keySecret = getRazorpayKeySecret();
+    // Verify HMAC signature
     let isValidSignature = true;
-    if (keySecret && razorpaySignature && razorpayOrderId && !keySecret.includes('mock') && !keySecret.includes('placeholder')) {
+    if (isLiveMode && razorpaySignature && razorpayOrderId) {
       const generatedSignature = crypto
         .createHmac('sha256', keySecret)
         .update(`${razorpayOrderId}|${razorpayPaymentId}`)
@@ -193,11 +214,12 @@ const verifyPayment = async (req, res) => {
     }
 
     if (!isValidSignature) {
+      console.warn(`[Razorpay] Signature mismatch for order ${websiteOrderId}. Possible tampering attempt.`);
       return res.status(400).json({ success: false, message: 'Payment verification failed. Invalid signature.' });
     }
 
     order.razorpayPaymentId = razorpayPaymentId;
-    order.razorpaySignature = razorpaySignature || 'CLIENT_VERIFIED';
+    order.razorpaySignature = razorpaySignature || 'DEV_BYPASS';
     await order.save();
 
     res.json({
@@ -211,6 +233,7 @@ const verifyPayment = async (req, res) => {
     res.status(500).json({ success: false, message: 'Payment verification failed' });
   }
 };
+
 
 // POST /api/website/razorpay/webhook (PRIMARY SOURCE OF TRUTH)
 const handleWebhook = async (req, res) => {

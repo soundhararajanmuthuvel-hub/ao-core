@@ -11,10 +11,10 @@ function maskSecret(str) {
   return `${str.substring(0, 4)}******${str.substring(str.length - 4)}`;
 }
 
-// 1. Resolve Cloudinary environment credentials with strict priority:
+// 1. Resolve Cloudinary environment credentials — priority order:
 // Priority 1: Individual env variables (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET)
 // Priority 2: CLOUDINARY_URL string fallback (used only if individual env vars are missing)
-// Priority 3: Verified default fallback
+// No hardcoded fallback — missing credentials throw at startup to prevent silent misconfiguration.
 let configMethod = 'INDIVIDUAL_ENV_VARS';
 let cloudName = process.env.CLOUDINARY_CLOUD_NAME;
 let apiKey = process.env.CLOUDINARY_API_KEY;
@@ -31,10 +31,15 @@ if (cloudName && apiKey && apiSecret) {
     cloudName = match[3].trim();
   }
 } else {
-  configMethod = 'FALLBACK_DEFAULTS';
-  cloudName = 'dacgzzpi';
-  apiKey = '248258669444973';
-  apiSecret = 'b7if9RfwcV4XV3DJEH7Sry-rF-g';
+  // Never fall back to hardcoded credentials.
+  // If env vars are not set, fail loudly at startup rather than silently
+  // using real credentials embedded in source code.
+  throw new Error(
+    '[Cloudinary] Missing required environment variables: ' +
+    'CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET. ' +
+    'Set these in your .env file or CLOUDINARY_URL. ' +
+    'Do NOT hardcode credentials in source files.'
+  );
 }
 
 // 2. Initialize Cloudinary SDK exactly once on startup
@@ -50,6 +55,7 @@ console.log(`- Config Method: ${configMethod}`);
 console.log(`- Cloud Name:    ${cloudName}`);
 console.log(`- API Key:       ${maskSecret(apiKey)}`);
 console.log(`- API Secret:    ${maskSecret(apiSecret)}`);
+
 
 
 /**
