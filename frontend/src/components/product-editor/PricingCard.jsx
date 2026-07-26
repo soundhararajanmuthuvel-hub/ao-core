@@ -1,5 +1,5 @@
 import React from 'react';
-import { DollarSign, Lock } from 'lucide-react';
+import { DollarSign } from 'lucide-react';
 import ErrorBoundary from '../ErrorBoundary';
 
 export default function PricingCard({
@@ -77,9 +77,6 @@ export default function PricingCard({
               style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.9rem', color: '#334155', fontWeight: 600 }}
             />
           </div>
-              style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.85rem', backgroundColor: '#F8FAFC', fontWeight: 700, color: '#334155' }}
-            />
-          </div>
 
           <div>
             <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569', marginBottom: '4px', display: 'block' }}>
@@ -87,9 +84,13 @@ export default function PricingCard({
             </label>
             <input
               type="text"
-              readOnly
+              placeholder="e.g. 250g / pcs"
               value={formData.unit || 'pcs'}
-              style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.85rem', backgroundColor: '#F8FAFC', fontWeight: 600 }}
+              onChange={(e) => {
+                setFormData((prev) => ({ ...prev, unit: e.target.value }));
+                setIsDirty(true);
+              }}
+              style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.85rem', fontWeight: 600 }}
             />
           </div>
         </div>
