@@ -69,17 +69,17 @@ const calcInvoiceTotals = (items, discount = 0, gstMode = 'exclusive', charges =
 
     if (gstMode === 'inclusive') {
       const lineTotal = qty * unitPrice;
-      const base = lineTotal / (1 + gstPercent / 100);
-      const gst = lineTotal - base;
+      const base = Math.round((lineTotal / (1 + gstPercent / 100)) * 100) / 100;
+      const gst = Math.round((lineTotal - base) * 100) / 100;
       subtotal += base;
       gstTotal += gst;
     } else if (gstMode === 'no_gst') {
-      const base = qty * unitPrice;
+      const base = Math.round((qty * unitPrice) * 100) / 100;
       subtotal += base;
       gstTotal += 0;
     } else { // default 'exclusive'
-      const base = qty * unitPrice;
-      const gst = (base * gstPercent) / 100;
+      const base = Math.round((qty * unitPrice) * 100) / 100;
+      const gst = Math.round((base * gstPercent / 100) * 100) / 100;
       subtotal += base;
       gstTotal += gst;
     }

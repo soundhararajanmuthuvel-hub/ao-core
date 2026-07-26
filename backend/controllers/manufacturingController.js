@@ -269,7 +269,7 @@ exports.createEntry = async (req, res, next) => {
           qtyNeeded,
           name: item.rawMaterial.name,
           category: item.rawMaterial.category,
-          unitCost: Number(item.rawMaterial.purchasePrice || 0),
+          unitCost: await calculateFifoCost(item.rawMaterialId, qtyNeeded, t),
           stockAvailable: Number(item.rawMaterial.stock || 0)
         });
       }
@@ -284,7 +284,7 @@ exports.createEntry = async (req, res, next) => {
           qtyNeeded: Number(item.qty),
           name: material.name,
           category: material.category,
-          unitCost: Number(material.purchasePrice || 0),
+          unitCost: await calculateFifoCost(item.rawMaterialId, Number(item.qty), t),
           stockAvailable: Number(material.stock || 0)
         });
       }

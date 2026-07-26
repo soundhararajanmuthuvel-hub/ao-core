@@ -441,14 +441,14 @@ exports.createSale = async (req, res, next) => {
         let gst = 0;
         if (gstBillingMode === 'inclusive') {
           const lineTotal = qty * unitPrice;
-          taxable = lineTotal / (1 + gstPercent / 100);
-          gst = lineTotal - taxable;
+          taxable = Math.round((lineTotal / (1 + gstPercent / 100)) * 100) / 100;
+          gst = Math.round((lineTotal - taxable) * 100) / 100;
         } else if (gstBillingMode === 'no_gst') {
-          taxable = qty * unitPrice;
+          taxable = Math.round((qty * unitPrice) * 100) / 100;
           gst = 0;
         } else { // exclusive
-          taxable = qty * unitPrice;
-          gst = (taxable * gstPercent) / 100;
+          taxable = Math.round((qty * unitPrice) * 100) / 100;
+          gst = Math.round((taxable * gstPercent / 100) * 100) / 100;
         }
         
         if (!summaryMap[hsn]) {
