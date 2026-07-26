@@ -1824,11 +1824,22 @@ exports.exportBackup = async (req, res) => {
   try {
     const backupData = {};
     for (const modelName of Object.keys(sequelize.models)) {
-      const model = sequelize.models[modelName];
-      if (modelName === 'User') {
-        backupData[modelName] = await model.scope('withPassword').findAll({ raw: true });
-      } else {
-        backupData[modelName] = await model.findAll({ raw: true });
+      try {
+        const model = sequelize.models[modelName];
+        if (typeof model.findAll === 'function') {
+          if (modelName === 'User') {
+            try {
+              backupData[modelName] = await model.scope('withPassword').findAll({ raw: true });
+            } catch {
+              backupData[modelName] = await model.findAll({ raw: true });
+            }
+          } else {
+            backupData[modelName] = await model.findAll({ raw: true });
+          }
+        }
+      } catch (modelErr) {
+        console.warn(`[exportBackup] Model ${modelName} fetch skipped:`, modelErr.message);
+        backupData[modelName] = [];
       }
     }
 
@@ -1843,7 +1854,8 @@ exports.exportBackup = async (req, res) => {
     // Export formats under CSV files in the zip too
     const createCSVBuffer = (data, fields) => {
       let csv = fields.join(',') + '\n';
-      data.forEach(row => {
+      (data || []).forEach(row => {
+        if (!row) return;
         const line = fields.map(f => {
           let val = row[f] === null || row[f] === undefined ? '' : row[f];
           if (typeof val === 'object') val = JSON.stringify(val);
