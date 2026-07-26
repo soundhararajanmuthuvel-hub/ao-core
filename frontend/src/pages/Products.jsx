@@ -98,19 +98,43 @@ export default function Products() {
     }
   };
 
+  const [wooSyncDiagnosticDetails, setWooSyncDiagnosticDetails] = useState(null);
+
   const handleSyncAllProducts = async () => {
     setSyncingAll(true);
+    setWooSyncDiagnosticDetails(null);
     try {
       const { data } = await integrationsApi.importProducts();
       if (data.success) {
-        toast(data.message || '✓ Synced all products successfully', 'success');
+        toast(data.message || '✓ Synced all products successfully from WooCommerce', 'success');
         setPage(1);
         load();
       } else {
-        toast(data.message || 'Failed to sync products', 'error');
+        setWooSyncDiagnosticDetails({
+          stage: data.stage || 'WooCommerce Product Sync',
+          error: data.error || 'Products sync failed',
+          sku: data.sku || 'N/A',
+          productName: data.productName || 'N/A',
+          productId: data.productId,
+          sqlError: data.sqlError,
+          details: data.details || 'No error details provided',
+          fixSuggestion: data.fixSuggestion || 'Verify WooCommerce credentials in Settings -> Integration and retry.'
+        });
+        toast(`Sync Failed: ${data.error || 'Check diagnostic log'}`, 'error');
       }
     } catch (err) {
-      toast(err.response?.data?.message || 'Sync failed', 'error');
+      const resp = err.response?.data || {};
+      setWooSyncDiagnosticDetails({
+        stage: resp.stage || 'WooCommerce API Connection',
+        error: resp.error || resp.message || err.message || 'Products sync failed',
+        sku: resp.sku || 'N/A',
+        productName: resp.productName || 'N/A',
+        productId: resp.productId,
+        sqlError: resp.sqlError,
+        details: resp.details || err.stack || err.message,
+        fixSuggestion: resp.fixSuggestion || 'Check WooCommerce API keys and network connection.'
+      });
+      toast(`Sync Failed: ${resp.error || resp.message || err.message}`, 'error');
     } finally {
       setSyncingAll(false);
     }
@@ -1619,6 +1643,109 @@ function ProductVariantManagement({ allProducts, loadProducts, toast }) {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* STRUCTURED WOOCOMMERCE SYNC DIAGNOSTIC ERROR MODAL */}
+      {wooSyncDiagnosticDetails && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '1rem' }}>
+          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #FCA5A5', maxWidth: '650px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden' }}>
+            
+            {/* Header */}
+            <div style={{ backgroundColor: '#FEF2F2', borderBottom: '1px solid #FEE2E2', padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ backgroundColor: '#FEE2E2', color: '#DC2626', width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '1.2rem' }}>
+                  🛍️
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#991B1B', margin: 0 }}>
+                    WooCommerce Product Sync Failed
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: '#B91C1C', fontWeight: 700 }}>
+                    Stage: {wooSyncDiagnosticDetails.stage}
+                  </span>
+                </div>
+              </div>
+              <button type="button" onClick={() => setWooSyncDiagnosticDetails(null)} style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', color: '#991B1B', cursor: 'pointer' }}>
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Product Info Banner */}
+              {(wooSyncDiagnosticDetails.productName !== 'N/A' || wooSyncDiagnosticDetails.sku !== 'N/A') && (
+                <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: '#64748B', display: 'block', textTransform: 'uppercase', fontWeight: 700 }}>Target Product</span>
+                    <strong style={{ fontSize: '0.95rem', color: '#0F172A' }}>{wooSyncDiagnosticDetails.productName}</strong>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#64748B', display: 'block', textTransform: 'uppercase', fontWeight: 700 }}>SKU</span>
+                    <span style={{ fontSize: '0.85rem', fontFamily: 'monospace', fontWeight: 700, color: '#2563EB' }}>{wooSyncDiagnosticDetails.sku}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Error Title */}
+              <div style={{ backgroundColor: '#FFF5F5', border: '1px solid #FED7D7', borderRadius: '8px', padding: '0.9rem', color: '#C53030', fontSize: '0.9rem', fontWeight: 700 }}>
+                🛑 Error: {wooSyncDiagnosticDetails.error}
+              </div>
+
+              {/* Fix Suggestion Banner */}
+              <div style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '0.9rem', color: '#1E40AF', fontSize: '0.85rem' }}>
+                <strong style={{ display: 'block', marginBottom: '0.2rem', color: '#1E3A8A' }}>💡 Suggested Fix:</strong>
+                {wooSyncDiagnosticDetails.fixSuggestion}
+              </div>
+
+              {/* Technical Stack / Log */}
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
+                  Technical Stack / Failure Log
+                </label>
+                <pre style={{ backgroundColor: '#1E293B', color: '#F8FAFC', padding: '0.8rem', borderRadius: '8px', fontSize: '0.75rem', maxHeight: '130px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'monospace', margin: 0 }}>
+                  {wooSyncDiagnosticDetails.details}
+                </pre>
+              </div>
+            </div>
+
+            {/* Footer Controls */}
+            <div style={{ backgroundColor: '#F8FAFC', borderTop: '1px solid #E2E8F0', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(JSON.stringify(wooSyncDiagnosticDetails, null, 2));
+                  toast('Technical error report copied to clipboard', 'info');
+                }}
+                style={{ fontWeight: 700 }}
+              >
+                📋 Copy Error Details
+              </button>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setWooSyncDiagnosticDetails(null)}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  style={{ fontWeight: 700 }}
+                  onClick={() => {
+                    setWooSyncDiagnosticDetails(null);
+                    handleSyncAllProducts();
+                  }}
+                >
+                  🔄 Retry Sync
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
       )}
     </div>
   );

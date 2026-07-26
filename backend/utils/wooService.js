@@ -295,24 +295,53 @@ class WooCommerceService {
   }
 
   async importProducts() {
-    if (!this.url) throw new Error('WooCommerce API not configured');
+    const res = await this.importProductsDetailed();
+    return res.summary.imported + res.summary.updated;
+  }
+
+  async importProductsDetailed() {
+    if (!this.url) {
+      const err = new Error('WooCommerce API URL not configured. Please check integration settings.');
+      err.stage = 'Configuration Check';
+      err.fixSuggestion = 'Go to Settings -> Integration and enter your WooCommerce Store URL.';
+      throw err;
+    }
 
     const startTime = Date.now();
+    let receivedCount = 0;
     let importedCount = 0;
+    let updatedCount = 0;
+    let skippedCount = 0;
     let failedCount = 0;
+    let imagesImportedCount = 0;
+    let categoriesImportedCount = 0;
+    const errorsList = [];
+    const warningsList = [];
+    const categorySet = new Set();
     let page = 1;
     let keepFetching = true;
 
     try {
       while (keepFetching) {
-        const response = await axios.get(`${this.url}/wp-json/wc/v3/products`, {
-          params: {
-            ...this.getCredentialsParams(),
-            per_page: 100,
-            page: page,
-          },
-          timeout: 20000,
-        });
+        let response;
+        try {
+          response = await axios.get(`${this.url}/wp-json/wc/v3/products`, {
+            params: {
+              ...this.getCredentialsParams(),
+              per_page: 100,
+              page: page,
+            },
+            timeout: 25000,
+          });
+        } catch (apiErr) {
+          const status = apiErr.response ? apiErr.response.status : 'Network / Timeout';
+          const msg = apiErr.response?.data?.message || apiErr.message;
+          const err = new Error(`[Fetch WooCommerce API (Status ${status})] ${msg}`);
+          err.stage = 'Fetch WooCommerce API';
+          err.details = `HTTP Status: ${status}. URL: ${this.url}/wp-json/wc/v3/products. Stack: ${apiErr.stack}`;
+          err.fixSuggestion = 'Verify WooCommerce Store URL, Consumer Key, and Consumer Secret in Settings -> Integration.';
+          throw err;
+        }
 
         const products = response.data;
         if (!products || products.length === 0) {
@@ -320,23 +349,35 @@ class WooCommerceService {
           break;
         }
 
-        for (const wpProd of products) {
-          try {
-            const sku = wpProd.sku || `WOO-PROD-${wpProd.id}`;
+        receivedCount += products.length;
 
+        for (const wpProd of products) {
+          const sku = wpProd.sku || `WOO-PROD-${wpProd.id}`;
+          const prodName = wpProd.name || 'WooCommerce Product';
+
+          // Transaction boundary per product
+          const t = await sequelize.transaction();
+
+          try {
             let categoryName = 'General';
             if (wpProd.categories && wpProd.categories.length > 0) {
               categoryName = wpProd.categories[0].name;
+              if (!categorySet.has(categoryName)) {
+                categorySet.add(categoryName);
+                categoriesImportedCount++;
+              }
             }
 
             let imageUrl = '';
             if (wpProd.images && wpProd.images.length > 0) {
               imageUrl = wpProd.images[0].src;
+              imagesImportedCount++;
             }
 
             let galleryImagesList = [];
             if (wpProd.images && wpProd.images.length > 1) {
               galleryImagesList = wpProd.images.slice(1).map(img => img.src);
+              imagesImportedCount += galleryImagesList.length;
             }
 
             let dimensionsText = '';
@@ -375,7 +416,7 @@ class WooCommerceService {
             const wpModified = wpProd.date_modified ? new Date(wpProd.date_modified) : null;
 
             const productData = {
-              name: wpProd.name || 'WooCommerce Product',
+              name: prodName,
               sku: sku,
               description: fullDescription,
               shortDescription: shortDescText,
@@ -404,7 +445,7 @@ class WooCommerceService {
               woocommerce_permalink: wpProd.permalink || '',
             };
 
-            // Enterprise Schema Compatibility Layer: Sanitize productData against Product.rawAttributes
+            // Enterprise Schema Compatibility Layer
             const sanitizeForModel = (model, data) => {
               const allowedKeys = Object.keys(model.rawAttributes || {});
               const sanitized = {};
@@ -418,61 +459,45 @@ class WooCommerceService {
 
             const safeProductData = sanitizeForModel(Product, productData);
 
-            // Match by WooCommerce Product ID
             let existingProduct = await Product.findOne({
               where: {
                 [Op.or]: [
                   { woocommerce_product_id: String(wpProd.id) },
                   { wooProductId: String(wpProd.id) }
                 ]
-              }
+              },
+              transaction: t
             });
 
             if (!existingProduct && wpProd.sku) {
-              existingProduct = await Product.findOne({ where: { sku: wpProd.sku } });
+              existingProduct = await Product.findOne({ where: { sku: wpProd.sku }, transaction: t });
             }
 
-            let isChanged = false;
             if (existingProduct) {
-              let shouldUpdate = true;
-              if (this.settings.wooProductSyncMode === 'ERP Master') {
-                shouldUpdate = false;
-              } else if (this.settings.wooProductSyncMode === 'Two-Way Sync') {
-                const localLastMod = existingProduct.lastModifiedDate ? new Date(existingProduct.lastModifiedDate) : null;
-                if (localLastMod && wpModified && wpModified.getTime() <= localLastMod.getTime()) {
-                  shouldUpdate = false;
-                }
-              }
-
-              if (shouldUpdate) {
-                const lastWooUpdate = existingProduct.lastWooUpdateTimestamp ? new Date(existingProduct.lastWooUpdateTimestamp) : null;
-                if (!lastWooUpdate || (wpModified && wpModified.getTime() !== lastWooUpdate.getTime())) {
-                  isChanged = true;
-                }
-
-                await existingProduct.update(safeProductData);
-
-                if (isChanged) {
-                  await createNotification({
-                    title: 'Product updated from WooCommerce',
-                    message: `Product "${productData.name}" (SKU: ${productData.sku}) was updated with changes from WooCommerce.`,
-                    type: 'info',
-                    user: null
-                  });
-                }
-              }
+              await existingProduct.update(safeProductData, { transaction: t });
+              updatedCount++;
             } else {
-              // Create new trading product
               await Product.create({
                 ...safeProductData,
                 productType: 'trading',
                 unit: 'pcs',
-              });
+              }, { transaction: t });
+              importedCount++;
             }
-            importedCount++;
-          } catch (err) {
-            console.error(`Failed to process item ${wpProd.id}:`, err.message);
+
+            await t.commit();
+          } catch (itemErr) {
+            await t.rollback();
+            console.error(`[Woo Sync Failure] Item ${wpProd.id} (${prodName} / ${sku}):`, itemErr.message);
             failedCount++;
+            errorsList.push({
+              productId: wpProd.id,
+              sku: sku,
+              productName: prodName,
+              stage: 'Save Product',
+              reason: itemErr.message,
+              sqlError: itemErr.code || null
+            });
           }
         }
 
@@ -483,11 +508,26 @@ class WooCommerceService {
         }
       }
 
-      await this.writeSyncLog('Products', 'Import', importedCount, failedCount, Date.now() - startTime);
-      return importedCount;
+      await this.writeSyncLog('Products', 'Import', importedCount + updatedCount, failedCount, Date.now() - startTime);
+
+      return {
+        success: true,
+        summary: {
+          received: receivedCount,
+          imported: importedCount,
+          updated: updatedCount,
+          skipped: skippedCount,
+          failed: failedCount,
+          imagesImported: imagesImportedCount,
+          categoriesImported: categoriesImportedCount,
+          errors: errorsList,
+          warnings: warningsList,
+          durationMs: Date.now() - startTime
+        }
+      };
     } catch (err) {
-      await this.writeSyncLog('Products', 'Import', importedCount, failedCount || 1, Date.now() - startTime, err.message);
-      console.error(`Error importing WooCommerce products page ${page}:`, err.message);
+      await this.writeSyncLog('Products', 'Import', importedCount + updatedCount, failedCount || 1, Date.now() - startTime, err.message);
+      console.error(`[WooCommerce Import Fatal Error]:`, err.message);
       throw err;
     }
   }

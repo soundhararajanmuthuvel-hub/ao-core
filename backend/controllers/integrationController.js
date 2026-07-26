@@ -117,21 +117,33 @@ exports.triggerProductImport = async (req, res, next) => {
   try {
     const settings = await getSettings();
     const woo = new WooCommerceService(settings);
-    const count = await woo.importProducts();
+    const result = await woo.importProductsDetailed();
 
-    await logActivity(req.user.id, 'sync', 'products', `Imported ${count} products from WooCommerce`);
+    const totalProcessed = result.summary.imported + result.summary.updated;
+    await logActivity(req.user.id, 'sync', 'products', `Imported ${result.summary.imported} and updated ${result.summary.updated} products from WooCommerce`);
 
-    // Update last sync time
     settings.wooLastSyncTime = new Date();
     await settings.save();
 
     res.json({
       success: true,
-      count,
-      message: `Successfully imported/updated ${count} products from WooCommerce`,
+      count: totalProcessed,
+      summary: result.summary,
+      message: `Successfully imported ${result.summary.imported} and updated ${result.summary.updated} products from WooCommerce`,
     });
   } catch (err) {
-    next(err);
+    console.error('[WooCommerce Product Import Error]:', err);
+    res.status(200).json({
+      success: false,
+      stage: err.stage || 'WooCommerce Product Import',
+      error: err.message || 'Products import failed',
+      sku: err.sku || 'N/A',
+      productName: err.productName || 'N/A',
+      productId: err.productId || null,
+      sqlError: err.code || err.sqlState || null,
+      details: err.details || err.stack || err.message,
+      fixSuggestion: err.fixSuggestion || 'Verify WooCommerce API Store URL, Consumer Key, and Consumer Secret in Settings -> Integration and retry.'
+    });
   }
 };
 
