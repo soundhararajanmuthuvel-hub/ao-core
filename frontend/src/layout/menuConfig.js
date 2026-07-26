@@ -33,16 +33,6 @@ export const websiteMenuStructure = [
     roles: ['Super Admin', 'admin']
   },
   {
-    id: 'ws-products',
-    type: 'link',
-    to: '/website?tab=products',
-    tabId: 'products',
-    icon: Package,
-    emoji: '📦',
-    label: 'Products',
-    roles: ['Super Admin', 'admin']
-  },
-  {
     id: 'ws-orders',
     type: 'link',
     to: '/website?tab=orders',

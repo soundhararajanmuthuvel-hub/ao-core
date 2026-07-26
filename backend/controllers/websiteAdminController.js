@@ -398,42 +398,7 @@ const createAdminProduct = async (req, res) => {
       websiteLabels: formatArrayJson(websiteLabels),
     });
 
-    // 4. Safely Link WebsiteProduct Setting Record if present
-    try {
-      await WebsiteProduct.create({
-        managementProductId: masterProduct.id,
-        name: masterProduct.name,
-        sku: masterProduct.sku,
-        slug: masterProduct.slug,
-        price: numericPrice,
-        compareAtPrice: masterProduct.mrp,
-        stock: masterProduct.stock,
-        category: masterProduct.category,
-        shortDescription: masterProduct.shortDescription,
-        description: masterProduct.description,
-        benefits: masterProduct.benefits,
-        ingredients: masterProduct.ingredients,
-        nutritionFacts: masterProduct.nutritionFacts,
-        usageInstructions: masterProduct.usageInstructions,
-        faqs: masterProduct.faqs,
-        seoTitle: masterProduct.seoTitle,
-        seoDescription: masterProduct.seoDescription,
-        seoKeywords: masterProduct.seoKeywords,
-        badges: masterProduct.badges,
-        healthGoals: masterProduct.healthGoals,
-        isFeatured: masterProduct.isFeatured,
-        isBestseller: masterProduct.isBestseller,
-        isTrending: masterProduct.isTrending,
-        isPublished: masterProduct.isPublished,
-        isActive: masterProduct.isActive,
-        sortOrder: masterProduct.sortOrder,
-        images: galleryArrJson,
-        galleryImages: galleryArrJson,
-        imageUrl: primaryImgUrl,
-      });
-    } catch (wpErr) {
-      console.warn('WebsiteProduct secondary sync skipped:', wpErr.message);
-    }
+
 
     // 5. Audit Log Entry
     try {
@@ -540,9 +505,7 @@ const updateAdminProduct = async (req, res) => {
       websiteLabels,
     } = req.body;
 
-    let wp = await WebsiteProduct.findByPk(id);
-    let targetMasterId = wp?.managementProductId || managementProductId || productId || id;
-    let masterProduct = await Product.findByPk(targetMasterId);
+    let masterProduct = await Product.findByPk(id);
 
     if (!masterProduct) {
       // If master product doesn't exist, route to createAdminProduct
@@ -721,46 +684,7 @@ const updateAdminProduct = async (req, res) => {
 
     await masterProduct.save();
 
-    // 4. Update WebsiteProduct Settings Link Record
-    // 4. Safely Link / Update WebsiteProduct Setting Record if present
-    try {
-      if (!wp) {
-        wp = await WebsiteProduct.findOne({ where: { managementProductId: masterProduct.id } });
-      }
-      if (wp) {
-        wp.name = masterProduct.name;
-        wp.slug = masterProduct.slug;
-        wp.sku = masterProduct.sku;
-        wp.price = masterProduct.price;
-        wp.compareAtPrice = masterProduct.mrp;
-        wp.stock = masterProduct.stock;
-        wp.category = masterProduct.category;
-        wp.shortDescription = masterProduct.shortDescription;
-        wp.description = masterProduct.description;
-        wp.benefits = masterProduct.benefits;
-        wp.ingredients = masterProduct.ingredients;
-        wp.nutritionFacts = masterProduct.nutritionFacts;
-        wp.usageInstructions = masterProduct.usageInstructions;
-        wp.faqs = masterProduct.faqs;
-        wp.seoTitle = masterProduct.seoTitle;
-        wp.seoDescription = masterProduct.seoDescription;
-        wp.seoKeywords = masterProduct.seoKeywords;
-        wp.badges = masterProduct.badges;
-        wp.healthGoals = masterProduct.healthGoals;
-        wp.isFeatured = masterProduct.isFeatured;
-        wp.isBestseller = masterProduct.isBestseller;
-        wp.isTrending = masterProduct.isTrending;
-        wp.isPublished = masterProduct.isPublished;
-        wp.isActive = masterProduct.isActive;
-        wp.sortOrder = masterProduct.sortOrder;
-        wp.images = masterProduct.images;
-        wp.galleryImages = masterProduct.galleryImages;
-        wp.imageUrl = masterProduct.imageUrl;
-        await wp.save();
-      }
-    } catch (wpErr) {
-      console.warn('WebsiteProduct secondary update skipped:', wpErr.message);
-    }
+
 
     // 5. Audit Log Entry
     try {
@@ -803,12 +727,6 @@ const deleteAdminProduct = async (req, res) => {
   try {
     const { id } = req.params;
     let masterProduct = await Product.findByPk(id);
-    if (!masterProduct) {
-      const wp = await WebsiteProduct.findByPk(id);
-      if (wp?.managementProductId) {
-        masterProduct = await Product.findByPk(wp.managementProductId);
-      }
-    }
 
     if (masterProduct) {
       masterProduct.isPublished = false;
