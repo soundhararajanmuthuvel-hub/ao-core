@@ -2652,8 +2652,27 @@ function MigrationCenter() {
     }
   };
 
+  const [migrationErrorDetails, setMigrationErrorDetails] = useState(null);
+
+  const handleDownloadErrorReport = async (id) => {
+    try {
+      const res = await migrationApi.downloadErrorReport(id);
+      const blob = new Blob([res.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Migration_Error_Report_${id || 'latest'}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast('Error report downloaded', 'success');
+    } catch (err) {
+      toast('Failed to download error report', 'error');
+    }
+  };
+
   const handleStartIngestion = async () => {
     setMigrating(true);
+    setMigrationErrorDetails(null);
     try {
       const { data } = await migrationApi.execute({
         tempFileId,
@@ -2669,10 +2688,25 @@ function MigrationCenter() {
         setStep(5);
         toast('Data migration successful', 'success');
       } else {
-        toast(data.message || 'Data ingestion failed', 'error');
+        setMigrationErrorDetails({
+          stage: data.stage || 'Data Ingestion',
+          error: data.error || data.message || 'Ingestion failed',
+          details: data.details || 'Check input data or logs.',
+          fixSuggestion: data.fixSuggestion || 'Resolve validation or format errors and retry.',
+          migrationId: data.migrationId
+        });
+        toast(`Ingestion Failed: ${data.error || data.message}`, 'error');
       }
     } catch (err) {
-      toast(err.response?.data?.message || 'Ingestion failed', 'error');
+      const resp = err.response?.data || {};
+      setMigrationErrorDetails({
+        stage: resp.stage || 'Ingestion Error',
+        error: resp.error || resp.message || err.message || 'Ingestion failed',
+        details: resp.details || err.stack || 'Check server logs.',
+        fixSuggestion: resp.fixSuggestion || 'Review database settings and retry migration.',
+        migrationId: resp.migrationId
+      });
+      toast(`Ingestion Failed: ${resp.error || resp.message || err.message}`, 'error');
     } finally {
       setMigrating(false);
     }
@@ -3808,6 +3842,92 @@ function MigrationCenter() {
           </div>
         )}
       </div>
+
+      {/* STRUCTURED MIGRATION DIAGNOSTIC ERROR MODAL */}
+      {migrationErrorDetails && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '1rem' }}>
+          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', border: '1px solid #FCA5A5', maxWidth: '650px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden' }}>
+            
+            {/* Header */}
+            <div style={{ backgroundColor: '#FEF2F2', borderBottom: '1px solid #FEE2E2', padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ backgroundColor: '#FEE2E2', color: '#DC2626', width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '1.2rem' }}>
+                  ⚠️
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#991B1B', margin: 0 }}>
+                    Migration Action Failed
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: '#B91C1C', fontWeight: 700 }}>
+                    Stage: {migrationErrorDetails.stage}
+                  </span>
+                </div>
+              </div>
+              <button type="button" onClick={() => setMigrationErrorDetails(null)} style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', color: '#991B1B', cursor: 'pointer' }}>
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Error Title */}
+              <div style={{ backgroundColor: '#FFF5F5', border: '1px solid #FED7D7', borderRadius: '8px', padding: '0.9rem', color: '#C53030', fontSize: '0.9rem', fontWeight: 700 }}>
+                🛑 Error: {migrationErrorDetails.error}
+              </div>
+
+              {/* Fix Suggestion Banner */}
+              <div style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '0.9rem', color: '#1E40AF', fontSize: '0.85rem' }}>
+                <strong style={{ display: 'block', marginBottom: '0.2rem', color: '#1E3A8A' }}>💡 Suggested Action / Fix:</strong>
+                {migrationErrorDetails.fixSuggestion}
+              </div>
+
+              {/* Technical Details */}
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
+                  Technical Stack / Failure Details
+                </label>
+                <pre style={{ backgroundColor: '#1E293B', color: '#F8FAFC', padding: '0.8rem', borderRadius: '8px', fontSize: '0.75rem', maxHeight: '140px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'monospace', margin: 0 }}>
+                  {migrationErrorDetails.details}
+                </pre>
+              </div>
+            </div>
+
+            {/* Footer Controls */}
+            <div style={{ backgroundColor: '#F8FAFC', borderTop: '1px solid #E2E8F0', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {migrationErrorDetails.migrationId ? (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => handleDownloadErrorReport(migrationErrorDetails.migrationId)}
+                  style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  📥 Download Diagnostic Error CSV Report
+                </button>
+              ) : <div />}
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setMigrationErrorDetails(null)}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  style={{ backgroundColor: '#DC2626', borderColor: '#DC2626', fontWeight: 700 }}
+                  onClick={() => { setMigrationErrorDetails(null); handleStartIngestion(); }}
+                >
+                  🔄 Adjust & Retry Ingestion
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

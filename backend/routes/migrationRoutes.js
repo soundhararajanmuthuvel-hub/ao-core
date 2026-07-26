@@ -25,6 +25,7 @@ router.get('/history', auth, authorize('admin'), migrationController.getMigratio
 router.get('/logs/:id', auth, authorize('admin'), migrationController.getMigrationLogs);
 router.post('/rollback/:id', auth, authorize('admin'), migrationController.rollbackMigration);
 router.get('/export', auth, authorize('admin'), migrationController.exportBackup);
+router.get('/error-report/:id', auth, authorize('admin'), migrationController.downloadErrorReport);
 router.post('/restore', auth, authorize('admin'), upload.single('file'), migrationController.restoreBackup);
 
 module.exports = router;

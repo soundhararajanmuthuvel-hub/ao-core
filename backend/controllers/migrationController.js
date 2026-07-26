@@ -1666,20 +1666,31 @@ exports.executeMigration = async (req, res) => {
     }
     console.error('Migration execution failed:', err);
 
+    const stage = err.stage || 'Data Ingestion';
+    const fixSuggestion = err.fixSuggestion || 'Check input data for missing required fields, duplicate keys, or invalid formats and try again.';
+
     if (migrationHistoryRecord) {
       try {
         await migrationHistoryRecord.update({ status: 'Failed' });
         await MigrationDetailLog.create({
           migrationId: migrationHistoryRecord.id,
           level: 'ERROR',
-          message: `Fatal migration error: ${err.message}`
+          message: `[${stage}] Fatal migration error: ${err.message}`
         });
       } catch (logErr) {
         console.error('Failed to write failure log to database:', logErr);
       }
     }
 
-    res.status(500).json({ success: false, message: 'Migration execution crashed', error: err.message });
+    res.status(200).json({
+      success: false,
+      stage: stage,
+      error: err.message,
+      details: err.stack || err.message,
+      fixSuggestion: fixSuggestion,
+      migrationId: migrationHistoryRecord ? migrationHistoryRecord.id : null,
+      message: `[${stage}] ${err.message}`
+    });
   }
 };
 
@@ -1816,6 +1827,32 @@ exports.getMigrationLogs = async (req, res) => {
     res.json({ success: true, logs });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+exports.downloadErrorReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const logs = await MigrationDetailLog.findAll({
+      where: { migrationId: id },
+      order: [['timestamp', 'ASC']]
+    });
+
+    let csv = 'Timestamp,Level,Message\n';
+    logs.forEach(log => {
+      const time = log.timestamp ? new Date(log.timestamp).toISOString() : '';
+      const level = log.level || 'INFO';
+      const msg = `"${String(log.message || '').replace(/"/g, '""')}"`;
+      csv += `${time},${level},${msg}\n`;
+    });
+
+    const fileName = `Migration_Error_Report_${id}_${Date.now()}.csv`;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+    res.send(Buffer.from(csv, 'utf8'));
+  } catch (err) {
+    console.error('Failed to generate error report CSV:', err);
+    res.status(500).json({ success: false, message: 'Failed to generate error report', error: err.message });
   }
 };
 

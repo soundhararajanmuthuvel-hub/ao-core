@@ -305,6 +305,7 @@ export const migrationApi = {
   rollback: (id) => client.post(`/migration/rollback/${id}`),
   exportUrl: () => `${client.defaults.baseURL}/migration/export`,
   exportBackup: () => client.get('/migration/export', { responseType: 'blob' }),
+  downloadErrorReport: (id) => client.get(`/migration/error-report/${id}`, { responseType: 'blob' }),
   restore: (formData) => client.post('/migration/restore', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
 };
 
