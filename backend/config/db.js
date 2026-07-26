@@ -413,14 +413,7 @@ const connectDB = async () => {
 
   // Safe table alterations helper using memory-cached layout
   const addColumnIfNotExist = async (tableName, columnName, columnDefSql) => {
-    let rawTable = tableNameMap[tableName];
-    if (!rawTable) {
-      const singular = tableName.endsWith('ies')
-        ? tableName.replace(/ies$/, 'Entry')
-        : (tableName.endsWith('s') ? tableName.slice(0, -1) : tableName);
-      rawTable = tableNameMap[singular] || tableNameMap[tableName] || tableName;
-    }
-    const resolvedTableName = rawTable.toLowerCase();
+    const resolvedTableName = (tableNameMap[tableName] || tableNameMap[tableName.replace(/s$/, '')] || tableName).toLowerCase();
     const existingColumns = tableColumnsCache[resolvedTableName] || [];
 
     if (!existingColumns.includes(columnName.toLowerCase())) {
@@ -473,15 +466,15 @@ const connectDB = async () => {
   await addColumnIfNotExist('Products', 'lastSyncTimestamp', "DATETIME NULL");
   await addColumnIfNotExist('Products', 'lastWooUpdateTimestamp', "DATETIME NULL");
   await addColumnIfNotExist('Products', 'isArchived', "TINYINT DEFAULT 0");
-  await addColumnIfNotExist('RepackEntry', 'lossQty', "DECIMAL(10, 2) DEFAULT 0.00");
-  await addColumnIfNotExist('StockMovement', 'batchNumber', "VARCHAR(255) NULL");
-  await addColumnIfNotExist('StockMovement', 'expiryDate', "DATETIME NULL");
-  await addColumnIfNotExist('ManufacturingEntry', 'packagingCost', "DECIMAL(10, 2) DEFAULT 0.00");
-  await addColumnIfNotExist('ManufacturingEntry', 'overheadCost', "DECIMAL(10, 2) DEFAULT 0.00");
-  await addColumnIfNotExist('InvoiceItem', 'freeQty', "DECIMAL(10, 2) DEFAULT 0.00");
-  await addColumnIfNotExist('InvoiceItem', 'schemeApplied', "VARCHAR(255) NULL");
-  await addColumnIfNotExist('ManufacturingEntry', 'batchNumber', "VARCHAR(255) NULL");
-  await addColumnIfNotExist('ManufacturingEntry', 'expiryDate', "DATETIME NULL");
+  await addColumnIfNotExist('RepackEntries', 'lossQty', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('StockMovements', 'batchNumber', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('StockMovements', 'expiryDate', "DATETIME NULL");
+  await addColumnIfNotExist('ManufacturingEntries', 'packagingCost', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('ManufacturingEntries', 'overheadCost', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('InvoiceItems', 'freeQty', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('InvoiceItems', 'schemeApplied', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('ManufacturingEntries', 'batchNumber', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('ManufacturingEntries', 'expiryDate', "DATETIME NULL");
   await addColumnIfNotExist('RawMaterials', 'bagSize', "DECIMAL(10, 2) DEFAULT 1.00");
   await addColumnIfNotExist('Invoices', 'dueDate', "DATETIME NULL");
   await addColumnIfNotExist('Invoices', 'type', "VARCHAR(255) DEFAULT 'invoice'");

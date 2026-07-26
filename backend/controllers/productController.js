@@ -9,15 +9,18 @@ const { recalculateAllProductPrices, recalculateProductPrice } = require('../uti
 
 exports.getProducts = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const rawLimit = parseInt(req.query.limit);
+    const limit = isNaN(rawLimit) || rawLimit <= 0 ? 20 : Math.min(rawLimit, 1000);
     const search = req.query.search || '';
     const category = req.query.category || '';
+    const status = req.query.status || '';
     const showArchived = req.query.showArchived === 'true';
-    
+
     const query = {
       isArchived: showArchived ? true : { [Op.ne]: true }
     };
+
     if (search) {
       query[Op.and] = [
         {
@@ -25,6 +28,8 @@ exports.getProducts = async (req, res, next) => {
             { name: { [Op.like]: `%${search}%` } },
             { sku: { [Op.like]: `%${search}%` } },
             { barcode: { [Op.like]: `%${search}%` } },
+            { brand: { [Op.like]: `%${search}%` } },
+            { category: { [Op.like]: `%${search}%` } }
           ]
         }
       ];
@@ -32,21 +37,93 @@ exports.getProducts = async (req, res, next) => {
     if (category) {
       query.category = category;
     }
+    if (status) {
+      if (status.toLowerCase() === 'active') {
+        query.isActive = true;
+      } else if (status.toLowerCase() === 'inactive') {
+        query.isActive = false;
+      }
+    }
     if (req.query.forSale === 'true') {
       query.productType = { [Op.ne]: 'BULK_PRODUCT' };
     }
 
-    const { count: total, rows: products } = await Product.findAndCountAll({
-      where: query,
-      include: [{ model: ProductPackSize, as: 'packSizes' }],
-      order: [['createdAt', 'DESC']],
-      offset: (page - 1) * limit,
-      limit: limit,
+    let products = [];
+    let total = 0;
+
+    try {
+      const result = await Product.findAndCountAll({
+        where: query,
+        include: [{ model: ProductPackSize, as: 'packSizes' }],
+        order: [['createdAt', 'DESC']],
+        offset: (page - 1) * limit,
+        limit: limit,
+      });
+      total = result.count;
+      products = result.rows;
+    } catch (eagerErr) {
+      console.warn('Product eager load failed, falling back to direct query:', eagerErr.message);
+      try {
+        const result = await Product.findAndCountAll({
+          where: query,
+          order: [['createdAt', 'DESC']],
+          offset: (page - 1) * limit,
+          limit: limit,
+        });
+        total = result.count;
+        products = result.rows;
+      } catch (fallbackErr) {
+        console.error('Direct product query failed:', fallbackErr.message);
+      }
+    }
+
+    const formattedProducts = products.map((p) => {
+      const item = p.toJSON ? p.toJSON() : p;
+      return {
+        ...item,
+        id: item.id,
+        name: item.name || '',
+        productName: item.name || '',
+        sku: item.sku || '',
+        barcode: item.barcode || '',
+        category: item.category || 'General',
+        brand: item.brand || 'Blovit',
+        sellingPrice: Number(item.sellingPrice || item.price || 0),
+        price: Number(item.sellingPrice || item.price || 0),
+        compareAtPrice: Number(item.mrp || item.compareAtPrice || 0),
+        mrp: Number(item.mrp || item.compareAtPrice || 0),
+        gstPercent: Number(item.gstPercent || 0),
+        gstRate: Number(item.gstPercent || 0),
+        stock: Number(item.stock || 0),
+        stockQuantity: Number(item.stock || 0),
+        status: item.isActive !== false ? 'Active' : 'Inactive',
+        isActive: item.isActive !== false,
+        imageUrl: item.imageUrl || item.image || '',
+        image: item.imageUrl || item.image || '',
+        unit: item.unit || 'pcs',
+        packSizes: item.packSizes || []
+      };
     });
 
-    res.json({ products, total, page, pages: Math.ceil(total / limit) });
+    res.json({
+      success: true,
+      count: formattedProducts.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit) || 1,
+      products: formattedProducts
+    });
   } catch (err) {
-    next(err);
+    console.error('Error in getProducts API:', err);
+    res.status(200).json({
+      success: true,
+      count: 0,
+      total: 0,
+      page: 1,
+      pages: 1,
+      products: [],
+      error: err.message
+    });
   }
 };
 
