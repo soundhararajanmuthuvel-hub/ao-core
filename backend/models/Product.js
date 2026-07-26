@@ -310,6 +310,82 @@ const Product = sequelize.define('Product', {
     type: DataTypes.INTEGER,
     allowNull: true,
   },
+  subCategory: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  hsnCode: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  costPrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0.00,
+  },
+  dealerPrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0.00,
+  },
+  distributorPrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0.00,
+  },
+  openingStock: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  minStock: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  maxStock: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  reorderLevel: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  recipe: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  shelfLife: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  batchTracking: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  expiryTracking: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  highlights: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  videoUrl: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  canonicalUrl: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  openGraphImage: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  schemaData: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  websiteLabels: {
+    type: DataTypes.TEXT,
+    defaultValue: '[]',
+  },
 
   isLowStock: {
     type: DataTypes.VIRTUAL,

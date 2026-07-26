@@ -581,6 +581,46 @@ const connectDB = async () => {
   await addColumnIfNotExist('Product', 'versionHistory', "TEXT NULL");
   await addColumnIfNotExist('Products', 'versionHistory', "TEXT NULL");
 
+  // New master columns
+  await addColumnIfNotExist('Product', 'subCategory', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Products', 'subCategory', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Product', 'hsnCode', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Products', 'hsnCode', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Product', 'costPrice', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Products', 'costPrice', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Product', 'dealerPrice', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Products', 'dealerPrice', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Product', 'distributorPrice', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Products', 'distributorPrice', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('Product', 'openingStock', "INTEGER DEFAULT 0");
+  await addColumnIfNotExist('Products', 'openingStock', "INTEGER DEFAULT 0");
+  await addColumnIfNotExist('Product', 'minStock', "INTEGER DEFAULT 0");
+  await addColumnIfNotExist('Products', 'minStock', "INTEGER DEFAULT 0");
+  await addColumnIfNotExist('Product', 'maxStock', "INTEGER DEFAULT 0");
+  await addColumnIfNotExist('Products', 'maxStock', "INTEGER DEFAULT 0");
+  await addColumnIfNotExist('Product', 'reorderLevel', "INTEGER DEFAULT 0");
+  await addColumnIfNotExist('Products', 'reorderLevel', "INTEGER DEFAULT 0");
+  await addColumnIfNotExist('Product', 'recipe', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'recipe', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'shelfLife', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Products', 'shelfLife', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Product', 'batchTracking', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('Products', 'batchTracking', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('Product', 'expiryTracking', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('Products', 'expiryTracking', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('Product', 'highlights', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'highlights', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'videoUrl', "VARCHAR(1000) NULL");
+  await addColumnIfNotExist('Products', 'videoUrl', "VARCHAR(1000) NULL");
+  await addColumnIfNotExist('Product', 'canonicalUrl', "VARCHAR(1000) NULL");
+  await addColumnIfNotExist('Products', 'canonicalUrl', "VARCHAR(1000) NULL");
+  await addColumnIfNotExist('Product', 'openGraphImage', "VARCHAR(1000) NULL");
+  await addColumnIfNotExist('Products', 'openGraphImage', "VARCHAR(1000) NULL");
+  await addColumnIfNotExist('Product', 'schemaData', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'schemaData', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'websiteLabels', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'websiteLabels', "TEXT NULL");
+
   await addColumnIfNotExist('WebsiteProduct', 'imageUrl', "TEXT NULL");
   await addColumnIfNotExist('WebsiteProduct', 'imagePublicId', "VARCHAR(255) NULL");
   await addColumnIfNotExist('WebsiteProduct', 'managementProductId', "INTEGER NULL");

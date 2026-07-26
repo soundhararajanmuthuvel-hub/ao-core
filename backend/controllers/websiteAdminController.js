@@ -179,7 +179,6 @@ const resolveUniqueSlug = async (rawSlug, currentProductId = null) => {
     candidateSlug = `${baseSlug}-${counter}`;
   }
 };
-
 const createAdminProduct = async (req, res) => {
   try {
     const {
@@ -188,6 +187,7 @@ const createAdminProduct = async (req, res) => {
       sku,
       barcode,
       category,
+      subCategory,
       brand,
       price,
       compareAtPrice,
@@ -223,6 +223,29 @@ const createAdminProduct = async (req, res) => {
       crossSellProductIds,
       managementProductId,
       productId,
+      // New master columns
+      productType,
+      hsnCode,
+      purchasePrice,
+      costPrice,
+      wholesalePrice,
+      distributorPrice,
+      dealerPrice,
+      openingStock,
+      minStock,
+      maxStock,
+      reorderLevel,
+      bom,
+      recipe,
+      shelfLife,
+      batchTracking,
+      expiryTracking,
+      highlights,
+      videoUrl,
+      canonicalUrl,
+      openGraphImage,
+      schemaData,
+      websiteLabels,
     } = req.body;
 
     // 1. Enterprise Validation Rules
@@ -250,6 +273,36 @@ const createAdminProduct = async (req, res) => {
       }
     }
 
+    const finalIsPublished = isPublished !== undefined ? !!isPublished : (status === 'Published');
+    const finalIsActive = isActive !== undefined ? !!isActive : true;
+
+    // Validate storefront publication fields
+    const galleryArr = Array.isArray(galleryImages || images)
+      ? (galleryImages || images)
+      : (() => {
+          try { return JSON.parse(galleryImages || images || '[]'); } catch { return []; }
+        })();
+    const galleryArrJson = JSON.stringify(galleryArr);
+    const primaryImgUrl = imageUrl || (galleryArr.length > 0 ? galleryArr[0] : '');
+
+    if (finalIsPublished) {
+      if (!primaryImgUrl) {
+        return res.status(400).json({ success: false, message: 'At least one product image is required when Show on Website is ON.' });
+      }
+      if (!shortDescription || !shortDescription.trim()) {
+        return res.status(400).json({ success: false, message: 'Short description is required when Show on Website is ON.' });
+      }
+      if (!category || !category.trim() || category === 'General') {
+        return res.status(400).json({ success: false, message: 'A specific Category is required when Show on Website is ON.' });
+      }
+      if (slug && slug.trim()) {
+        const existingSlug = await Product.findOne({ where: { slug: slug.trim() } });
+        if (existingSlug) {
+          return res.status(400).json({ success: false, message: `SEO Slug "${slug}" is already in use by another product.` });
+        }
+      }
+    }
+
     // 2. Automatic Slug Conflict Resolution
     const uniqueSlug = await resolveUniqueSlug(slug || name);
 
@@ -262,17 +315,6 @@ const createAdminProduct = async (req, res) => {
       }
       return '[]';
     };
-
-    const galleryArr = Array.isArray(galleryImages || images)
-      ? (galleryImages || images)
-      : (() => {
-          try { return JSON.parse(galleryImages || images || '[]'); } catch { return []; }
-        })();
-    const galleryArrJson = JSON.stringify(galleryArr);
-    const primaryImgUrl = imageUrl || (galleryArr.length > 0 ? galleryArr[0] : '');
-
-    const finalIsPublished = isPublished !== undefined ? !!isPublished : (status === 'Published');
-    const finalIsActive = isActive !== undefined ? !!isActive : true;
 
     // Initial Version Snapshot
     const initialVersion = {
@@ -292,6 +334,7 @@ const createAdminProduct = async (req, res) => {
       sku: finalSku,
       barcode: barcode?.trim() || null,
       category: category?.trim() || 'General',
+      subCategory: subCategory?.trim() || null,
       brand: brand?.trim() || 'Blovit Organics',
       price: numericPrice,
       sellingPrice: numericPrice,
@@ -301,7 +344,7 @@ const createAdminProduct = async (req, res) => {
       stock: Math.max(0, Number(stock || 0)),
       unit: unit?.trim() || 'pcs',
       gstPercent: Number(gstPercent || 5),
-      productType: 'trading',
+      productType: productType || 'trading',
       imageUrl: primaryImgUrl,
       image: primaryImgUrl,
       images: galleryArrJson,
@@ -332,6 +375,27 @@ const createAdminProduct = async (req, res) => {
       versionHistory: JSON.stringify([initialVersion]),
       isActive: finalIsActive,
       isArchived: false,
+      // New master columns
+      hsnCode: hsnCode?.trim() || null,
+      costPrice: Number(costPrice || 0),
+      dealerPrice: Number(dealerPrice || 0),
+      distributorPrice: Number(distributorPrice || 0),
+      purchasePrice: Number(purchasePrice || 0),
+      openingStock: Number(openingStock || 0),
+      minStock: Number(minStock || 0),
+      maxStock: Number(maxStock || 0),
+      reorderLevel: Number(reorderLevel || 0),
+      recipe: recipe || null,
+      bom: bom || null,
+      shelfLife: shelfLife || null,
+      batchTracking: !!batchTracking,
+      expiryTracking: !!expiryTracking,
+      highlights: highlights || '',
+      videoUrl: videoUrl || null,
+      canonicalUrl: canonicalUrl || null,
+      openGraphImage: openGraphImage || null,
+      schemaData: schemaData || null,
+      websiteLabels: formatArrayJson(websiteLabels),
     });
 
     // 4. Safely Link WebsiteProduct Setting Record if present
@@ -415,6 +479,7 @@ const updateAdminProduct = async (req, res) => {
       sku,
       barcode,
       category,
+      subCategory,
       brand,
       price,
       compareAtPrice,
@@ -450,6 +515,29 @@ const updateAdminProduct = async (req, res) => {
       crossSellProductIds,
       managementProductId,
       productId,
+      // New master columns
+      productType,
+      hsnCode,
+      purchasePrice,
+      costPrice,
+      wholesalePrice,
+      distributorPrice,
+      dealerPrice,
+      openingStock,
+      minStock,
+      maxStock,
+      reorderLevel,
+      bom,
+      recipe,
+      shelfLife,
+      batchTracking,
+      expiryTracking,
+      highlights,
+      videoUrl,
+      canonicalUrl,
+      openGraphImage,
+      schemaData,
+      websiteLabels,
     } = req.body;
 
     let wp = await WebsiteProduct.findByPk(id);
@@ -487,6 +575,29 @@ const updateAdminProduct = async (req, res) => {
       }
     }
 
+    const finalIsPublished = isPublished !== undefined ? !!isPublished : (status === 'Published' || status === 'published' ? true : masterProduct.isPublished);
+
+    if (finalIsPublished) {
+      const checkImg = imageUrl || masterProduct.imageUrl || (galleryImages && galleryImages.length > 0 && galleryImages !== '[]') || (masterProduct.galleryImages && masterProduct.galleryImages !== '[]');
+      if (!checkImg) {
+        return res.status(400).json({ success: false, message: 'At least one product image is required when Show on Website is ON.' });
+      }
+      const checkDesc = shortDescription !== undefined ? shortDescription : masterProduct.shortDescription;
+      if (!checkDesc || !checkDesc.trim()) {
+        return res.status(400).json({ success: false, message: 'Short description is required when Show on Website is ON.' });
+      }
+      const checkCat = category !== undefined ? category : masterProduct.category;
+      if (!checkCat || !checkCat.trim() || checkCat === 'General') {
+        return res.status(400).json({ success: false, message: 'A specific Category is required when Show on Website is ON.' });
+      }
+      if (slug && slug.trim() && slug !== masterProduct.slug) {
+        const existingSlug = await Product.findOne({ where: { slug: slug.trim(), id: { [Op.ne]: masterProduct.id } } });
+        if (existingSlug) {
+          return res.status(400).json({ success: false, message: `SEO Slug "${slug}" is already in use by another product.` });
+        }
+      }
+    }
+
     // 2. Automatic Slug Conflict Resolution if slug changed
     let uniqueSlug = masterProduct.slug;
     if (slug && slug !== masterProduct.slug) {
@@ -511,6 +622,7 @@ const updateAdminProduct = async (req, res) => {
     if (sku !== undefined) masterProduct.sku = sku.trim();
     if (barcode !== undefined) masterProduct.barcode = barcode ? barcode.trim() : null;
     if (category !== undefined) masterProduct.category = category.trim();
+    if (subCategory !== undefined) masterProduct.subCategory = subCategory ? subCategory.trim() : null;
     if (brand !== undefined) masterProduct.brand = brand.trim();
     if (price !== undefined) {
       const numericPrice = Number(price);
@@ -543,6 +655,29 @@ const updateAdminProduct = async (req, res) => {
     if (sortOrder !== undefined) masterProduct.sortOrder = Number(sortOrder);
     if (availabilityState !== undefined) masterProduct.availabilityState = availabilityState;
     if (status !== undefined) masterProduct.status = status;
+
+    // New master columns
+    if (productType !== undefined) masterProduct.productType = productType;
+    if (hsnCode !== undefined) masterProduct.hsnCode = hsnCode ? hsnCode.trim() : null;
+    if (costPrice !== undefined) masterProduct.costPrice = Number(costPrice || 0);
+    if (dealerPrice !== undefined) masterProduct.dealerPrice = Number(dealerPrice || 0);
+    if (distributorPrice !== undefined) masterProduct.distributorPrice = Number(distributorPrice || 0);
+    if (purchasePrice !== undefined) masterProduct.purchasePrice = Number(purchasePrice || 0);
+    if (openingStock !== undefined) masterProduct.openingStock = Number(openingStock || 0);
+    if (minStock !== undefined) masterProduct.minStock = Number(minStock || 0);
+    if (maxStock !== undefined) masterProduct.maxStock = Number(maxStock || 0);
+    if (reorderLevel !== undefined) masterProduct.reorderLevel = Number(reorderLevel || 0);
+    if (recipe !== undefined) masterProduct.recipe = recipe;
+    if (bom !== undefined) masterProduct.bom = bom;
+    if (shelfLife !== undefined) masterProduct.shelfLife = shelfLife;
+    if (batchTracking !== undefined) masterProduct.batchTracking = !!batchTracking;
+    if (expiryTracking !== undefined) masterProduct.expiryTracking = !!expiryTracking;
+    if (highlights !== undefined) masterProduct.highlights = highlights;
+    if (videoUrl !== undefined) masterProduct.videoUrl = videoUrl;
+    if (canonicalUrl !== undefined) masterProduct.canonicalUrl = canonicalUrl;
+    if (openGraphImage !== undefined) masterProduct.openGraphImage = openGraphImage;
+    if (schemaData !== undefined) masterProduct.schemaData = schemaData;
+    if (websiteLabels !== undefined) masterProduct.websiteLabels = formatArrayJson(websiteLabels);
 
     if (isPublished !== undefined) {
       masterProduct.isPublished = !!isPublished;

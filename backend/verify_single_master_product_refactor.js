@@ -81,6 +81,8 @@ async function runMasterProductVerification() {
         benefits: ['Rich in Iron', 'Natural Energy'],
         ingredients: ['Ragi', 'Almonds', 'Dates'],
         seoTitle: 'Master Unified Health Mix 500g Online',
+        imageUrl: 'https://demo.amudhasurabiy.com/ragi-front.jpg',
+        images: ['https://demo.amudhasurabiy.com/ragi-front.jpg']
       },
       user: { id: 1, name: 'Super Admin' },
       ip: '127.0.0.1',
@@ -88,6 +90,9 @@ async function runMasterProductVerification() {
     };
     const resCreate = runMockRes();
     await websiteAdminController.createAdminProduct(reqCreate, resCreate);
+    if (resCreate.statusCode !== 201) {
+      console.error('Failed to create admin product:', resCreate.data);
+    }
     assert.strictEqual(resCreate.statusCode, 201);
     const masterProdId = resCreate.data.data.productId;
 
