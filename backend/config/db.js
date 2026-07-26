@@ -521,6 +521,10 @@ const connectDB = async () => {
   await addColumnIfNotExist('Visits', 'leadId', "INTEGER NULL");
 
   // Product enhancements & WooCommerce Schema Compatibility
+  await addColumnIfNotExist('Product', 'images', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'images', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'galleryImages', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'galleryImages', "TEXT NULL");
   await addColumnIfNotExist('Product', 'mrp', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('Product', 'greenPrice', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('Product', 'yellowPrice', "DECIMAL(10, 2) DEFAULT 0.00");
@@ -538,6 +542,45 @@ const connectDB = async () => {
   await addColumnIfNotExist('Product', 'lastSyncTimestamp', "DATETIME NULL");
   await addColumnIfNotExist('Product', 'lastWooUpdateTimestamp', "DATETIME NULL");
   await addColumnIfNotExist('Product', 'stockStatus', "VARCHAR(100) DEFAULT 'instock'");
+  await addColumnIfNotExist('Product', 'isPublished', "TINYINT DEFAULT 1");
+  await addColumnIfNotExist('Products', 'isPublished', "TINYINT DEFAULT 1");
+  await addColumnIfNotExist('Product', 'publishToWebsite', "TINYINT DEFAULT 1");
+  await addColumnIfNotExist('Products', 'publishToWebsite', "TINYINT DEFAULT 1");
+  await addColumnIfNotExist('Product', 'seoTitle', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Products', 'seoTitle', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Product', 'seoDescription', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'seoDescription', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'seoKeywords', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Products', 'seoKeywords', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('Product', 'isBestseller', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('Products', 'isBestseller', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('Product', 'isFeatured', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('Products', 'isFeatured', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('Product', 'isWebsiteVisible', "TINYINT DEFAULT 1");
+  await addColumnIfNotExist('Products', 'isWebsiteVisible', "TINYINT DEFAULT 1");
+  await addColumnIfNotExist('Product', 'isActive', "TINYINT DEFAULT 1");
+  await addColumnIfNotExist('Products', 'isActive', "TINYINT DEFAULT 1");
+  await addColumnIfNotExist('Product', 'availabilityState', "VARCHAR(100) DEFAULT 'In Stock'");
+  await addColumnIfNotExist('Products', 'availabilityState', "VARCHAR(100) DEFAULT 'In Stock'");
+  await addColumnIfNotExist('Product', 'faqs', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'faqs', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'badges', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'badges', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'healthGoals', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'healthGoals', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'isTrending', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('Products', 'isTrending', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('Product', 'sortOrder', "INTEGER DEFAULT 0");
+  await addColumnIfNotExist('Products', 'sortOrder', "INTEGER DEFAULT 0");
+  await addColumnIfNotExist('Product', 'relatedProductIds', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'relatedProductIds', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'upsellProductIds', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'upsellProductIds', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'crossSellProductIds', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'crossSellProductIds', "TEXT NULL");
+  await addColumnIfNotExist('Product', 'versionHistory', "TEXT NULL");
+  await addColumnIfNotExist('Products', 'versionHistory', "TEXT NULL");
+
   await addColumnIfNotExist('WebsiteProduct', 'imageUrl', "TEXT NULL");
   await addColumnIfNotExist('WebsiteProduct', 'imagePublicId', "VARCHAR(255) NULL");
   await addColumnIfNotExist('WebsiteProduct', 'managementProductId', "INTEGER NULL");
@@ -554,7 +597,13 @@ const connectDB = async () => {
 
   // Dynamic Schema Alignment Helper comparing Sequelize Model attributes with DB Table columns
   const syncModelAttributesToTable = async (model, tableName) => {
-    const resolvedTableName = (tableNameMap[tableName] || tableNameMap[tableName.replace(/s$/, '')] || tableName).toLowerCase();
+    const resolvedTableName = (
+      model?.tableName ||
+      model?.options?.tableName ||
+      tableNameMap[tableName] ||
+      tableNameMap[tableName.replace(/s$/, '')] ||
+      tableName
+    ).toLowerCase();
     const existingColumns = tableColumnsCache[resolvedTableName] || [];
     const addedCols = [];
     const existingCols = [];
