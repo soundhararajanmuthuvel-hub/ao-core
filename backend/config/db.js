@@ -1,3 +1,4 @@
+console.log('[STARTUP TRACE] Loading Database Configuration...');
 const { Sequelize } = require('sequelize');
 const path = require('path');
 
@@ -33,6 +34,7 @@ let sequelize;
 
 if (dialect === 'postgres') {
   console.log('Using Postgres/Supabase database connection URL...');
+console.log('[STARTUP TRACE] Loading Sequelize Instance...');
   sequelize = new Sequelize(dbUrl, {
     dialect: 'postgres',
     dialectOptions: {
@@ -292,6 +294,7 @@ const connectDB = async () => {
   
   await renameTablesToLowercaseIfMySql(sequelize);
   
+  console.log('[STARTUP TRACE] Loading Models...');
   // Dynamically require all models to register them with Sequelize before syncing.
   require('../models/User');
   require('../models/Customer');
