@@ -1731,9 +1731,6 @@ const runAsyncMigrationWorker = async (jobId, tempPath, extractedData, bodyOptio
     // Write all detailed diagnostic logs
     await MigrationDetailLog.bulkCreate(logMessages, { transaction: t });
 
-    // Write all detailed diagnostic logs
-    await MigrationDetailLog.bulkCreate(logMessages, { transaction: t });
-
     // Commit Transaction!
     await t.commit();
 
@@ -1763,6 +1760,7 @@ const runAsyncMigrationWorker = async (jobId, tempPath, extractedData, bodyOptio
 
     const stage = err.stage || 'Data Ingestion';
     const fixSuggestion = err.fixSuggestion || 'Check input data for missing required fields, duplicate keys, or invalid formats and try again.';
+    const exactSqlError = err.original ? err.original.message : (err.errors ? err.errors.map(e => e.message).join(', ') : err.message);
 
     if (migrationHistoryRecord) {
       try {
@@ -1770,7 +1768,7 @@ const runAsyncMigrationWorker = async (jobId, tempPath, extractedData, bodyOptio
         await MigrationDetailLog.create({
           migrationId: migrationHistoryRecord.id,
           level: 'ERROR',
-          message: `[${stage}] Fatal migration error: ${err.message}`
+          message: `[${stage}] Fatal migration error: ${exactSqlError}`
         });
       } catch (logErr) {
         console.error('Failed to write failure log to database:', logErr);
@@ -1779,7 +1777,7 @@ const runAsyncMigrationWorker = async (jobId, tempPath, extractedData, bodyOptio
 
     if (jobState) {
       jobState.status = 'Failed';
-      jobState.error = err.message;
+      jobState.error = exactSqlError;
       jobState.currentStage = stage;
       jobState.details = err.stack || err.message;
       jobState.fixSuggestion = fixSuggestion;

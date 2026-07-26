@@ -99,19 +99,29 @@ exports.triggerProductSync = async (req, res, next) => {
   try {
     const settings = await getSettings();
     const woo = new WooCommerceService(settings);
-    const count = await woo.syncProducts();
+    const result = await woo.syncProducts();
 
-    await logActivity(req.user.id, 'sync', 'products', `Synced ${count} products to WooCommerce`);
+    const successCount = result.successCount || 0;
+    const failedCount = result.failedCount || 0;
+    const failures = result.failures || [];
 
-    res.json({
-      success: true,
-      count,
-      message: `Successfully synced ${count} products to WooCommerce`,
+    await logActivity(req.user.id, 'sync', 'products', `Synced ${successCount} products to WooCommerce. Failed: ${failedCount}`);
+
+    // Return 207 Multi-Status if there are mixed results, otherwise 200
+    const statusCode = (failedCount > 0 && successCount > 0) ? 207 : (failedCount > 0 && successCount === 0) ? 400 : 200;
+
+    res.status(statusCode).json({
+      success: failedCount === 0,
+      count: successCount,
+      failedCount,
+      failures,
+      message: `Successfully synced ${successCount} products to WooCommerce. ${failedCount > 0 ? failedCount + ' failed.' : ''}`,
     });
   } catch (err) {
     next(err);
   }
 };
+
 
 exports.triggerProductImport = async (req, res, next) => {
   try {

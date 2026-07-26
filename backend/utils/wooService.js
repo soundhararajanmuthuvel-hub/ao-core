@@ -555,12 +555,13 @@ class WooCommerceService {
 
     if (this.settings.wooProductSyncMode === 'Website Master') {
       console.log('[Product Sync] Skipped pushing products because sync mode is set to Website Master.');
-      return 0;
+      return { successCount: 0, failedCount: 0, failures: [] };
     }
 
     const startTime = Date.now();
     let successCount = 0;
     let failedCount = 0;
+    const failures = [];
 
     try {
       const localProducts = await Product.findAll({
@@ -571,7 +572,16 @@ class WooCommerceService {
       });
 
       for (const prod of localProducts) {
-        if (!prod.sku) continue;
+        if (!prod.sku) {
+          failures.push({
+            stage: 'Validation',
+            product: prod.name,
+            sku: 'N/A',
+            error: 'Missing SKU'
+          });
+          failedCount++;
+          continue;
+        }
 
         let galleryList = [];
         try {
@@ -625,15 +635,26 @@ class WooCommerceService {
           successCount++;
         } catch (err) {
           console.error(`Error syncing product ${prod.sku}:`, err.message);
+          let apiError = err.message;
+          if (err.response && err.response.data && err.response.data.message) {
+            apiError = err.response.data.message;
+          }
+          failures.push({
+            stage: 'API Request',
+            product: prod.name,
+            sku: prod.sku,
+            error: apiError,
+            details: err.response?.data?.code || 'WC_ERROR'
+          });
           failedCount++;
         }
       }
 
       await this.writeSyncLog('Products', 'Export', successCount, failedCount, Date.now() - startTime);
-      return successCount;
+      return { successCount, failedCount, failures };
     } catch (err) {
       await this.writeSyncLog('Products', 'Export', successCount, failedCount || 1, Date.now() - startTime, err.message);
-      throw err;
+      return { successCount, failedCount, failures: [{ stage: 'Database Query', error: err.message }] };
     }
   }
 

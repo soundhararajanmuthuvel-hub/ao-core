@@ -197,12 +197,22 @@ exports.createProduct = async (req, res, next) => {
     const cloudinaryService = require('../services/cloudinaryService');
     const data = { ...req.body };
     
-    // Cloudinary image upload handling
+    let imageUploadFailed = false;
+    let imageUploadError = null;
+
+    // Cloudinary image upload handling with failure resilience
     if (req.file) {
-      const cloudRes = await cloudinaryService.uploadImage(req.file.buffer);
-      data.imageUrl = cloudRes.secure_url;
-      data.imagePublicId = cloudRes.public_id;
-      data.image = cloudRes.secure_url;
+      try {
+        const cloudRes = await cloudinaryService.uploadImage(req.file.buffer);
+        data.imageUrl = cloudRes.secure_url;
+        data.imagePublicId = cloudRes.public_id;
+        data.image = cloudRes.secure_url;
+      } catch (uploadErr) {
+        console.error('[Cloudinary Upload Failed during createProduct]', uploadErr.message);
+        imageUploadFailed = true;
+        imageUploadError = uploadErr.message;
+        // Proceed without image — do not crash the product save
+      }
     } else if (data.imageUrl) {
       data.imagePublicId = data.imagePublicId || cloudinaryService.extractPublicId(data.imageUrl);
       data.image = data.imageUrl;
@@ -251,9 +261,11 @@ exports.createProduct = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: 'Product created successfully',
+      message: imageUploadFailed ? 'Product created successfully, but image upload failed.' : 'Product created successfully',
       product: updatedProduct,
       data: updatedProduct,
+      imageUploadFailed,
+      imageUploadError
     });
   } catch (err) {
     console.error('[createProduct Error]', err);
@@ -261,12 +273,16 @@ exports.createProduct = async (req, res, next) => {
   }
 };
 
+
 exports.updateProduct = async (req, res, next) => {
   try {
     const cloudinaryService = require('../services/cloudinaryService');
     const data = { ...req.body };
     const product = await Product.findByPk(req.params.id);
     if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+
+    let imageUploadFailed = false;
+    let imageUploadError = null;
 
     // Cloudinary image upload & replacement handling
     if (req.file) {
@@ -277,10 +293,17 @@ exports.updateProduct = async (req, res, next) => {
           console.warn('[Cloudinary Delete Previous Image Warning]', err.message);
         }
       }
-      const cloudRes = await cloudinaryService.uploadImage(req.file.buffer);
-      data.imageUrl = cloudRes.secure_url;
-      data.imagePublicId = cloudRes.public_id;
-      data.image = cloudRes.secure_url;
+      try {
+        const cloudRes = await cloudinaryService.uploadImage(req.file.buffer);
+        data.imageUrl = cloudRes.secure_url;
+        data.imagePublicId = cloudRes.public_id;
+        data.image = cloudRes.secure_url;
+      } catch (uploadErr) {
+        console.error('[Cloudinary Upload Failed during updateProduct]', uploadErr.message);
+        imageUploadFailed = true;
+        imageUploadError = uploadErr.message;
+        // Proceed without new image
+      }
     } else if (data.imageUrl && data.imageUrl !== product.imageUrl) {
       data.imagePublicId = data.imagePublicId || cloudinaryService.extractPublicId(data.imageUrl);
       data.image = data.imageUrl;
@@ -338,15 +361,18 @@ exports.updateProduct = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: 'Product updated successfully',
+      message: imageUploadFailed ? 'Product updated successfully, but new image upload failed.' : 'Product updated successfully',
       product: updatedProduct,
       data: updatedProduct,
+      imageUploadFailed,
+      imageUploadError
     });
   } catch (err) {
     console.error('[updateProduct Error]', err);
     next(err);
   }
 };
+
 
 const getProductDependencies = async (productId) => {
   const ProductPackSize = require('../models/ProductPackSize');
