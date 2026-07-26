@@ -72,6 +72,8 @@ export default function WebsiteManagement() {
   // Modals & Selections
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [productFilter, setProductFilter] = useState('all');
+  const [productSearchQuery, setProductSearchQuery] = useState('');
 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -229,6 +231,22 @@ export default function WebsiteManagement() {
       fetchDataForTab('products');
     } catch {
       setMsg({ type: 'error', text: 'Failed to delete product.' });
+    }
+  };
+
+  const handleToggleField = async (product, field) => {
+    const updatedValue = !product[field];
+    try {
+      const res = await client.put(`${API_BASE}/products/${product.id}`, {
+        [field]: updatedValue
+      });
+      if (res.data.success) {
+        setProducts(prev => prev.map(p => p.id === product.id ? { ...p, [field]: updatedValue, isPublished: field === 'isPublished' ? updatedValue : p.isPublished } : p));
+        setMsg({ type: 'success', text: `Product "${product.name}" updated successfully.` });
+        setTimeout(() => setMsg({ type: '', text: '' }), 3000);
+      }
+    } catch (err) {
+      setMsg({ type: 'error', text: err.response?.data?.message || `Failed to update ${field}.` });
     }
   };
 
@@ -446,118 +464,274 @@ export default function WebsiteManagement() {
       {/* TAB 2: PRODUCTS */}
       {!loading && activeTab === 'products' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <h3 style={{ fontWeight: 700 }}>Storefront Products ({products.length})</h3>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                setEditingProduct(null);
-                setShowProductModal(true);
-              }}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-            >
-              <Plus size={16} /> Add Product
-            </button>
+          {/* Dashboard Header & Search/Filters Bar */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontWeight: 800, margin: 0 }}>Storefront Publishing & Merchandising</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>
+                  Manage storefront visibility, search engine optimization (SEO), and digital placements for the master catalog.
+                </p>
+              </div>
+            </div>
 
+            {/* Filters and Search Bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', background: '#F8FAFC', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #E2E8F0', flexWrap: 'wrap' }}>
+              {/* Search input */}
+              <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+                <input
+                  type="text"
+                  placeholder="Search by product name or SKU..."
+                  value={productSearchQuery}
+                  onChange={(e) => setProductSearchQuery(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem 0.75rem 0.5rem 2rem', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '0.85rem' }}
+                />
+                <span style={{ position: 'absolute', left: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }}>🔍</span>
+              </div>
+
+              {/* Status Tabs */}
+              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                {[
+                  { id: 'all', label: `All (${products.length})` },
+                  { id: 'published', label: `Published (${products.filter(p => p.isPublished && p.isActive).length})` },
+                  { id: 'draft', label: `Draft (${products.filter(p => !p.isPublished && p.isActive).length})` },
+                  { id: 'hidden', label: `Hidden (${products.filter(p => !p.isActive).length})` },
+                ].map(filter => (
+                  <button
+                    key={filter.id}
+                    onClick={() => setProductFilter(filter.id)}
+                    style={{
+                      border: 'none',
+                      background: productFilter === filter.id ? '#0284C7' : '#FFF',
+                      color: productFilter === filter.id ? '#FFF' : '#475569',
+                      padding: '0.4rem 0.8rem',
+                      borderRadius: '6px',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: '1px solid #CBD5E1',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                    }}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
-          <div className="card" style={{ overflowX: 'auto' }}>
-            <table className="table" style={{ width: '100%' }}>
+          <div className="card" style={{ overflowX: 'auto', border: '1px solid #E2E8F0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+            <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Category</th>
-                  <th>Price</th>
-                  <th>Original Price</th>
-                  <th>Stock</th>
-                  <th>Bestseller</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                  <th style={{ padding: '0.85rem 1.25rem', textAlign: 'left', fontSize: '0.82rem', color: '#475569' }}>Product</th>
+                  <th style={{ padding: '0.85rem 1.25rem', textAlign: 'left', fontSize: '0.82rem', color: '#475569' }}>Website Status</th>
+                  <th style={{ padding: '0.85rem 1.25rem', textAlign: 'center', fontSize: '0.82rem', color: '#475569' }}>Featured</th>
+                  <th style={{ padding: '0.85rem 1.25rem', textAlign: 'center', fontSize: '0.82rem', color: '#475569' }}>Bestseller</th>
+                  <th style={{ padding: '0.85rem 1.25rem', textAlign: 'left', fontSize: '0.82rem', color: '#475569' }}>SEO Score</th>
+                  <th style={{ padding: '0.85rem 1.25rem', textAlign: 'center', fontSize: '0.82rem', color: '#475569' }}>Publish</th>
+                  <th style={{ padding: '0.85rem 1.25rem', textAlign: 'center', fontSize: '0.82rem', color: '#475569' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {products.map((p) => {
-                  let pImages = [];
-                  if (Array.isArray(p.images)) {
-                    pImages = p.images;
-                  } else {
-                    try { pImages = JSON.parse(p.images || '[]'); } catch { pImages = p.images ? [p.images] : []; }
+                {(() => {
+                  const filtered = products.filter(p => {
+                    if (productFilter === 'published') return p.isPublished && p.isActive;
+                    if (productFilter === 'draft') return !p.isPublished && p.isActive;
+                    if (productFilter === 'hidden') return !p.isActive;
+                    return true;
+                  }).filter(p => {
+                    if (!productSearchQuery) return true;
+                    return (p.name || '').toLowerCase().includes(productSearchQuery.toLowerCase()) || 
+                           (p.sku || '').toLowerCase().includes(productSearchQuery.toLowerCase());
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: '#64748B' }}>
+                          No products found matching the criteria.
+                        </td>
+                      </tr>
+                    );
                   }
 
-                  return (
-                    <tr key={p.id}>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          {pImages && pImages.length > 0 ? (
-                            <img
-                              src={resolveAssetUrl(pImages[0])}
-                              alt={p.name}
-                              style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-color)' }}
-                            />
-                          ) : (
-                            <div style={{ width: 40, height: 40, borderRadius: '6px', background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF' }}>
-                              <ImageIcon size={20} />
+                  return filtered.map((p) => {
+                    let pImages = [];
+                    if (Array.isArray(p.images)) {
+                      pImages = p.images;
+                    } else {
+                      try { pImages = JSON.parse(p.images || '[]'); } catch { pImages = p.imageUrl ? [p.imageUrl] : []; }
+                    }
+
+                    // SEO Score calculation
+                    let seoScore = 0;
+                    if (p.seoTitle && p.seoTitle.length >= 10) seoScore += 40;
+                    if (p.seoDescription && p.seoDescription.length >= 30) seoScore += 40;
+                    if (p.seoKeywords) seoScore += 20;
+
+                    let seoColor = '#EF4444';
+                    if (seoScore >= 80) seoColor = '#10B981';
+                    else if (seoScore >= 40) seoColor = '#F59E0B';
+
+                    return (
+                      <tr key={p.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
+                        {/* 1. Product Info */}
+                        <td style={{ padding: '0.85rem 1.25rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            {pImages && pImages.length > 0 ? (
+                              <img
+                                src={resolveAssetUrl(pImages[0])}
+                                alt={p.name}
+                                style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: '6px', border: '1px solid #CBD5E1' }}
+                              />
+                            ) : (
+                              <div style={{ width: 44, height: 44, borderRadius: '6px', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', border: '1px solid #CBD5E1' }}>
+                                <ImageIcon size={20} />
+                              </div>
+                            )}
+                            <div>
+                              <div style={{ fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                {p.name}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748B', display: 'flex', gap: '0.5rem', marginTop: '2px' }}>
+                                <span style={{ fontFamily: 'monospace' }}>SKU: {p.sku || '—'}</span>
+                                <span>|</span>
+                                <span style={{ color: '#0284C7' }}>/{p.slug}</span>
+                              </div>
                             </div>
-                          )}
-                          <div>
-                            <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              {p.name}
-                              {p.isLinkedToManagement && (
-                                <span style={{ background: '#DEF7EC', color: '#03543F', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px' }}>
-                                  ERP Synced
-                                </span>
-                              )}
-                            </div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>/{p.slug}</div>
                           </div>
-                        </div>
-                      </td>
-                      <td>{p.category || 'General'}</td>
-                      <td style={{ fontWeight: 700, color: 'var(--primary-color)' }}>₹{p.price}</td>
-                      <td style={{ textDecoration: 'line-through', color: 'var(--text-secondary)' }}>{p.compareAtPrice ? `₹${p.compareAtPrice}` : '-'}</td>
-                      <td>
-                        <span className={`badge ${p.stock > 10 ? 'badge-success' : 'badge-warning'}`}>
-                          {p.stock} units
-                        </span>
-                      </td>
-                      <td>{p.isBestseller ? <Sparkles size={16} style={{ color: '#F59E0B' }} /> : '-'}</td>
-                      <td>
-                        <span className={`badge ${p.isActive ? 'badge-success' : 'badge-secondary'}`}>
-                          {p.isActive ? 'Active' : 'Draft'}
-                        </span>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        </td>
+
+                        {/* 2. Status Badge */}
+                        <td style={{ padding: '0.85rem 1.25rem' }}>
+                          {!p.isActive ? (
+                            <span style={{ display: 'inline-block', background: '#F1F5F9', color: '#475569', fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', border: '1px solid #CBD5E1' }}>
+                              🚫 ERP Hidden
+                            </span>
+                          ) : p.isPublished ? (
+                            <span style={{ display: 'inline-block', background: '#DEF7EC', color: '#03543F', fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', border: '1px solid #A7F3D0' }}>
+                              🌐 Published
+                            </span>
+                          ) : (
+                            <span style={{ display: 'inline-block', background: '#FEF3C7', color: '#92400E', fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', border: '1px solid #FDE68A' }}>
+                              📝 Draft
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 3. Featured Toggle */}
+                        <td style={{ padding: '0.85rem 1.25rem', textAlign: 'center' }}>
                           <button
-                            className="btn btn-secondary"
-                            style={{ padding: '0.3rem 0.5rem' }}
-                            onClick={() => {
-                              setEditingProduct(p);
-                              setShowProductModal(true);
+                            onClick={() => handleToggleField(p, 'isFeatured')}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              color: p.isFeatured ? '#F59E0B' : '#CBD5E1',
+                              transition: 'transform 0.2s',
+                              outline: 'none'
+                            }}
+                            title={p.isFeatured ? 'Featured Product' : 'Mark as Featured'}
+                          >
+                            <StarIcon size={18} fill={p.isFeatured ? '#F59E0B' : 'none'} />
+                          </button>
+                        </td>
+
+                        {/* 4. Bestseller Toggle */}
+                        <td style={{ padding: '0.85rem 1.25rem', textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleToggleField(p, 'isBestseller')}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              color: p.isBestseller ? '#10B981' : '#CBD5E1',
+                              transition: 'transform 0.2s',
+                              outline: 'none'
+                            }}
+                            title={p.isBestseller ? 'Bestseller Placement' : 'Mark as Bestseller'}
+                          >
+                            <Sparkles size={18} fill={p.isBestseller ? '#10B981' : 'none'} />
+                          </button>
+                        </td>
+
+                        {/* 5. SEO Score indicator */}
+                        <td style={{ padding: '0.85rem 1.25rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ width: '40px', height: '6px', background: '#E2E8F0', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: `${seoScore}%`, height: '100%', background: seoColor }} />
+                            </div>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: seoColor }}>{seoScore}%</span>
+                          </div>
+                        </td>
+
+                        {/* 6. Instant Publish Switch */}
+                        <td style={{ padding: '0.85rem 1.25rem', textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleToggleField(p, 'isPublished')}
+                            disabled={!p.isActive}
+                            style={{
+                              border: '1px solid',
+                              borderColor: p.isPublished ? '#10B981' : '#CBD5E1',
+                              background: p.isPublished ? '#DEF7EC' : '#F1F5F9',
+                              color: p.isPublished ? '#03543F' : '#475569',
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: p.isActive ? 'pointer' : 'not-allowed',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              opacity: p.isActive ? 1 : 0.5
                             }}
                           >
-                            <Edit2 size={14} />
+                            {p.isPublished ? <Check size={12} /> : <X size={12} />}
+                            {p.isPublished ? 'Live' : 'Draft'}
                           </button>
+                        </td>
 
-                          <button
-                            className="btn btn-secondary"
-                            style={{ padding: '0.3rem 0.5rem', color: '#EF4444' }}
-                            onClick={() => handleDeleteProduct(p.id)}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {products.length === 0 && (
-                  <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-                      No website products defined yet. Click "Add Product" above to create one.
-                    </td>
-                  </tr>
-                )}
+                        {/* 7. Action Links */}
+                        <td style={{ padding: '0.85rem 1.25rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem' }}>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => {
+                                setEditingProduct(p);
+                                setShowProductModal(true);
+                              }}
+                              style={{ padding: '0.3rem 0.5rem', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', fontWeight: 700 }}
+                              title="Website Settings"
+                            >
+                              ⚙️ Website Settings
+                            </button>
+                            <button
+                              className="btn btn-outline-secondary btn-sm"
+                              onClick={() => {
+                                window.open(`https://demo.amudhasurabiy.com/product/${p.slug || p.id}`, '_blank');
+                              }}
+                              style={{ padding: '0.3rem 0.5rem', fontSize: '0.78rem' }}
+                              title="Preview Storefront"
+                            >
+                              👁️ Preview
+                            </button>
+                            <button
+                              className="btn btn-outline-secondary btn-sm"
+                              onClick={() => {
+                                setActiveTab('analytics');
+                              }}
+                              style={{ padding: '0.3rem 0.5rem', fontSize: '0.78rem' }}
+                              title="View Analytics"
+                            >
+                              📊 Stats
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  });
+                })()}
               </tbody>
             </table>
           </div>

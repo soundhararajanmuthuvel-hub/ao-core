@@ -30,6 +30,7 @@ export default function EnterpriseProductEditor({
   onClose = () => {},
   onSaveSuccess = () => {},
   managementProductsList = [],
+  mode = 'full',
 }) {
   if (!isOpen) return null;
 
@@ -128,7 +129,12 @@ export default function EnterpriseProductEditor({
     })(),
   });
 
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeTab, setActiveTab] = useState(mode === 'website-only' ? 'publishing' : 'general');
+  useEffect(() => {
+    if (mode === 'website-only') {
+      setActiveTab('publishing');
+    }
+  }, [mode]);
   const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [aiLoadingField, setAiLoadingField] = useState(null);
@@ -242,14 +248,17 @@ export default function EnterpriseProductEditor({
   };
 
   const handleSave = async () => {
-    if (!formData.name.trim()) {
-      setMsg({ type: 'error', text: 'Product Title is required.' });
-      return;
-    }
-    const finalPrice = parseFloat(formData.sellingPrice || formData.price);
-    if (isNaN(finalPrice) || finalPrice <= 0) {
-      setMsg({ type: 'error', text: 'Selling Price is required and must be greater than zero.' });
-      return;
+    let finalPrice = 0;
+    if (mode !== 'website-only') {
+      if (!formData.name.trim()) {
+        setMsg({ type: 'error', text: 'Product Title is required.' });
+        return;
+      }
+      finalPrice = parseFloat(formData.sellingPrice || formData.price);
+      if (isNaN(finalPrice) || finalPrice <= 0) {
+        setMsg({ type: 'error', text: 'Selling Price is required and must be greater than zero.' });
+        return;
+      }
     }
 
     // Publication logic validation
@@ -271,7 +280,33 @@ export default function EnterpriseProductEditor({
     setSaving(true);
     setMsg({ type: '', text: '' });
 
-    const payload = {
+    const payload = mode === 'website-only' ? {
+      images: formData.images,
+      galleryImages: formData.images,
+      imageUrl: formData.images?.[0] || formData.imageUrl || '',
+      shortDescription: formData.shortDescription || '',
+      description: formData.description || '',
+      highlights: formData.highlights || '',
+      benefits: formData.benefits,
+      ingredients: formData.ingredients,
+      nutritionFacts: formData.nutritionFacts,
+      usageInstructions: formData.usageInstructions || '',
+      faqs: formData.faqs,
+      isFeatured: !!formData.isFeatured,
+      isBestseller: !!formData.isBestseller,
+      isTrending: !!formData.isTrending,
+      isPublished: !!formData.isPublished,
+      publishToWebsite: !!formData.isPublished,
+      sortOrder: Number(formData.sortOrder || 0),
+      seoTitle: formData.seoTitle || formData.name,
+      seoDescription: formData.seoDescription || formData.shortDescription || formData.name,
+      seoKeywords: formData.seoKeywords || '',
+      canonicalUrl: formData.canonicalUrl || '',
+      openGraphImage: formData.openGraphImage || '',
+      schemaData: formData.schemaData || '',
+      websiteLabels: formData.websiteLabels,
+      healthGoals: formData.healthGoals,
+    } : {
       ...formData,
       price: finalPrice,
       sellingPrice: finalPrice,
@@ -401,7 +436,7 @@ export default function EnterpriseProductEditor({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
-                  {formData.id ? `Edit Product: ${formData.name}` : 'Create Master Product'}
+                  {formData.id ? (mode === 'website-only' ? `Edit Website Settings: ${formData.name}` : `Edit Product: ${formData.name}`) : 'Create Master Product'}
                 </h2>
                 {isDirty && (
                   <span style={{ background: '#FEF3C7', color: '#92400E', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -428,35 +463,37 @@ export default function EnterpriseProductEditor({
         )}
 
         {/* TABS STRIP */}
-        <div style={{ display: 'flex', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', padding: '0 1rem' }}>
-          {[
-            { id: 'general', label: 'Basic Info', icon: Settings },
-            { id: 'pricing', label: 'Pricing', icon: DollarSign },
-            { id: 'inventory', label: 'Inventory', icon: Database },
-            { id: 'manufacturing', label: 'Manufacturing', icon: Hammer },
-            { id: 'publishing', label: 'Website Publishing', icon: Globe },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.85rem 1.25rem',
-                border: 'none',
-                background: 'transparent',
-                borderBottom: activeTab === tab.id ? '2px solid #0284C7' : '2px solid transparent',
-                color: activeTab === tab.id ? '#0284C7' : '#64748B',
-                fontWeight: activeTab === tab.id ? 700 : 500,
-                fontSize: '0.85rem',
-                cursor: 'pointer'
-              }}
-            >
-              <tab.icon size={16} /> {tab.label}
-            </button>
-          ))}
-        </div>
+        {mode === 'full' && (
+          <div style={{ display: 'flex', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', padding: '0 1rem' }}>
+            {[
+              { id: 'general', label: 'Basic Info', icon: Settings },
+              { id: 'pricing', label: 'Pricing', icon: DollarSign },
+              { id: 'inventory', label: 'Inventory', icon: Database },
+              { id: 'manufacturing', label: 'Manufacturing', icon: Hammer },
+              { id: 'publishing', label: 'Website Publishing', icon: Globe },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.85rem 1.25rem',
+                  border: 'none',
+                  background: 'transparent',
+                  borderBottom: activeTab === tab.id ? '2px solid #0284C7' : '2px solid transparent',
+                  color: activeTab === tab.id ? '#0284C7' : '#64748B',
+                  fontWeight: activeTab === tab.id ? 700 : 500,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                <tab.icon size={16} /> {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* CONTAINER */}
         <div style={{ flex: 1, overflowY: 'auto', background: '#F1F5F9', padding: '1.5rem' }}>

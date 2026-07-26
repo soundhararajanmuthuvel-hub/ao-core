@@ -1,6 +1,5 @@
-const WebsiteProduct = require('../models/WebsiteProduct');
-const WebsiteProductReview = require('../models/WebsiteProductReview');
 const Product = require('../models/Product');
+const WebsiteProductReview = require('../models/WebsiteProductReview');
 const { Op } = require('sequelize');
 
 // Helper to format JSON fields
@@ -19,8 +18,13 @@ const getProducts = async (req, res) => {
   try {
     const { category, isBestseller, isFeatured, search } = req.query;
 
-    // Filter Product Master for active, non-archived products
-    const productWhere = { isArchived: false, isActive: true };
+    // Filter Product Master for active, non-archived products that are published to website
+    const productWhere = { 
+      isArchived: false, 
+      isActive: true,
+      isPublished: true
+    };
+
     if (category && category !== 'All') {
       productWhere.category = category;
     }
@@ -31,60 +35,57 @@ const getProducts = async (req, res) => {
         { brand: { [Op.like]: `%${search}%` } },
       ];
     }
+    if (isBestseller === 'true') {
+      productWhere.isBestseller = true;
+    }
+    if (isFeatured === 'true') {
+      productWhere.isFeatured = true;
+    }
 
     const masterProducts = await Product.findAll({
       where: productWhere,
-      include: [{ model: WebsiteProduct, as: 'websiteProduct' }],
       order: [['createdAt', 'DESC']],
     });
 
     const formattedProducts = masterProducts.map((p) => {
-      const wp = p.websiteProduct || {};
-
-      // If website settings or product explicitly set isPublished to false or status is Draft, filter out
-      if (wp.isPublished === false || p.isPublished === false || p.publishToWebsite === false || p.status === 'Draft') return null;
-
-      if (isBestseller === 'true' && !wp.isBestseller) return null;
-      if (isFeatured === 'true' && !wp.isFeatured) return null;
-
       const primaryImageUrl = p.imageUrl || p.image || 'https://demo.amudhasurabiy.com/images/products/placeholder-product.webp';
-      let galleryArr = parseJsonField(wp.galleryImages || wp.images || p.galleryImages || p.images, true);
+      let galleryArr = parseJsonField(p.galleryImages || p.images, true);
       if (galleryArr.length === 0 && primaryImageUrl) galleryArr = [primaryImageUrl];
 
-      const benefitsArr = parseJsonField(wp.benefits || p.benefits, true);
-      const ingredientsArr = parseJsonField(wp.ingredients || p.ingredients, true);
+      const benefitsArr = parseJsonField(p.benefits, true);
+      const ingredientsArr = parseJsonField(p.ingredients, true);
 
       return {
-        id: wp.id || p.id,
+        id: p.id,
         productId: p.id,
         managementProductId: p.id,
         name: p.name,
-        slug: wp.slug || `${p.name.toLowerCase().replace(/[\s\W-]+/g, '-')}-${p.id}`,
+        slug: p.slug || `${p.name.toLowerCase().replace(/[\s\W-]+/g, '-')}-${p.id}`,
         sku: p.sku || `SKU-${p.id}`,
         price: Number(p.sellingPrice || p.price || 0),
         compareAtPrice: Number(p.mrp || 0),
         gstPercent: Number(p.gstPercent || 0),
-        description: wp.description || p.description || '',
-        shortDescription: wp.shortDescription || p.shortDescription || '',
+        description: p.description || '',
+        shortDescription: p.shortDescription || '',
         stock: Number(p.stock || 0),
         category: p.category || 'General',
         brand: p.brand || 'Blovit',
         imageUrl: primaryImageUrl,
-        imagePublicId: p.imagePublicId || wp.imagePublicId || null,
+        imagePublicId: p.imagePublicId || null,
         images: galleryArr,
         galleryImages: galleryArr,
         rating: 5.0,
         status: p.isActive ? 'active' : 'inactive',
-        isBestseller: !!wp.isBestseller,
-        isFeatured: !!wp.isFeatured,
-        isTrending: !!wp.isTrending,
+        isBestseller: !!p.isBestseller,
+        isFeatured: !!p.isFeatured,
+        isTrending: !!p.isTrending,
         benefits: benefitsArr,
         ingredients: ingredientsArr,
-        seoTitle: wp.seoTitle || p.name,
-        seoDescription: wp.seoDescription || wp.shortDescription || p.name,
-        seoKeywords: wp.seoKeywords || '',
+        seoTitle: p.seoTitle || p.name,
+        seoDescription: p.seoDescription || p.shortDescription || p.name,
+        seoKeywords: p.seoKeywords || '',
       };
-    }).filter(Boolean);
+    });
 
     res.json({
       success: true,
@@ -102,47 +103,34 @@ const getProductBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
 
-    // Search WebsiteProduct by slug or Product Master by ID/SKU
-    let wp = await WebsiteProduct.findOne({
-      where: { slug },
-      include: [{ model: Product, as: 'managementProduct' }]
+    // Search Product Master directly by slug / ID / SKU
+    const masterProduct = await Product.findOne({
+      where: { 
+        isArchived: false, 
+        isActive: true, 
+        isPublished: true,
+        [Op.or]: [{ slug }, { sku: slug }, { id: Number(slug) || 0 }] 
+      }
     });
 
-    let masterProduct = wp?.managementProduct;
-
-    if (!wp) {
-      // Fallback search Product Master directly by slug / ID
-      masterProduct = await Product.findOne({
-        where: { isArchived: false, isActive: true, [Op.or]: [{ sku: slug }, { id: Number(slug) || 0 }] },
-        include: [{ model: WebsiteProduct, as: 'websiteProduct' }]
-      });
-      if (masterProduct) {
-        wp = masterProduct.websiteProduct;
-      }
-    }
-
-    if (!masterProduct || masterProduct.isActive === false || masterProduct.isArchived) {
+    if (!masterProduct) {
       return res.status(404).json({ success: false, message: 'Product not found or unavailable' });
     }
 
-    if ((wp && wp.isPublished === false) || masterProduct.isPublished === false || masterProduct.publishToWebsite === false || masterProduct.status === 'Draft') {
-      return res.status(404).json({ success: false, message: 'Product is currently not published on website' });
-    }
-
     const primaryImageUrl = masterProduct.imageUrl || masterProduct.image || 'https://demo.amudhasurabiy.com/images/products/placeholder-product.webp';
-    let galleryArr = parseJsonField(wp?.galleryImages || wp?.images || masterProduct.galleryImages || masterProduct.images, true);
+    let galleryArr = parseJsonField(masterProduct.galleryImages || masterProduct.images, true);
     if (galleryArr.length === 0 && primaryImageUrl) galleryArr = [primaryImageUrl];
 
-    const benefitsArr = parseJsonField(wp?.benefits || masterProduct.benefits, true);
-    const ingredientsArr = parseJsonField(wp?.ingredients || masterProduct.ingredients, true);
-    const nutritionFactsObj = parseJsonField(wp?.nutritionFacts || masterProduct.nutritionFacts, false);
-    const faqsArr = parseJsonField(wp?.faqs, true);
+    const benefitsArr = parseJsonField(masterProduct.benefits, true);
+    const ingredientsArr = parseJsonField(masterProduct.ingredients, true);
+    const nutritionFactsObj = parseJsonField(masterProduct.nutritionFacts, false);
+    const faqsArr = parseJsonField(masterProduct.faqs, true);
 
     // Fetch active product reviews
     const reviews = await WebsiteProductReview.findAll({
       where: {
         [Op.or]: [
-          { productId: wp?.id || masterProduct.id },
+          { productId: masterProduct.id },
           { productSlug: slug }
         ],
         isActive: true
@@ -153,11 +141,11 @@ const getProductBySlug = async (req, res) => {
     res.json({
       success: true,
       data: {
-        id: wp?.id || masterProduct.id,
+        id: masterProduct.id,
         productId: masterProduct.id,
         managementProductId: masterProduct.id,
         name: masterProduct.name,
-        slug: wp?.slug || slug,
+        slug: masterProduct.slug || slug,
         sku: masterProduct.sku || '',
         barcode: masterProduct.barcode || '',
         brand: masterProduct.brand || 'Blovit',
@@ -171,21 +159,21 @@ const getProductBySlug = async (req, res) => {
         imageUrl: primaryImageUrl,
         images: galleryArr,
         galleryImages: galleryArr,
-        description: wp?.description || masterProduct.description || '',
-        shortDescription: wp?.shortDescription || masterProduct.shortDescription || '',
+        description: masterProduct.description || '',
+        shortDescription: masterProduct.shortDescription || '',
         benefits: benefitsArr,
         ingredients: ingredientsArr,
         nutritionFacts: nutritionFactsObj,
-        usageInstructions: wp?.usageInstructions || masterProduct.usageInstructions || '',
+        usageInstructions: masterProduct.usageInstructions || '',
         faqs: faqsArr,
-        seoTitle: wp?.seoTitle || masterProduct.name,
-        seoDescription: wp?.seoDescription || wp?.shortDescription || masterProduct.name,
-        seoKeywords: wp?.seoKeywords || '',
-        badges: parseJsonField(wp?.badges, true),
-        healthGoals: parseJsonField(wp?.healthGoals, true),
-        isBestseller: !!wp?.isBestseller,
-        isFeatured: !!wp?.isFeatured,
-        isTrending: !!wp?.isTrending,
+        seoTitle: masterProduct.seoTitle || masterProduct.name,
+        seoDescription: masterProduct.seoDescription || masterProduct.shortDescription || masterProduct.name,
+        seoKeywords: masterProduct.seoKeywords || '',
+        badges: parseJsonField(masterProduct.badges, true),
+        healthGoals: parseJsonField(masterProduct.healthGoals, true),
+        isBestseller: !!masterProduct.isBestseller,
+        isFeatured: !!masterProduct.isFeatured,
+        isTrending: !!masterProduct.isTrending,
         status: masterProduct.isActive ? 'active' : 'inactive',
         reviews,
       },
