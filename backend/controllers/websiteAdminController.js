@@ -83,14 +83,14 @@ const getAdminProducts = async (req, res) => {
     let masterProducts = [];
     try {
       masterProducts = await Product.findAll({
-        where: { isArchived: false },
+        where: { isArchived: { [Op.ne]: true } },
         include: [{ model: WebsiteProduct, as: 'websiteProduct' }],
         order: [['createdAt', 'DESC']],
       });
     } catch (eagerErr) {
       console.warn('Admin products eager load failed, falling back to direct query:', eagerErr.message);
       masterProducts = await Product.findAll({
-        where: { isArchived: false },
+        where: { isArchived: { [Op.ne]: true } },
         order: [['createdAt', 'DESC']],
       });
     }

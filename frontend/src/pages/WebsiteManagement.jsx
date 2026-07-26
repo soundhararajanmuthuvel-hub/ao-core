@@ -120,11 +120,43 @@ export default function WebsiteManagement() {
         const res = await client.get(`${API_BASE}/api-key`);
         setApiKeyData(res.data.data);
       } else if (tab === 'products') {
-        const res = await client.get(`${API_BASE}/products`);
-        setProducts(res.data.data || []);
-        if (res.data.managementProductsList) {
-          setManagementProductsList(res.data.managementProductsList);
+        const [adminProdRes, masterProdRes] = await Promise.allSettled([
+          client.get(`${API_BASE}/products`),
+          productsApi.list({ limit: 1000 })
+        ]);
+
+        let websiteProds = [];
+        let mgmtProds = [];
+
+        if (adminProdRes.status === 'fulfilled' && adminProdRes.value?.data) {
+          websiteProds = adminProdRes.value.data.data || [];
+          mgmtProds = adminProdRes.value.data.managementProductsList || [];
         }
+
+        if ((!mgmtProds || mgmtProds.length === 0) && masterProdRes.status === 'fulfilled' && masterProdRes.value?.data) {
+          const rawMasterList = masterProdRes.value.data.products || masterProdRes.value.data.data || [];
+          mgmtProds = rawMasterList.map(p => ({
+            id: p.id,
+            name: p.name || p.productName || 'Unnamed Product',
+            productName: p.name || p.productName || 'Unnamed Product',
+            sku: p.sku || '',
+            barcode: p.barcode || '',
+            brand: p.brand || 'Blovit',
+            category: p.category || 'General',
+            price: Number(p.sellingPrice || p.price || 0),
+            sellingPrice: Number(p.sellingPrice || p.price || 0),
+            gstPercent: Number(p.gstPercent || 0),
+            stock: Number(p.stock !== undefined ? p.stock : (p.stockQuantity || 0)),
+            stockQuantity: Number(p.stock !== undefined ? p.stock : (p.stockQuantity || 0)),
+            imageUrl: p.imageUrl || p.image || '',
+            isActive: p.isActive !== false,
+            status: p.isActive !== false ? 'Active' : 'Inactive'
+          }));
+        }
+
+        console.log(`[WebsiteManagement] Loaded ${websiteProds.length} website product settings and ${mgmtProds.length} Product Master items into selector.`);
+        setProducts(websiteProds);
+        setManagementProductsList(mgmtProds);
       } else if (tab === 'orders') {
         const res = await client.get(`${API_BASE}/orders`);
         setOrders(res.data.data || []);

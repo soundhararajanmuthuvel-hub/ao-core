@@ -14,31 +14,43 @@ export default function ProductInformationCard({
 
   const filteredMasterProducts = (managementProductsList || []).filter(p => {
     if (!selectorQuery.trim()) return true;
-    const q = selectorQuery.toLowerCase();
+    const q = selectorQuery.toLowerCase().trim();
+    const pName = String(p.name || p.productName || '').toLowerCase();
+    const pSku = String(p.sku || '').toLowerCase();
+    const pBarcode = String(p.barcode || '').toLowerCase();
+    const pBrand = String(p.brand || '').toLowerCase();
+    const pCategory = String(p.category || '').toLowerCase();
     return (
-      (p.name && p.name.toLowerCase().includes(q)) ||
-      (p.sku && p.sku.toLowerCase().includes(q)) ||
-      (p.barcode && p.barcode.toLowerCase().includes(q)) ||
-      (p.brand && p.brand.toLowerCase().includes(q)) ||
-      (p.category && p.category.toLowerCase().includes(q))
+      pName.includes(q) ||
+      pSku.includes(q) ||
+      pBarcode.includes(q) ||
+      pBrand.includes(q) ||
+      pCategory.includes(q)
     );
   });
 
   const handleSelectMaster = (prodId) => {
-    const sel = managementProductsList.find(p => String(p.id) === String(prodId));
+    const sel = (managementProductsList || []).find(p => String(p.id) === String(prodId));
     if (sel) {
+      const chosenName = sel.name || sel.productName || '';
+      const chosenPrice = sel.sellingPrice !== undefined && sel.sellingPrice !== null ? sel.sellingPrice : (sel.price || 0);
+      const chosenStock = sel.stock !== undefined && sel.stock !== null ? sel.stock : (sel.stockQuantity || 0);
+      const chosenGst = sel.gstPercent !== undefined && sel.gstPercent !== null ? sel.gstPercent : (sel.gstRate || 0);
+
       setFormData(prev => ({
         ...prev,
         managementProductId: sel.id,
         productId: sel.id,
-        name: sel.name,
+        name: chosenName,
         sku: sel.sku || '',
         barcode: sel.barcode || '',
         brand: sel.brand || 'Blovit',
         category: sel.category || 'General',
-        price: sel.price || sel.sellingPrice || 0,
-        gstPercent: sel.gstPercent || 0,
-        stock: sel.stock || 0,
+        price: Number(chosenPrice),
+        sellingPrice: Number(chosenPrice),
+        gstPercent: Number(chosenGst),
+        stock: Number(chosenStock),
+        stockQuantity: Number(chosenStock),
         masterStatus: sel.status || (sel.isActive ? 'Active' : 'Inactive'),
         imageUrl: sel.imageUrl || sel.image || ''
       }));
@@ -85,10 +97,16 @@ export default function ProductInformationCard({
               onChange={e => handleSelectMaster(e.target.value)}
               style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #0284C7', fontSize: '0.85rem', fontWeight: 700, backgroundColor: '#FFFFFF', color: '#0F172A' }}
             >
-              <option value="">-- Choose Active Product Master Item --</option>
+              {(managementProductsList || []).length === 0 ? (
+                <option value="" disabled>-- No active products found in Product Master --</option>
+              ) : (
+                <option value="">
+                  -- Choose Active Product Master Item ({filteredMasterProducts.length} Available) --
+                </option>
+              )}
               {filteredMasterProducts.map(p => (
                 <option key={p.id} value={p.id}>
-                  {p.name} | SKU: {p.sku || 'N/A'} | Price: ₹{p.price || 0} | Stock: {p.stock || 0} ({p.category})
+                  {p.name || p.productName} | SKU: {p.sku || 'N/A'} | Price: ₹{p.sellingPrice !== undefined ? p.sellingPrice : (p.price || 0)} | Stock: {p.stock !== undefined ? p.stock : (p.stockQuantity || 0)} ({p.category || 'General'})
                 </option>
               ))}
             </select>
