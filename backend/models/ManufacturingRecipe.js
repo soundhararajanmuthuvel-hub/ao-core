@@ -47,8 +47,8 @@ const ManufacturingRecipe = sequelize.define('ManufacturingRecipe', {
   },
 });
 
-ManufacturingRecipe.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
-ManufacturingRecipe.belongsTo(Product, { as: 'variantProduct', foreignKey: 'variantProductId' });
+ManufacturingRecipe.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'CASCADE' });
+ManufacturingRecipe.belongsTo(Product, { as: 'variantProduct', foreignKey: 'variantProductId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(ManufacturingRecipe, {
   product: 'productId',

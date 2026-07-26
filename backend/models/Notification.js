@@ -32,7 +32,7 @@ const Notification = sequelize.define('Notification', {
 });
 
 // Associations
-Notification.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+Notification.belongsTo(User, { as: 'user', foreignKey: 'userId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(Notification, { user: 'userId' });
 

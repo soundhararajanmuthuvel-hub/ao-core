@@ -145,8 +145,8 @@ const WebsiteProduct = sequelize.define(
 );
 
 const Product = require('./Product');
-WebsiteProduct.belongsTo(Product, { as: 'managementProduct', foreignKey: 'managementProductId' });
-Product.hasOne(WebsiteProduct, { as: 'websiteProduct', foreignKey: 'managementProductId' });
+WebsiteProduct.belongsTo(Product, { as: 'managementProduct', foreignKey: 'managementProductId', onDelete: 'CASCADE' });
+Product.hasOne(WebsiteProduct, { as: 'websiteProduct', foreignKey: 'managementProductId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(WebsiteProduct);
 

@@ -218,12 +218,12 @@ const Invoice = sequelize.define('Invoice', {
 });
 
 // Associations
-Invoice.belongsTo(Customer, { as: 'customer', foreignKey: 'customerId' });
-Invoice.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById' });
+Invoice.belongsTo(Customer, { as: 'customer', foreignKey: 'customerId', onDelete: 'CASCADE' });
+Invoice.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById', onDelete: 'CASCADE' });
 
 // An invoice has many items, which will be cascaded on deletion
 Invoice.hasMany(InvoiceItem, { as: 'items', foreignKey: 'invoiceId', onDelete: 'CASCADE' });
-InvoiceItem.belongsTo(Invoice, { as: 'invoice', foreignKey: 'invoiceId' });
+InvoiceItem.belongsTo(Invoice, { as: 'invoice', foreignKey: 'invoiceId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(Invoice, {
   customer: 'customerId',

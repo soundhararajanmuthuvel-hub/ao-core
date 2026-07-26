@@ -188,7 +188,7 @@ const Customer = sequelize.define('Customer', {
   ]
 });
 
-Customer.belongsTo(require('./User'), { as: 'salesman', foreignKey: 'assignedSalesmanId' });
+Customer.belongsTo(require('./User'), { as: 'salesman', foreignKey: 'assignedSalesmanId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(Customer, {
   salesman: 'assignedSalesmanId',

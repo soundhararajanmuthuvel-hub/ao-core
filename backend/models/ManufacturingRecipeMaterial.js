@@ -19,7 +19,7 @@ const ManufacturingRecipeMaterial = sequelize.define('ManufacturingRecipeMateria
 ManufacturingRecipeMaterial.belongsTo(ManufacturingRecipe, { as: 'recipe', foreignKey: 'recipeId', onDelete: 'CASCADE' });
 ManufacturingRecipe.hasMany(ManufacturingRecipeMaterial, { as: 'materials', foreignKey: 'recipeId', onDelete: 'CASCADE' });
 
-ManufacturingRecipeMaterial.belongsTo(RawMaterial, { as: 'rawMaterial', foreignKey: 'rawMaterialId' });
+ManufacturingRecipeMaterial.belongsTo(RawMaterial, { as: 'rawMaterial', foreignKey: 'rawMaterialId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(ManufacturingRecipeMaterial, {
   recipe: 'recipeId',

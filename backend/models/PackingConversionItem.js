@@ -24,8 +24,8 @@ const PackingConversionItem = sequelize.define('PackingConversionItem', {
   },
 });
 
-PackingConversionItem.belongsTo(Product, { as: 'targetProduct', foreignKey: 'targetProductId' });
-PackingConversionItem.belongsTo(PackingConversion, { as: 'packingConversion', foreignKey: 'packingConversionId' });
+PackingConversionItem.belongsTo(Product, { as: 'targetProduct', foreignKey: 'targetProductId', onDelete: 'CASCADE' });
+PackingConversionItem.belongsTo(PackingConversion, { as: 'packingConversion', foreignKey: 'packingConversionId', onDelete: 'CASCADE' });
 PackingConversion.hasMany(PackingConversionItem, { as: 'items', foreignKey: 'packingConversionId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(PackingConversionItem, {

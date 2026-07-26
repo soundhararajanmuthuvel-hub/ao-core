@@ -61,9 +61,9 @@ const SalesTarget = sequelize.define('SalesTarget', {
   },
 });
 
-SalesTarget.belongsTo(require('./User'), { as: 'salesman', foreignKey: 'salesmanId' });
-SalesTarget.belongsTo(require('./Customer'), { as: 'customer', foreignKey: 'customerId' });
-SalesTarget.belongsTo(require('./Product'), { as: 'product', foreignKey: 'productId' });
+SalesTarget.belongsTo(require('./User'), { as: 'salesman', foreignKey: 'salesmanId', onDelete: 'SET NULL' });
+SalesTarget.belongsTo(require('./Customer'), { as: 'customer', foreignKey: 'customerId', onDelete: 'CASCADE' });
+SalesTarget.belongsTo(require('./Product'), { as: 'product', foreignKey: 'productId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(SalesTarget, {
   salesman: 'salesmanId',

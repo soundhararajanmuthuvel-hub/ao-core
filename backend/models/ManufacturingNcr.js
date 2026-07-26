@@ -71,8 +71,8 @@ const ManufacturingNcr = sequelize.define('ManufacturingNcr', {
   timestamps: true,
 });
 
-ManufacturingNcr.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
-ManufacturingNcr.belongsTo(User, { as: 'assignedQaUser', foreignKey: 'assignedQaUserId' });
+ManufacturingNcr.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'CASCADE' });
+ManufacturingNcr.belongsTo(User, { as: 'assignedQaUser', foreignKey: 'assignedQaUserId', onDelete: 'SET NULL' });
 
 makeMongooseCompatible(ManufacturingNcr, {
   product: 'productId',

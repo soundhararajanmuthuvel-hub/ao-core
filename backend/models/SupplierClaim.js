@@ -50,7 +50,7 @@ const SupplierClaim = sequelize.define('SupplierClaim', {
   timestamps: true,
 });
 
-SupplierClaim.belongsTo(Supplier, { as: 'supplier', foreignKey: 'supplierId' });
+SupplierClaim.belongsTo(Supplier, { as: 'supplier', foreignKey: 'supplierId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(SupplierClaim, {
   supplier: 'supplierId',

@@ -106,11 +106,11 @@ const RepackEntry = sequelize.define('RepackEntry', {
 });
 
 // Associations
-RepackEntry.belongsTo(RepackRecipe, { as: 'recipe', foreignKey: 'recipeId' });
-RepackEntry.belongsTo(Product, { as: 'finishedProduct', foreignKey: 'finishedProductId' });
-RepackEntry.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById' });
+RepackEntry.belongsTo(RepackRecipe, { as: 'recipe', foreignKey: 'recipeId', onDelete: 'CASCADE' });
+RepackEntry.belongsTo(Product, { as: 'finishedProduct', foreignKey: 'finishedProductId', onDelete: 'CASCADE' });
+RepackEntry.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById', onDelete: 'CASCADE' });
 const ProductPackSize = require('./ProductPackSize');
-RepackEntry.belongsTo(ProductPackSize, { as: 'packSize', foreignKey: 'packSizeId' });
+RepackEntry.belongsTo(ProductPackSize, { as: 'packSize', foreignKey: 'packSizeId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(RepackEntry, {
   recipe: 'recipeId',

@@ -212,11 +212,11 @@ const ReturnRequest = sequelize.define('ReturnRequest', {
   ]
 });
 
-ReturnRequest.belongsTo(Customer, { as: 'customer', foreignKey: 'customerId' });
-ReturnRequest.belongsTo(Invoice, { as: 'invoice', foreignKey: 'invoiceId' });
-ReturnRequest.belongsTo(User, { as: 'salesman', foreignKey: 'salesmanId' });
-ReturnRequest.belongsTo(User, { as: 'approvedBy', foreignKey: 'approvedById' });
-ReturnRequest.belongsTo(User, { as: 'qcInspector', foreignKey: 'qcInspectorId' });
+ReturnRequest.belongsTo(Customer, { as: 'customer', foreignKey: 'customerId', onDelete: 'CASCADE' });
+ReturnRequest.belongsTo(Invoice, { as: 'invoice', foreignKey: 'invoiceId', onDelete: 'CASCADE' });
+ReturnRequest.belongsTo(User, { as: 'salesman', foreignKey: 'salesmanId', onDelete: 'SET NULL' });
+ReturnRequest.belongsTo(User, { as: 'approvedBy', foreignKey: 'approvedById', onDelete: 'SET NULL' });
+ReturnRequest.belongsTo(User, { as: 'qcInspector', foreignKey: 'qcInspectorId', onDelete: 'SET NULL' });
 
 makeMongooseCompatible(ReturnRequest, {
   customer: 'customerId',

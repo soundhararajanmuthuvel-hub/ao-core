@@ -63,8 +63,8 @@ const ReturnCreditNote = sequelize.define('ReturnCreditNote', {
   timestamps: true,
 });
 
-ReturnCreditNote.belongsTo(Customer, { as: 'customer', foreignKey: 'customerId' });
-ReturnCreditNote.belongsTo(Invoice, { as: 'invoice', foreignKey: 'invoiceId' });
+ReturnCreditNote.belongsTo(Customer, { as: 'customer', foreignKey: 'customerId', onDelete: 'CASCADE' });
+ReturnCreditNote.belongsTo(Invoice, { as: 'invoice', foreignKey: 'invoiceId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(ReturnCreditNote, {
   customer: 'customerId',

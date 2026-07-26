@@ -95,8 +95,8 @@ const RepackWorkOrder = sequelize.define('RepackWorkOrder', {
   timestamps: true,
 });
 
-RepackWorkOrder.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
-RepackWorkOrder.belongsTo(User, { as: 'operator', foreignKey: 'operatorUserId' });
+RepackWorkOrder.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'CASCADE' });
+RepackWorkOrder.belongsTo(User, { as: 'operator', foreignKey: 'operatorUserId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(RepackWorkOrder, {
   product: 'productId',

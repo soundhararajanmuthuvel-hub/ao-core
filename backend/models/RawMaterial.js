@@ -111,7 +111,7 @@ RawMaterial.beforeUpdate((material) => {
   syncUnits(material);
 });
 
-RawMaterial.belongsTo(Supplier, { as: 'supplier', foreignKey: 'supplierId' });
+RawMaterial.belongsTo(Supplier, { as: 'supplier', foreignKey: 'supplierId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(RawMaterial, {
   supplier: 'supplierId',

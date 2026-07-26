@@ -51,8 +51,8 @@ const CustomerReview = sequelize.define('CustomerReview', {
   },
 });
 
-CustomerReview.belongsTo(require('./Customer'), { as: 'customer', foreignKey: 'customerId' });
-CustomerReview.belongsTo(require('./Invoice'), { as: 'invoice', foreignKey: 'invoiceId' });
+CustomerReview.belongsTo(require('./Customer'), { as: 'customer', foreignKey: 'customerId', onDelete: 'CASCADE' });
+CustomerReview.belongsTo(require('./Invoice'), { as: 'invoice', foreignKey: 'invoiceId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(CustomerReview, {
   customer: 'customerId',

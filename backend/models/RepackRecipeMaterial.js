@@ -20,7 +20,7 @@ const RepackRecipeMaterial = sequelize.define('RepackRecipeMaterial', {
 RepackRecipeMaterial.belongsTo(RepackRecipe, { as: 'recipe', foreignKey: 'recipeId', onDelete: 'CASCADE' });
 RepackRecipe.hasMany(RepackRecipeMaterial, { as: 'materials', foreignKey: 'recipeId', onDelete: 'CASCADE' });
 
-RepackRecipeMaterial.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
+RepackRecipeMaterial.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(RepackRecipeMaterial, {
   recipe: 'recipeId',

@@ -121,8 +121,8 @@ const Shipment = sequelize.define('Shipment', {
 // Associations
 Shipment.belongsTo(Invoice, { as: 'invoice', foreignKey: 'invoiceId', onDelete: 'CASCADE' });
 Invoice.hasMany(Shipment, { as: 'shipments', foreignKey: 'invoiceId', onDelete: 'CASCADE' });
-Shipment.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById' });
-Shipment.belongsTo(User, { as: 'deliveryStaff', foreignKey: 'deliveryStaffId' });
+Shipment.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById', onDelete: 'CASCADE' });
+Shipment.belongsTo(User, { as: 'deliveryStaff', foreignKey: 'deliveryStaffId', onDelete: 'SET NULL' });
 
 // We define Courier relation inline to prevent circular references during module initialization
 const Courier = require('./Courier');

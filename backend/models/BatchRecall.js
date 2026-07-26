@@ -64,7 +64,7 @@ const BatchRecall = sequelize.define('BatchRecall', {
   timestamps: true,
 });
 
-BatchRecall.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
+BatchRecall.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(BatchRecall, {
   product: 'productId',

@@ -34,7 +34,7 @@ const ProductShelfLifeRule = sequelize.define('ProductShelfLifeRule', {
   timestamps: true,
 });
 
-ProductShelfLifeRule.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
+ProductShelfLifeRule.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(ProductShelfLifeRule, {
   product: 'productId',

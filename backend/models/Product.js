@@ -288,10 +288,10 @@ Product.beforeUpdate((product) => {
   }
 });
 
-Product.belongsTo(Product, { as: 'parentProduct', foreignKey: 'parentProductId' });
-Product.hasMany(Product, { as: 'variants', foreignKey: 'parentProductId' });
+Product.belongsTo(Product, { as: 'parentProduct', foreignKey: 'parentProductId', onDelete: 'CASCADE' });
+Product.hasMany(Product, { as: 'variants', foreignKey: 'parentProductId', onDelete: 'CASCADE' });
 
-Product.belongsTo(require('./Supplier'), { as: 'preferredSupplier', foreignKey: 'preferredSupplierId' });
+Product.belongsTo(require('./Supplier'), { as: 'preferredSupplier', foreignKey: 'preferredSupplierId', onDelete: 'SET NULL' });
 
 makeMongooseCompatible(Product, {
   preferredSupplier: 'preferredSupplierId',

@@ -26,7 +26,7 @@ const SalesmanLocation = sequelize.define('SalesmanLocation', {
   },
 });
 
-SalesmanLocation.belongsTo(require('./User'), { as: 'salesman', foreignKey: 'salesmanId' });
+SalesmanLocation.belongsTo(require('./User'), { as: 'salesman', foreignKey: 'salesmanId', onDelete: 'SET NULL' });
 
 makeMongooseCompatible(SalesmanLocation, {
   salesman: 'salesmanId',

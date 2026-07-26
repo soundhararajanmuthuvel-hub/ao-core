@@ -86,8 +86,8 @@ const Lead = sequelize.define('Lead', {
   }
 });
 
-Lead.belongsTo(require('./User'), { as: 'salesman', foreignKey: 'assignedSalesmanId' });
-Lead.belongsTo(require('./Customer'), { as: 'customer', foreignKey: 'customerId' });
+Lead.belongsTo(require('./User'), { as: 'salesman', foreignKey: 'assignedSalesmanId', onDelete: 'CASCADE' });
+Lead.belongsTo(require('./Customer'), { as: 'customer', foreignKey: 'customerId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(Lead, {
   salesman: 'assignedSalesmanId',

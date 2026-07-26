@@ -28,7 +28,7 @@ const ActivityLog = sequelize.define('ActivityLog', {
 });
 
 // Associations
-ActivityLog.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+ActivityLog.belongsTo(User, { as: 'user', foreignKey: 'userId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(ActivityLog, { user: 'userId' });
 

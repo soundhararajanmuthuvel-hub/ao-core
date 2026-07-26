@@ -42,8 +42,8 @@ const TradeScheme = sequelize.define('TradeScheme', {
   },
 });
 
-TradeScheme.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
-TradeScheme.belongsTo(Customer, { as: 'customer', foreignKey: 'customerId' });
+TradeScheme.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'CASCADE' });
+TradeScheme.belongsTo(Customer, { as: 'customer', foreignKey: 'customerId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(TradeScheme, {
   product: 'productId',

@@ -33,8 +33,8 @@ const PackingConversion = sequelize.define('PackingConversion', {
   },
 });
 
-PackingConversion.belongsTo(Product, { as: 'sourceProduct', foreignKey: 'sourceProductId' });
-PackingConversion.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById' });
+PackingConversion.belongsTo(Product, { as: 'sourceProduct', foreignKey: 'sourceProductId', onDelete: 'CASCADE' });
+PackingConversion.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(PackingConversion, {
   sourceProduct: 'sourceProductId',

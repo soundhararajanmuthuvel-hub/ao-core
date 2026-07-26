@@ -50,7 +50,7 @@ const PurchaseItem = sequelize.define('PurchaseItem', {
   },
 });
 
-PurchaseItem.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
+PurchaseItem.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(PurchaseItem, { product: 'productId' });
 

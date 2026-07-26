@@ -140,7 +140,7 @@ const ReturnItem = sequelize.define('ReturnItem', {
 
 ReturnItem.belongsTo(ReturnRequest, { as: 'returnRequest', foreignKey: 'returnRequestId', onDelete: 'CASCADE' });
 ReturnRequest.hasMany(ReturnItem, { as: 'items', foreignKey: 'returnRequestId', onDelete: 'CASCADE' });
-ReturnItem.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
+ReturnItem.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(ReturnItem, {
   returnRequest: 'returnRequestId',

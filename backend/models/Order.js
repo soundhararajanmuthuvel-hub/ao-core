@@ -114,9 +114,9 @@ const Order = sequelize.define('Order', {
   ]
 });
 
-Order.belongsTo(require('./Customer'), { as: 'customer', foreignKey: 'customerId' });
-Order.belongsTo(require('./Invoice'), { as: 'invoice', foreignKey: 'invoiceId' });
-Order.belongsTo(require('./Shipment'), { as: 'shipment', foreignKey: 'shipmentId' });
+Order.belongsTo(require('./Customer'), { as: 'customer', foreignKey: 'customerId', onDelete: 'CASCADE' });
+Order.belongsTo(require('./Invoice'), { as: 'invoice', foreignKey: 'invoiceId', onDelete: 'CASCADE' });
+Order.belongsTo(require('./Shipment'), { as: 'shipment', foreignKey: 'shipmentId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(Order, {
   customer: 'customerId',

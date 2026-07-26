@@ -40,7 +40,7 @@ const RepackRecipe = sequelize.define('RepackRecipe', {
 });
 
 // Associations
-RepackRecipe.belongsTo(Product, { as: 'finishedProduct', foreignKey: 'finishedProductId' });
+RepackRecipe.belongsTo(Product, { as: 'finishedProduct', foreignKey: 'finishedProductId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(RepackRecipe, {
   finishedProduct: 'finishedProductId',

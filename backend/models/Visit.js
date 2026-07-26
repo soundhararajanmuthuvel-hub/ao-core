@@ -59,9 +59,9 @@ const Visit = sequelize.define('Visit', {
   },
 });
 
-Visit.belongsTo(require('./User'), { as: 'salesman', foreignKey: 'salesmanId' });
-Visit.belongsTo(require('./Customer'), { as: 'customer', foreignKey: 'customerId' });
-Visit.belongsTo(require('./Lead'), { as: 'lead', foreignKey: 'leadId' });
+Visit.belongsTo(require('./User'), { as: 'salesman', foreignKey: 'salesmanId', onDelete: 'SET NULL' });
+Visit.belongsTo(require('./Customer'), { as: 'customer', foreignKey: 'customerId', onDelete: 'CASCADE' });
+Visit.belongsTo(require('./Lead'), { as: 'lead', foreignKey: 'leadId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(Visit, {
   salesman: 'salesmanId',

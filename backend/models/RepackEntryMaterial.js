@@ -30,7 +30,7 @@ const RepackEntryMaterial = sequelize.define('RepackEntryMaterial', {
 RepackEntryMaterial.belongsTo(RepackEntry, { as: 'repackEntry', foreignKey: 'repackEntryId', onDelete: 'CASCADE' });
 RepackEntry.hasMany(RepackEntryMaterial, { as: 'materials', foreignKey: 'repackEntryId', onDelete: 'CASCADE' });
 
-RepackEntryMaterial.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
+RepackEntryMaterial.belongsTo(Product, { as: 'product', foreignKey: 'productId', onDelete: 'CASCADE' });
 
 makeMongooseCompatible(RepackEntryMaterial, {
   repackEntry: 'repackEntryId',

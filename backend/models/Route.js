@@ -39,7 +39,7 @@ const Route = sequelize.define('Route', {
   },
 });
 
-Route.belongsTo(require('./User'), { as: 'salesman', foreignKey: 'salesmanId' });
+Route.belongsTo(require('./User'), { as: 'salesman', foreignKey: 'salesmanId', onDelete: 'SET NULL' });
 
 makeMongooseCompatible(Route, {
   salesman: 'salesmanId',
