@@ -34,12 +34,14 @@ if (cloudName && apiKey && apiSecret) {
   // Never fall back to hardcoded credentials.
   // If env vars are not set, fail loudly at startup rather than silently
   // using real credentials embedded in source code.
-  throw new Error(
-    '[Cloudinary] Missing required environment variables: ' +
-    'CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET. ' +
-    'Set these in your .env file or CLOUDINARY_URL. ' +
-    'Do NOT hardcode credentials in source files.'
-  );
+  console.error('\n======================================================');
+  console.error('CRITICAL STARTUP FAILURE');
+  console.error('======================================================');
+  console.error('[Cloudinary] Missing required environment variables:');
+  console.error('CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET.');
+  console.error('Set these in your .env file or CLOUDINARY_URL in your deployment dashboard.');
+  console.error('======================================================\n');
+  process.exit(1);
 }
 
 // 2. Initialize Cloudinary SDK exactly once on startup
