@@ -75,6 +75,11 @@ export const salesApi = {
   deletePayment: (id) => client.delete(`/sales/payment/${id}`),
 };
 
+export const quickBillingApi = {
+  create: (data) => client.post('/quick-billing', data),
+  stats: (params) => client.get('/quick-billing/stats', { params }),
+};
+
 export const purchasesApi = {
   list: (params) => client.get('/purchases', { params }),
   create: (data) => client.post('/purchases', data),

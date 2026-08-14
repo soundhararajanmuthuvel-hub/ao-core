@@ -200,6 +200,7 @@ export const menuStructure = [
     children: [
       { to: '/order-noting', label: 'Orders', roles: ['Super Admin', 'admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive', 'Store Keeper'] },
       { to: '/sales', label: 'Invoices', roles: ['Super Admin', 'admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive', 'Sales Manager', 'Salesman'] },
+      { to: '/quick-billing', label: '⚡ Quick Billing', roles: ['Super Admin', 'admin', 'Billing Executive', 'Sales Executive'] },
       { to: '/customers', label: 'Customers', roles: ['Super Admin', 'admin', 'Sales Executive', 'Billing Executive', 'Sales Manager', 'Salesman'] },
       { to: '/sales/returns', label: 'Returns', roles: ['Super Admin', 'admin', 'Billing Executive', 'Sales Executive', 'Sales Manager', 'Dispatch Executive', 'Store Keeper'] }
     ]

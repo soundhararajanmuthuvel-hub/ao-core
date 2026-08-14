@@ -21,6 +21,12 @@ export function ModuleProvider({ children }) {
         setActiveModuleState('website');
         localStorage.setItem('active_erp_module', 'website');
       }
+    } else {
+      // Reset to management on any non-website route so the correct sidebar shows
+      if (activeModule !== 'management') {
+        setActiveModuleState('management');
+        localStorage.setItem('active_erp_module', 'management');
+      }
     }
   }, [location.pathname]);
 

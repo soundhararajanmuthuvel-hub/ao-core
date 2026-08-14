@@ -1,0 +1,734 @@
+/* ============================================================
+   Quick Billing Module — quickbilling.css
+   All values reference existing CSS custom properties from
+   variables.css — no new design tokens introduced.
+   ============================================================ */
+
+/* ── Page layout ──────────────────────────────────────────── */
+.qb-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg-page);
+  padding-bottom: 90px; /* space for sticky bar */
+  font-family: var(--font-body);
+  color: var(--text-primary);
+}
+
+.qb-header {
+  padding: 1rem 1rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.qb-header-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--brand-primary);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.qb-header h1 {
+  font-family: var(--font-headline);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.qb-header p {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ── Dashboard stat cards ─────────────────────────────────── */
+.qb-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.qb-stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s;
+}
+
+.qb-stat-card:hover {
+  transform: translateY(-1px);
+}
+
+.qb-stat-card .stat-value {
+  font-family: var(--font-headline);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--brand-primary);
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-theme='dark'] .qb-stat-card .stat-value {
+  color: var(--brand-primary);
+}
+
+.qb-stat-card .stat-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Section wrapper ─────────────────────────────────────── */
+.qb-section {
+  padding: 0 1rem 0.5rem;
+}
+
+.qb-section-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  padding-left: 0.1rem;
+}
+
+/* ── Bill form card ──────────────────────────────────────── */
+.qb-form-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 2);
+  padding: 1rem;
+  box-shadow: var(--shadow);
+  margin-bottom: 0.75rem;
+}
+
+/* ── Form fields ─────────────────────────────────────────── */
+.qb-field {
+  margin-bottom: 0.9rem;
+}
+
+.qb-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+}
+
+.qb-label .qb-required {
+  color: var(--danger);
+  margin-left: 2px;
+}
+
+.qb-input {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.95rem;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  box-sizing: border-box;
+  min-height: 48px;
+  font-family: var(--font-body);
+}
+
+.qb-input:focus {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 2px rgba(43, 29, 20, 0.12);
+}
+
+.qb-input.error {
+  border-color: var(--danger);
+}
+
+.qb-error-msg {
+  font-size: 0.74rem;
+  color: var(--danger);
+  margin-top: 0.3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* ── Product search dropdown ─────────────────────────────── */
+.qb-product-wrap {
+  position: relative;
+}
+
+.qb-product-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.qb-product-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.85rem;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid var(--border);
+  min-height: 48px;
+  gap: 0.5rem;
+}
+
+.qb-product-option:last-child {
+  border-bottom: none;
+}
+
+.qb-product-option:hover,
+.qb-product-option.active {
+  background: rgba(43, 29, 20, 0.06);
+}
+
+[data-theme='dark'] .qb-product-option:hover,
+[data-theme='dark'] .qb-product-option.active {
+  background: rgba(255,255,255,0.06);
+}
+
+.qb-product-option-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qb-product-option-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.qb-product-option-price {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--brand-primary);
+  white-space: nowrap;
+}
+
+/* ── Quantity stepper ────────────────────────────────────── */
+.qb-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-page);
+  height: 48px;
+}
+
+.qb-stepper-btn {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  border: none;
+  cursor: pointer;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.qb-stepper-btn:hover {
+  background: var(--brand-primary);
+  color: #fff;
+}
+
+.qb-stepper-btn:active {
+  background: var(--brand-primary-hover);
+  color: #fff;
+}
+
+.qb-stepper-input {
+  flex: 1;
+  height: 48px;
+  text-align: center;
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  outline: none;
+  min-width: 40px;
+}
+
+/* ── Discount toggle (segmented control) ─────────────────── */
+.qb-discount-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.qb-segment {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.qb-segment-btn {
+  padding: 0 0.9rem;
+  height: 48px;
+  background: var(--bg-page);
+  border: none;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.qb-segment-btn.active {
+  background: var(--brand-primary);
+  color: #fff;
+}
+
+.qb-discount-input {
+  flex: 1;
+}
+
+/* ── Line item row ───────────────────────────────────────── */
+.qb-line-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  background: var(--bg-page);
+  margin-bottom: 0.5rem;
+  position: relative;
+}
+
+.qb-line-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.qb-line-item-num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.qb-remove-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.qb-remove-btn:hover {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+
+.qb-line-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+}
+
+.qb-line-total-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.qb-line-total-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ── Price/Qty row ───────────────────────────────────────── */
+.qb-price-qty-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+/* ── Final amount display ────────────────────────────────── */
+.qb-final-wrap {
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 2);
+  margin: 0 0 0.75rem;
+  box-shadow: var(--shadow);
+}
+
+.qb-final-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.qb-final-amount {
+  font-family: var(--font-headline);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--brand-primary);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+/* ── Add item button ─────────────────────────────────────── */
+.qb-add-item-btn {
+  width: 100%;
+  padding: 0.7rem;
+  background: transparent;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  min-height: 48px;
+  font-family: var(--font-body);
+}
+
+.qb-add-item-btn:hover {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  background: rgba(43, 29, 20, 0.04);
+}
+
+/* ── Sticky bottom bar ───────────────────────────────────── */
+.qb-sticky-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  padding: 0.75rem 1rem;
+  background: var(--bg-page);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 20px rgba(43, 29, 20, 0.12);
+  /* On desktop, offset by sidebar width */
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+@media (min-width: 768px) {
+  /* When sidebar is present, let the sticky bar span only the content area */
+  .app-shell .qb-sticky-bar {
+    left: var(--sidebar-width, 260px);
+  }
+}
+
+.qb-bill-btn {
+  width: 100%;
+  min-height: 56px;
+  background: var(--brand-primary);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  text-transform: uppercase;
+  transition: background 0.18s, transform 0.12s, box-shadow 0.18s;
+  box-shadow: 0 4px 16px rgba(43, 29, 20, 0.25);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.qb-bill-btn:hover {
+  background: var(--brand-primary-hover);
+  box-shadow: 0 6px 24px rgba(43, 29, 20, 0.35);
+}
+
+.qb-bill-btn:active {
+  transform: scale(0.98);
+}
+
+.qb-bill-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.qb-bill-btn .wa-icon {
+  font-size: 1.2rem;
+}
+
+/* ── Success / New Bill state ────────────────────────────── */
+.qb-success-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.qb-new-bill-btn {
+  flex: 1;
+  min-height: 56px;
+  background: var(--success);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: background 0.18s;
+}
+
+.qb-new-bill-btn:hover {
+  background: #6f8c65;
+}
+
+/* ── Recent bills list ───────────────────────────────────── */
+.qb-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.qb-recent-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  transition: background 0.12s;
+  min-height: 56px;
+}
+
+.qb-recent-item:hover {
+  background: rgba(43, 29, 20, 0.04);
+}
+
+[data-theme='dark'] .qb-recent-item:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.qb-recent-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.qb-recent-inv {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qb-recent-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.qb-recent-amount {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--brand-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.qb-resend-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #25d366;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #fff;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.qb-resend-btn:hover {
+  background: #1da851;
+  transform: scale(1.08);
+}
+
+/* ── Search input ────────────────────────────────────────── */
+.qb-search-wrap {
+  position: relative;
+  margin-bottom: 0.6rem;
+}
+
+.qb-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+.qb-search-input {
+  width: 100%;
+  padding: 0.65rem 0.75rem 0.65rem 2.2rem;
+  font-size: 0.875rem;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  outline: none;
+  transition: border-color 0.18s;
+  box-sizing: border-box;
+  min-height: 44px;
+  font-family: var(--font-body);
+}
+
+.qb-search-input:focus {
+  border-color: var(--brand-primary);
+}
+
+/* ── Dashboard collapsible toggle ────────────────────────── */
+.qb-panel-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.qb-panel-toggle-arrow {
+  transition: transform 0.2s;
+}
+
+.qb-panel-toggle-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* ── Loading spinner in button ────────────────────────────── */
+.qb-btn-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: qb-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes qb-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Responsive desktop adjustments ─────────────────────── */
+@media (min-width: 640px) {
+  .qb-stats-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .qb-stat-card .stat-value {
+    font-size: 1.3rem;
+  }
+
+  .qb-form-card {
+    padding: 1.25rem;
+  }
+
+  .qb-final-amount {
+    font-size: 2.4rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .qb-page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding-bottom: 100px;
+  }
+}

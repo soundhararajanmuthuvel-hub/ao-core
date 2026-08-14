@@ -59,6 +59,8 @@ const IntegrationsMarketplace = lazy(() => import('../pages/IntegrationsMarketpl
 const DeveloperCenter = lazy(() => import('../pages/DeveloperCenter'));
 const WebsiteManagement = lazy(() => import('../pages/WebsiteManagement'));
 const ReturnRecoveryModule = lazy(() => import('../pages/ReturnRecoveryModule'));
+const QuickBilling = lazy(() => import('../pages/QuickBilling'));
+
 
 
 
@@ -278,6 +280,15 @@ export default function AppRoutes() {
             </RoleRoute>
           }
         />
+        <Route
+          path="quick-billing"
+          element={
+            <RoleRoute roles={['Super Admin', 'Billing Executive', 'Sales Executive']}>
+              <QuickBilling />
+            </RoleRoute>
+          }
+        />
+
         <Route
           path="order-noting"
           element={
