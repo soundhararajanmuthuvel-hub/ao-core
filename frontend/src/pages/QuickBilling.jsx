@@ -62,6 +62,8 @@ function buildWhatsAppMessage(sale, phoneHint) {
 
   if (discount > 0) {
     msg += `\n🎉 You saved: ₹${fmtShort(discount)}\n`;
+  } else {
+    msg += `\n🎁 Ask us about our best offers on your next order!\n`;
   }
 
   msg += `\n*Total Paid: ₹${fmtShort(grandTotal)}*\n\n`;
