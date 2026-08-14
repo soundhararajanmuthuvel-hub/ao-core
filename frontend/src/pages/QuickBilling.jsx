@@ -33,29 +33,43 @@ const blankForm = () => ({
 });
 
 // ─── WhatsApp message builder ──────────────────────────────────────────────────
-function buildWhatsAppMessage(sale) {
+// Warm, personal template — greeting first, savings called out, invitation to return
+function buildWhatsAppMessage(sale, phoneHint) {
   const customer = sale?.customer;
-  const customerName = customer?.name || 'Valued Customer';
+  // Use first name only for a personal feel; fall back gracefully to "there"
+  const fullName = customer?.name || '';
+  const firstName = fullName.split(' ')[0] || 'there';
+  // Never show "Walk-in Customer" as a name in the message
+  const greeting = (fullName && fullName.toLowerCase() !== 'walk-in customer')
+    ? firstName
+    : 'there';
+
   const invoiceNumber = sale?.invoiceNumber || '';
   const items = sale?.items || [];
   const discount = Number(sale?.discount || 0);
   const grandTotal = Number(sale?.grandTotal || 0);
 
-  let lines = `Amudhasurabiy Organics 🌿\n\nInvoice: ${invoiceNumber}\nCustomer: ${customerName}\n\n`;
+  let msg = `🌿 *Amudhasurabiy Organics*\n\n`;
+  msg += `Hi ${greeting}! Thank you for shopping with us today 💚\n\n`;
+  msg += `🧾 Invoice: ${invoiceNumber}\n\n`;
 
   for (const item of items) {
     const name = item.product?.name || item.name || 'Item';
     const qty = Number(item.qty || 0);
-    const price = Number(item.unitPrice || 0);
-    const lineTotal = Number(item.lineTotal || qty * price);
-    lines += `• ${name} — Qty: ${qty} × ₹${fmtShort(price)} = ₹${fmtShort(lineTotal)}\n`;
+    const lineTotal = Number(item.lineTotal || qty * Number(item.unitPrice || 0));
+    msg += `• ${name} × ${qty} — ₹${fmtShort(lineTotal)}\n`;
   }
 
-  lines += `\nDiscount: ${discount > 0 ? `₹${fmtShort(discount)}` : '—'}`;
-  lines += `\nFinal Amount: ₹${fmtShort(grandTotal)}`;
-  lines += `\n\nThank you for shopping with us! 🙏\n\nVisit us: https://www.amudhasurabiy.com`;
+  if (discount > 0) {
+    msg += `\n🎉 You saved: ₹${fmtShort(discount)}\n`;
+  }
 
-  return lines;
+  msg += `\n*Total Paid: ₹${fmtShort(grandTotal)}*\n\n`;
+  msg += `We hope you love your organic picks! For more goodness, visit us anytime:\n`;
+  msg += `🌐 www.amudhasurabiy.com\n\n`;
+  msg += `See you again soon! 🙏`;
+
+  return msg;
 }
 
 function openWhatsApp(phone, sale) {
@@ -297,35 +311,39 @@ export default function QuickBilling() {
   };
 
   // ── Submit ────────────────────────────────────────────────────────────────
+  // WhatsApp must open IMMEDIATELY the moment the invoice number is available —
+  // no blocking spinner in between, no extra confirmation tap.
   const handleSubmit = async () => {
     if (!validate()) return;
+    if (submitting) return; // prevent double-tap
 
     setSubmitting(true);
-    try {
-      const payload = {
-        customerName: form.customerName.trim() || undefined,
-        phone: form.phone.trim(),
-        items: form.items
-          .filter((i) => i.product && Number(i.qty) > 0)
-          .map((i) => ({
-            productId: i.product.id,
-            qty: Number(i.qty),
-            unitPrice: Number(i.unitPrice),
-          })),
-        discountType: form.discountType,
-        discountValue: Number(form.discountValue) || 0,
-      };
 
+    const phone = form.phone.trim();
+    const payload = {
+      customerName: form.customerName.trim() || undefined,
+      phone,
+      items: form.items
+        .filter((i) => i.product && Number(i.qty) > 0)
+        .map((i) => ({
+          productId: i.product.id,
+          qty: Number(i.qty),
+          unitPrice: Number(i.unitPrice),
+        })),
+      discountType: form.discountType,
+      discountValue: Number(form.discountValue) || 0,
+    };
+
+    try {
       const { data } = await client.post('/quick-billing', payload);
       const sale = data.sale;
 
+      // ── Fire WhatsApp immediately — no extra confirmation, no delay ──────
+      openWhatsApp(phone, sale);
+
+      // Update UI state after WhatsApp is already launched
       setLastSale(sale);
-      toast(`Invoice ${sale.invoiceNumber} saved ✓`, 'success');
-
-      // Open WhatsApp non-blocking (sale is already saved)
-      openWhatsApp(form.phone, sale);
-
-      // Refresh stats immediately
+      toast(`✓ Invoice ${sale.invoiceNumber} saved`, 'success');
       fetchStats(debouncedSearch);
     } catch (err) {
       const msg = err?.response?.data?.message || 'Failed to create bill. Please try again.';
