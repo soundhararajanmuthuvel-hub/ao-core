@@ -521,18 +521,9 @@ export default function AppLayout() {
       <div className={`main-area ${collapsed ? 'collapsed' : ''}`}>
         <Header onMenuToggle={handleMenuToggle} />
         <main style={{ flex: 1, overflowX: 'hidden', position: 'relative' }}>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 20, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.98 }}
-              transition={{ duration: 0.25, ease: [0.25, 0.8, 0.25, 1] }}
-              style={{ width: '100%', height: '100%' }}
-            >
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
+          <div style={{ width: '100%', height: '100%' }}>
+            <Outlet />
+          </div>
         </main>
       </div>
 
