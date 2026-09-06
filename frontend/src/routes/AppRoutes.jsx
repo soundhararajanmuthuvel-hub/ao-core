@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
 import RoleRoute from './RoleRoute';
-import LoadingSpinner from '../components/LoadingSpinner';
+import GlobalLoader from '../components/GlobalLoader';
 
 function DesktopOnlyRoute({ children }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -85,7 +85,7 @@ const PublicCatalog = lazy(() => import('../pages/PublicCatalog'));
 
 export default function AppRoutes() {
   return (
-    <Suspense fallback={<LoadingSpinner />}>
+    <Suspense fallback={<GlobalLoader message="Loading..." />}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/catalog" element={<PublicCatalog />} />

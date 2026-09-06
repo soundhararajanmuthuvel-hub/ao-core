@@ -86,7 +86,7 @@ export default function Login() {
             <h1 className="giant-brand-title">
               <span className="brand-white-title">{companyName ? companyName.toUpperCase() : 'AO CORE ERP'}</span>
             </h1>
-            <h3 className="hero-subtitle-primary">MANAGE BLOVIT MALTS</h3>
+            <h3 className="hero-subtitle-primary">{companyName ? companyName.toUpperCase() : 'AMUDHASURABIY ORGANICS'}</h3>
             <p className="hero-subtitle-detail">
               Control Production, Inventory, GST, Sales, Logistics & Analytics from a single platform.
             </p>

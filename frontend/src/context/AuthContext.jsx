@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authApi } from '../api';
 import { API_BASE_URL } from '../utils/url';
+import GlobalLoader from '../components/GlobalLoader';
 
 const AuthContext = createContext(null);
 
@@ -330,177 +331,20 @@ export function AuthProvider({ children }) {
 
   const renderLoadingOverlay = () => {
     let message = 'Initializing...';
-    let progress = 10;
-    
     if (healthStatus === 'checking-internet') {
       message = 'Checking Internet Connection...';
-      progress = 25;
     } else if (healthStatus === 'checking-server') {
       message = 'Locating Backend Server...';
-      progress = 50;
     } else if (healthStatus?.startsWith('retrying')) {
       const waitTime = healthStatus.split('-')[1];
       message = `Server busy. Retrying in ${waitTime}... (Attempt ${retryCount}/3)`;
-      progress = 60;
     } else if (healthStatus === 'connecting-db') {
       message = 'Connecting to Database...';
-      progress = 75;
     } else if (healthStatus === 'loading-erp') {
       message = 'Loading ERP Systems...';
-      progress = 95;
     }
 
-    return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        background: 'linear-gradient(135deg, #1c0f07 0%, #3a1c09 50%, #0c0603 100%)',
-        color: '#ffffff',
-        zIndex: 999999,
-        padding: '2rem',
-        boxSizing: 'border-box',
-        textAlign: 'center',
-        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-      }}>
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.04)',
-          backdropFilter: 'blur(18px)',
-          WebkitBackdropFilter: 'blur(18px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '24px',
-          padding: '2.5rem 2rem',
-          maxWidth: '440px',
-          width: '100%',
-          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.6), 0 0 40px rgba(245, 158, 11, 0.05)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          boxSizing: 'border-box'
-        }}>
-          <div style={{
-            position: 'relative',
-            width: '90px',
-            height: '90px',
-            marginBottom: '1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            {/* Spinning Outer Ring */}
-            <div style={{
-              position: 'absolute',
-              width: '82px',
-              height: '82px',
-              border: '3px solid transparent',
-              borderTop: '3px solid #ff9800',
-              borderBottom: '3px solid #ff9800',
-              borderRadius: '50%',
-              animation: 'ao-spin 2s linear infinite',
-            }} />
-            
-            {/* Pulsing Glow Ring */}
-            <div style={{
-              position: 'absolute',
-              width: '74px',
-              height: '74px',
-              border: '1px solid rgba(255, 152, 0, 0.2)',
-              borderRadius: '50%',
-              boxShadow: '0 0 15px rgba(255, 152, 0, 0.3)',
-              animation: 'ao-pulse 1.5s ease-in-out infinite alternate',
-            }} />
-
-            {/* Brand Logo in Center */}
-            <img
-              src="/default-logo.png"
-              alt="Logo"
-              style={{
-                width: '60px',
-                height: '60px',
-                borderRadius: '50%',
-                backgroundColor: '#ffffff',
-                border: '2px solid rgba(255, 152, 0, 0.1)',
-                objectFit: 'contain',
-                padding: '6px',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
-                zIndex: 2,
-              }}
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = '/default-logo.png';
-              }}
-            />
-          </div>
-          
-          <h2 style={{
-            margin: '0 0 0.25rem 0',
-            fontSize: '1.4rem',
-            fontWeight: 900,
-            color: '#ffffff',
-            letterSpacing: '1px',
-            textTransform: 'uppercase'
-          }}>
-            Amudhasurabiy Organics
-          </h2>
-          
-          <p style={{
-            margin: '0 0 1.5rem 0',
-            fontSize: '0.75rem',
-            color: '#f59e0b',
-            fontWeight: 700,
-            letterSpacing: '3px',
-            textTransform: 'uppercase',
-            opacity: 0.85
-          }}>
-            Enterprise ERP Platform
-          </p>
-
-          {/* Clean Thin Progress Bar */}
-          <div style={{
-            width: '240px',
-            height: '4px',
-            background: 'rgba(255, 255, 255, 0.08)',
-            borderRadius: '10px',
-            overflow: 'hidden',
-            marginBottom: '1rem'
-          }}>
-            <div style={{
-              width: `${progress}%`,
-              height: '100%',
-              background: 'linear-gradient(90deg, #f59e0b, #d97706)',
-              borderRadius: '10px',
-              transition: 'width 0.4s ease-out'
-            }} />
-          </div>
-
-          <p style={{
-            margin: 0,
-            fontSize: '0.85rem',
-            color: '#94a3b8',
-            fontWeight: 500,
-            letterSpacing: '0.5px'
-          }}>
-            {message}
-          </p>
-        </div>
-        <style>{`
-          @keyframes ao-spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-          @keyframes ao-pulse {
-            0% { transform: scale(0.95); opacity: 0.85; }
-            100% { transform: scale(1.05); opacity: 1; }
-          }
-        `}</style>
-      </div>
-    );
+    return <GlobalLoader message={message} />;
   };
 
   const renderErrorOverlay = () => {
