@@ -93,52 +93,43 @@ export default function Login() {
           </div>
           
           {/* 2x2 Dark Glass Feature Grid */}
-          <div className="features-2x2-grid">
-            <div className="feature-card-glass">
-              <div className="feature-icon-circle">⚡</div>
-              <div className="feature-text-content">
-                <h4>Manufacturing ERP</h4>
-                <p>Formula batches, raw materials & cost recovery</p>
-              </div>
+          <div className="premium-feature-grid">
+            <div className="glass-feature-card">
+              <div className="feature-icon">⚡</div>
+              <h4>Manufacturing ERP</h4>
+              <p>Formula batches, raw materials & cost recovery</p>
             </div>
             
-            <div className="feature-card-glass">
-              <div className="feature-icon-circle">📦</div>
-              <div className="feature-text-content">
-                <h4>Inventory Control</h4>
-                <p>Live warehouse stock & QR tracking</p>
-              </div>
+            <div className="glass-feature-card">
+              <div className="feature-icon">📦</div>
+              <h4>Inventory Control</h4>
+              <p>Live warehouse stock & QR tracking</p>
             </div>
             
-            <div className="feature-card-glass">
-              <div className="feature-icon-circle">🧾</div>
-              <div className="feature-text-content">
-                <h4>GST & E-Invoicing</h4>
-                <p>Automated B2B/B2C GST tax invoices</p>
-              </div>
+            <div className="glass-feature-card">
+              <div className="feature-icon">🧾</div>
+              <h4>GST & E-Invoicing</h4>
+              <p>Automated B2B/B2C GST tax invoices</p>
             </div>
             
-            <div className="feature-card-glass">
-              <div className="feature-icon-circle">📈</div>
-              <div className="feature-text-content">
-                <h4>Sales & Route SFA</h4>
-                <p>Field ordering & delivery tracking</p>
-              </div>
+            <div className="glass-feature-card">
+              <div className="feature-icon">📈</div>
+              <h4>Sales & Route SFA</h4>
+              <p>Field ordering & delivery tracking</p>
             </div>
           </div>
         </div>
 
         {/* Floating Customer Trust Badge */}
-        <div className="trust-footer-badge">
-          <span className="trust-stars">★★★★★</span>
-          <span className="trust-text">Enterprise Manufacturing System • Amudhasurabiy Organics</span>
+        <div className="bottom-highlight-strip">
+          <span className="highlight-item">★★★★★ Enterprise Manufacturing System • Amudhasurabiy Organics</span>
         </div>
       </div>
       
       {/* 30% Right Side - Login Card */}
-      <div className="login-right-section">
-        <div className="login-form-container">
-          <div className="login-card-glass">
+      <div className="login-right-panel">
+        <div className="login-card-container">
+          <div className="login-glass-card">
             <div className="login-card-header">
               {/* Mobile Header Branding */}
               <div className="mobile-logo-header">

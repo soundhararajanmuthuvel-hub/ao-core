@@ -251,6 +251,7 @@ export const menuStructure = [
     showOnMobileDrawer: true,
     children: [
       { to: '/settings', label: 'General Settings', roles: ['Super Admin', 'admin'] },
+      { to: '/website?tab=api-key', label: 'Storefront & eCommerce', roles: ['Super Admin', 'admin'] },
       { to: '/settings/integrations-marketplace', label: 'Integrations Marketplace', roles: ['Super Admin', 'admin'] },
       { to: '/settings/developer-center', label: 'Developer Center', roles: ['Super Admin', 'admin'] }
     ]

@@ -289,12 +289,6 @@ const createAdminProduct = async (req, res) => {
       if (!primaryImgUrl) {
         return res.status(400).json({ success: false, message: 'At least one product image is required when Show on Website is ON.' });
       }
-      if (!shortDescription || !shortDescription.trim()) {
-        return res.status(400).json({ success: false, message: 'Short description is required when Show on Website is ON.' });
-      }
-      if (!category || !category.trim() || category === 'General') {
-        return res.status(400).json({ success: false, message: 'A specific Category is required when Show on Website is ON.' });
-      }
       if (slug && slug.trim()) {
         const existingSlug = await Product.findOne({ where: { slug: slug.trim() } });
         if (existingSlug) {
@@ -544,14 +538,6 @@ const updateAdminProduct = async (req, res) => {
       const checkImg = imageUrl || masterProduct.imageUrl || (galleryImages && galleryImages.length > 0 && galleryImages !== '[]') || (masterProduct.galleryImages && masterProduct.galleryImages !== '[]');
       if (!checkImg) {
         return res.status(400).json({ success: false, message: 'At least one product image is required when Show on Website is ON.' });
-      }
-      const checkDesc = shortDescription !== undefined ? shortDescription : masterProduct.shortDescription;
-      if (!checkDesc || !checkDesc.trim()) {
-        return res.status(400).json({ success: false, message: 'Short description is required when Show on Website is ON.' });
-      }
-      const checkCat = category !== undefined ? category : masterProduct.category;
-      if (!checkCat || !checkCat.trim() || checkCat === 'General') {
-        return res.status(400).json({ success: false, message: 'A specific Category is required when Show on Website is ON.' });
       }
       if (slug && slug.trim() && slug !== masterProduct.slug) {
         const existingSlug = await Product.findOne({ where: { slug: slug.trim(), id: { [Op.ne]: masterProduct.id } } });

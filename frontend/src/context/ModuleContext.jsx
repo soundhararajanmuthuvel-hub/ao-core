@@ -1,37 +1,14 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { createContext, useContext, useState } from 'react';
 
 const ModuleContext = createContext();
 
 export function ModuleProvider({ children }) {
-  const location = useLocation();
-  const [activeModule, setActiveModuleState] = useState(() => {
-    return localStorage.getItem('active_erp_module') || 'management';
-  });
+  const [activeModule] = useState('management');
 
-  const switchModule = (moduleName) => {
-    setActiveModuleState(moduleName);
-    localStorage.setItem('active_erp_module', moduleName);
-  };
-
-  // Sync active module when route changes
-  useEffect(() => {
-    if (location.pathname.startsWith('/website')) {
-      if (activeModule !== 'website') {
-        setActiveModuleState('website');
-        localStorage.setItem('active_erp_module', 'website');
-      }
-    } else {
-      // Reset to management on any non-website route so the correct sidebar shows
-      if (activeModule !== 'management') {
-        setActiveModuleState('management');
-        localStorage.setItem('active_erp_module', 'management');
-      }
-    }
-  }, [location.pathname]);
+  const switchModule = () => {};
 
   return (
-    <ModuleContext.Provider value={{ activeModule, switchModule, isWebsite: activeModule === 'website' }}>
+    <ModuleContext.Provider value={{ activeModule: 'management', switchModule, isWebsite: false }}>
       {children}
     </ModuleContext.Provider>
   );

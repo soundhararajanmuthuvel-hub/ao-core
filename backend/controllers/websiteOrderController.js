@@ -31,9 +31,37 @@ const createRazorpayOrder = async (req, res) => {
     const verifiedItems = [];
 
     const productIds = items.map(i => i.productId);
-    const { Op } = require('sequelize'); // ensure Op is available
-    const products = await WebsiteProduct.findAll({ where: { id: { [Op.in]: productIds } } });
-    const productMap = new Map(products.map(p => [p.id.toString(), p]));
+    const { Op } = require('sequelize');
+    // Master Product is the single source of truth
+    const masterProducts = await Product.findAll({ where: { id: { [Op.in]: productIds }, isArchived: false } });
+    const productMap = new Map(masterProducts.map(p => [p.id.toString(), {
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      price: Number(p.sellingPrice || p.price || 0),
+      stock: Number(p.stock || 0),
+      isActive: !!p.isActive,
+      images: p.galleryImages || p.images,
+      imageUrl: p.imageUrl || p.image || ''
+    }]));
+
+    // Fallback for legacy items if any
+    const missingIds = productIds.filter(id => !productMap.has(id.toString()));
+    if (missingIds.length > 0) {
+      const legacyProducts = await WebsiteProduct.findAll({ where: { id: { [Op.in]: missingIds } } });
+      legacyProducts.forEach(lp => {
+        productMap.set(lp.id.toString(), {
+          id: lp.id,
+          name: lp.name,
+          slug: lp.slug,
+          price: Number(lp.price || 0),
+          stock: Number(lp.stock || 0),
+          isActive: !!lp.isActive,
+          images: lp.images,
+          imageUrl: lp.imageUrl || ''
+        });
+      });
+    }
 
     for (const item of items) {
       const product = productMap.get(item.productId.toString());
@@ -60,7 +88,7 @@ const createRazorpayOrder = async (req, res) => {
         price: Number(product.price),
         qty: Number(item.qty),
         total: itemTotal,
-        image: (() => {
+        image: product.imageUrl || (() => {
           try { return JSON.parse(product.images || '[]')[0] || ''; } catch { return ''; }
         })(),
       });

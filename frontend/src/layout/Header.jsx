@@ -6,14 +6,12 @@ import { useSettings } from '../context/SettingsContext';
 import { useCompanyBrand } from '../context/CompanyBrandContext';
 import PWAInstallButton from '../components/PWAInstallButton';
 import { usePWA } from '../context/PWAContext';
-import { useModule } from '../context/ModuleContext';
 import { searchApi, notificationsApi, salesApi } from '../api';
 
 export default function Header({ onMenuToggle }) {
   const { user, logout } = useAuth();
   const { darkMode, toggleDarkMode } = useTheme();
   const { settings } = useSettings();
-  const { activeModule, switchModule } = useModule();
   const navigate = useNavigate();
   const { logoUrl } = useCompanyBrand();
   const [search, setSearch] = useState('');
@@ -23,7 +21,6 @@ export default function Header({ onMenuToggle }) {
   const [unread, setUnread] = useState(0);
   const [showNotif, setShowNotif] = useState(false);
   const [showUser, setShowUser] = useState(false);
-  const [showModuleMenu, setShowModuleMenu] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
@@ -685,125 +682,27 @@ export default function Header({ onMenuToggle }) {
               </span>
             </div>
 
-            {/* MODULE SWITCHER DROPDOWN */}
-            <div className="module-switcher-container" style={{ position: 'relative', marginRight: '0.75rem' }}>
-              <button
-                type="button"
-                id="module-switcher-btn"
-                onClick={() => { setShowModuleMenu(!showModuleMenu); setShowNotif(false); setShowUser(false); }}
+            {/* SINGLE ERP MODULE BADGE */}
+            <div className="module-badge-container" style={{ position: 'relative', marginRight: '0.75rem' }}>
+              <div
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '0.4rem',
-                  padding: '0.4rem 0.75rem',
+                  gap: '0.45rem',
+                  padding: '0.4rem 0.85rem',
                   borderRadius: '8px',
-                  border: activeModule === 'website' ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid var(--border)',
-                  background: activeModule === 'website' ? 'rgba(99, 102, 241, 0.12)' : 'var(--bg-page)',
-                  color: activeModule === 'website' ? '#6366f1' : 'var(--text-primary)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-page)',
+                  color: 'var(--text-primary)',
                   fontWeight: 700,
                   fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
+                  letterSpacing: '0.2px',
+                  userSelect: 'none'
                 }}
+                title="AO Core Master ERP: Products, Inventory, Manufacturing, Billing & Sales"
               >
-                <span>{activeModule === 'website' ? '🌐 Website ▾' : '🏭 Management & Billing ▾'}</span>
-              </button>
-
-              {showModuleMenu && (
-                <div
-                  className="module-dropdown"
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: '100%',
-                    marginTop: '0.5rem',
-                    backgroundColor: 'var(--bg-card)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '12px',
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                    width: '280px',
-                    zIndex: 1000,
-                    padding: '0.5rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.35rem'
-                  }}
-                >
-                  <div style={{ padding: '0.4rem 0.6rem', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.5px' }}>
-                    Select Module
-                  </div>
-
-                  <button
-                    type="button"
-                    id="module-option-management"
-                    onClick={() => {
-                      switchModule('management');
-                      setShowModuleMenu(false);
-                      if (window.location.pathname.startsWith('/website')) {
-                        navigate('/');
-                      }
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '0.65rem',
-                      padding: '0.65rem',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: activeModule === 'management' ? 'var(--bg-active, rgba(90, 45, 12, 0.08))' : 'transparent',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      width: '100%',
-                      transition: 'background 0.15s'
-                    }}
-                  >
-                    <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>🏭</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>Management & Billing</span>
-                        {activeModule === 'management' && <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 800 }}>✓</span>}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.15rem', lineHeight: 1.3 }}>
-                        Production, Inventory, Accounts & Sales
-                      </div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    id="module-option-website"
-                    onClick={() => {
-                      switchModule('website');
-                      setShowModuleMenu(false);
-                      navigate('/website');
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '0.65rem',
-                      padding: '0.65rem',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: activeModule === 'website' ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      width: '100%',
-                      transition: 'background 0.15s'
-                    }}
-                  >
-                    <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>🌐</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>Website</span>
-                        {activeModule === 'website' && <span style={{ fontSize: '0.8rem', color: '#6366f1', fontWeight: 800 }}>✓</span>}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.15rem', lineHeight: 1.3 }}>
-                        Products, Orders, Referrals, Reviews
-                      </div>
-                    </div>
-                  </button>
-                </div>
-              )}
+                <span>📊 Management & Billing</span>
+              </div>
             </div>
 
             <div className="search-box desktop-search-only">

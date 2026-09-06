@@ -27,6 +27,7 @@ export const productsApi = {
   removePermanent: (id) => client.delete(`/products/${id}/permanent`),
   dependencies: (id) => client.get(`/products/${id}/dependencies`),
   adjustZero: (id) => client.post(`/products/${id}/adjust-zero`),
+  updateWebsite: (id, data) => client.patch(`/products/${id}/website`, data),
 };
 
 export const customersApi = {

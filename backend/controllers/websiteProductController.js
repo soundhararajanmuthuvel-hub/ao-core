@@ -114,7 +114,7 @@ const getProductBySlug = async (req, res) => {
     });
 
     if (!masterProduct) {
-      return res.status(404).json({ success: false, message: 'Product not found or unavailable' });
+      return res.status(404).json({ success: false, message: 'Product not found or not published' });
     }
 
     const primaryImageUrl = masterProduct.imageUrl || masterProduct.image || 'https://demo.amudhasurabiy.com/images/products/placeholder-product.webp';

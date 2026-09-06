@@ -266,6 +266,20 @@ export default function Products() {
     }
   };
 
+  const handleToggleWebsitePublished = async (product) => {
+    const prodId = product.id || product._id;
+    const nextVal = !product.isPublished;
+    try {
+      const { data } = await productsApi.updateWebsite(prodId, { isPublished: nextVal, publishToWebsite: nextVal });
+      if (data.success) {
+        toast(`Product "${product.name}" is now ${nextVal ? 'visible on Website (ON)' : 'hidden from Website (OFF)'}`, 'success');
+        setProducts(prev => prev.map(p => (String(p.id || p._id) === String(prodId) ? { ...p, isPublished: nextVal, publishToWebsite: nextVal } : p)));
+      }
+    } catch (err) {
+      toast(err.response?.data?.message || 'Failed to update website visibility', 'error');
+    }
+  };
+
   const triggerDelete = async (product) => {
     try {
       const { data } = await productsApi.dependencies(product._id || product.id);
@@ -479,16 +493,26 @@ export default function Products() {
               <div className="desktop-table-container card table-wrap">
                 <table className="data-table products-table">
                   <thead>
-                    <tr><th>Image</th><th>Name</th><th>SKU</th><th>Category</th><th>Type</th><th>Stock</th><th>Price</th><th>Actions</th></tr>
+                    <tr><th>Image</th><th>Name</th><th>SKU</th><th>Category</th><th>Stock</th><th>Price</th><th>Status</th><th>Website</th><th>Actions</th></tr>
                   </thead>
                   <tbody>
-                    {products.map((p) => (
-                      <tr key={p._id}>
+                    {products.map((p) => {
+                      const isOnline = !!(p.isPublished || p.publishToWebsite);
+                      const isActive = p.isActive !== false;
+                      return (
+                      <tr key={p._id || p.id}>
                         <td>{p.image ? <img src={resolveAssetUrl(p.image)} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} /> : '—'}</td>
                         <td>
                           <div>
-                            <strong>{p.name}</strong> {p.stock <= p.lowStockThreshold && <span className="badge badge-warning">Low</span>}
+                            <strong>{p.name}</strong> {p.stock <= p.lowStockThreshold && <span className="badge badge-warning" style={{ marginLeft: 6, fontSize: '0.7rem' }}>Low</span>}
                           </div>
+                          {p.productType && (
+                            <div style={{ marginTop: 3 }}>
+                              <span style={getProductTypeStyle(p.productType)}>
+                                {PRODUCT_TYPE_LABELS[p.productType] || p.productType}
+                              </span>
+                            </div>
+                          )}
                           {p.productType === 'BULK_PRODUCT' && (
                             <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '6px', paddingLeft: '8px', borderLeft: '2px solid #ff9800' }}>
                               <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 'bold', display: 'block', marginBottom: '2px' }}>Variants</span>
@@ -504,15 +528,34 @@ export default function Products() {
                             </div>
                           )}
                         </td>
-                        <td>{p.sku}</td>
-                        <td>{p.category}</td>
+                        <td><code>{p.sku || '—'}</code></td>
+                        <td>{p.category || 'General'}</td>
+                        <td><strong>{p.stock}</strong> {p.unit || 'pcs'}</td>
+                        <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>₹{p.sellingPrice}</td>
                         <td>
-                          <span style={getProductTypeStyle(p.productType)}>
-                            {PRODUCT_TYPE_LABELS[p.productType] || 'Manufactured Product'}
+                          <span className={`badge ${isActive ? 'badge-success' : 'badge-secondary'}`} style={{ fontSize: '0.75rem' }}>
+                            {isActive ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td>{p.stock} {p.unit}</td>
-                        <td>₹{p.sellingPrice}</td>
+                        <td>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              border: isOnline ? '1px solid #86efac' : '1px solid #cbd5e1',
+                              backgroundColor: isOnline ? '#f0fdf4' : '#f8fafc',
+                              color: isOnline ? '#166534' : '#64748b',
+                              fontSize: '0.8rem',
+                              fontWeight: 700
+                            }}
+                          >
+                            <span>{isOnline ? '🟢' : '⚪'}</span>
+                            <span>{isOnline ? 'Published' : 'Hidden'}</span>
+                          </span>
+                        </td>
                         <td>
                           {activeTab === 'active' ? (
                             <>
@@ -531,14 +574,17 @@ export default function Products() {
                           )}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
 
               {/* Mobile Card List View */}
               <div className="mobile-card-list" style={{ display: 'none', flexDirection: 'column', gap: '0.75rem' }}>
-                {products.map((p) => (
+                {products.map((p) => {
+                  const isOnline = !!(p.isPublished || p.publishToWebsite);
+                  return (
                   <div key={p._id || p.id} className="mobile-card">
                     <div className="mobile-card-header">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -573,8 +619,23 @@ export default function Products() {
                         <span className="mobile-card-value" style={{ color: 'var(--brand-primary)' }}>₹{p.sellingPrice}</span>
                       </div>
                       <div className="mobile-card-item">
-                        <span className="mobile-card-label">Low Level</span>
-                        <span className="mobile-card-value">{p.lowStockThreshold} {p.unit}</span>
+                        <span className="mobile-card-label">Website</span>
+                        <span className="mobile-card-value">
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            border: isOnline ? '1px solid #86efac' : '1px solid #cbd5e1',
+                            backgroundColor: isOnline ? '#f0fdf4' : '#f8fafc',
+                            color: isOnline ? '#166534' : '#64748b',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            borderRadius: '12px',
+                            padding: '2px 8px'
+                          }}>
+                            {isOnline ? '🟢 Published' : '⚪ Hidden'}
+                          </span>
+                        </span>
                       </div>
                     </div>
 
@@ -611,7 +672,8 @@ export default function Products() {
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               <Pagination page={page} pages={pages} onPageChange={setPage} />

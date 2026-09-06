@@ -22,14 +22,16 @@
    70% LEFT SIDE - BRAND PANEL
    ========================================================================== */
 .login-left-panel {
-  width: 70%;
+  flex: 1.2;
+  width: 58%;
+  min-width: 0;
   height: 100%;
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 4rem;
+  padding: 3.5rem;
   background: linear-gradient(135deg, #100602 0%, #2b1d14 50%, #3d2c20 100%);
   color: #ffffff;
   border-right: 1px solid rgba(201, 162, 93, 0.15);
@@ -103,11 +105,11 @@
 
 .giant-brand-title {
   font-family: var(--font-headline);
-  font-size: 4rem; /* 64px */
+  font-size: clamp(2.4rem, 3.8vw, 3.5rem);
   font-weight: 900;
   margin: 0 0 1rem 0;
   letter-spacing: -0.02em;
-  line-height: 1.1;
+  line-height: 1.15;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -213,17 +215,20 @@
 }
 
 /* ==========================================================================
-   30% RIGHT SIDE - LOGIN PANEL
+   42% RIGHT SIDE - LOGIN PANEL
    ========================================================================== */
 .login-right-panel {
-  width: 30%;
+  flex: 1;
+  width: 42%;
+  min-width: 420px;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2.5rem;
+  padding: 2.5rem 2rem;
   background-color: var(--bg-page);
   box-sizing: border-box;
+  overflow-y: auto;
 }
 
 [data-theme='dark'] .login-right-panel {
@@ -232,23 +237,24 @@
 
 .login-card-container {
   width: 100%;
-  max-width: 520px;
+  max-width: 460px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 /* Pure White Card Redesign */
 .login-glass-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  border-radius: var(--radius);
-  padding: 3.5rem 2.5rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  border-radius: 18px;
+  padding: 2.5rem 2.25rem;
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
+  gap: 1.5rem;
   box-sizing: border-box;
   transition: all 0.3s ease;
 }

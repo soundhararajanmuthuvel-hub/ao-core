@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import {
   Globe,
   Key,
@@ -33,7 +33,6 @@ import {
 } from 'lucide-react';
 import client from '../api/client';
 import { resolveAssetUrl } from '../utils/url';
-import EnterpriseProductEditor from '../components/EnterpriseProductEditor';
 import ErrorBoundary from '../components/ErrorBoundary';
 
 const API_BASE = '/website-admin';
@@ -122,43 +121,7 @@ export default function WebsiteManagement() {
         const res = await client.get(`${API_BASE}/api-key`);
         setApiKeyData(res.data.data);
       } else if (tab === 'products') {
-        const [adminProdRes, masterProdRes] = await Promise.allSettled([
-          client.get(`${API_BASE}/products`),
-          productsApi.list({ limit: 1000 })
-        ]);
-
-        let websiteProds = [];
-        let mgmtProds = [];
-
-        if (adminProdRes.status === 'fulfilled' && adminProdRes.value?.data) {
-          websiteProds = adminProdRes.value.data.data || [];
-          mgmtProds = adminProdRes.value.data.managementProductsList || [];
-        }
-
-        if ((!mgmtProds || mgmtProds.length === 0) && masterProdRes.status === 'fulfilled' && masterProdRes.value?.data) {
-          const rawMasterList = masterProdRes.value.data.products || masterProdRes.value.data.data || [];
-          mgmtProds = rawMasterList.map(p => ({
-            id: p.id,
-            name: p.name || p.productName || 'Unnamed Product',
-            productName: p.name || p.productName || 'Unnamed Product',
-            sku: p.sku || '',
-            barcode: p.barcode || '',
-            brand: p.brand || 'Blovit',
-            category: p.category || 'General',
-            price: Number(p.sellingPrice || p.price || 0),
-            sellingPrice: Number(p.sellingPrice || p.price || 0),
-            gstPercent: Number(p.gstPercent || 0),
-            stock: Number(p.stock !== undefined ? p.stock : (p.stockQuantity || 0)),
-            stockQuantity: Number(p.stock !== undefined ? p.stock : (p.stockQuantity || 0)),
-            imageUrl: p.imageUrl || p.image || '',
-            isActive: p.isActive !== false,
-            status: p.isActive !== false ? 'Active' : 'Inactive'
-          }));
-        }
-
-        console.log(`[WebsiteManagement] Loaded ${websiteProds.length} website product settings and ${mgmtProds.length} Product Master items into selector.`);
-        setProducts(websiteProds);
-        setManagementProductsList(mgmtProds);
+        // Tab products displays the unified redirection message to Master Products
       } else if (tab === 'orders') {
         const res = await client.get(`${API_BASE}/orders`);
         setOrders(res.data.data || []);
@@ -222,33 +185,6 @@ export default function WebsiteManagement() {
     }
   };
 
-  // Product Actions
-  const handleDeleteProduct = async (id) => {
-    if (!window.confirm('Delete this product from Blovit web store?')) return;
-    try {
-      await client.delete(`${API_BASE}/products/${id}`);
-      setMsg({ type: 'success', text: 'Product removed.' });
-      fetchDataForTab('products');
-    } catch {
-      setMsg({ type: 'error', text: 'Failed to delete product.' });
-    }
-  };
-
-  const handleToggleField = async (product, field) => {
-    const updatedValue = !product[field];
-    try {
-      const res = await client.put(`${API_BASE}/products/${product.id}`, {
-        [field]: updatedValue
-      });
-      if (res.data.success) {
-        setProducts(prev => prev.map(p => p.id === product.id ? { ...p, [field]: updatedValue, isPublished: field === 'isPublished' ? updatedValue : p.isPublished } : p));
-        setMsg({ type: 'success', text: `Product "${product.name}" updated successfully.` });
-        setTimeout(() => setMsg({ type: '', text: '' }), 3000);
-      }
-    } catch (err) {
-      setMsg({ type: 'error', text: err.response?.data?.message || `Failed to update ${field}.` });
-    }
-  };
 
 
   // Order Actions
@@ -348,13 +284,21 @@ export default function WebsiteManagement() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <Globe style={{ color: 'var(--primary-color)' }} /> Website (Blovit eCommerce)
+            <Globe style={{ color: 'var(--primary-color)' }} /> Website / Storefront
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.2rem' }}>
-            Backend API Control & Storefront Management Center for Blovit Next.js Application
+            Storefront Orders, Customers, Reviews, Referrals & Integrations for Blovit Storefront
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <Link
+            to="/products"
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', fontWeight: 600 }}
+            title="Products are managed from Management & Billing → Inventory → Products"
+          >
+            <Package size={16} /> Go to Products
+          </Link>
           <span className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.8rem' }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }}></span>
             REST API Online
@@ -460,6 +404,26 @@ export default function WebsiteManagement() {
         </div>
       )}
 
+
+      {/* TAB: PRODUCTS REDIRECT TO MASTER PRODUCTS */}
+      {!loading && activeTab === 'products' && (
+        <div className="card" style={{ padding: '2.5rem 2rem', textAlign: 'center', maxWidth: '600px', margin: '2rem auto' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📦</div>
+          <h3 style={{ fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
+            Product Management
+          </h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+            Products are managed from <strong>Management & Billing → Inventory → Products</strong>.
+          </p>
+          <Link
+            to="/products"
+            className="btn btn-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.75rem', fontWeight: 700, fontSize: '0.95rem', textDecoration: 'none' }}
+          >
+            <Package size={18} /> Go to Product Management
+          </Link>
+        </div>
+      )}
 
       {/* TAB 3: ORDERS & FULFILLMENT */}
       {!loading && activeTab === 'orders' && (

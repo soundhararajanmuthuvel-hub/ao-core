@@ -100,6 +100,8 @@ exports.getProducts = async (req, res, next) => {
         isActive: item.isActive !== false,
         imageUrl: item.imageUrl || item.image || '',
         image: item.imageUrl || item.image || '',
+        isPublished: item.isPublished !== undefined ? !!item.isPublished : (item.publishToWebsite !== undefined ? !!item.publishToWebsite : false),
+        publishToWebsite: item.isPublished !== undefined ? !!item.isPublished : (item.publishToWebsite !== undefined ? !!item.publishToWebsite : false),
         unit: item.unit || 'pcs',
         packSizes: item.packSizes || []
       };
@@ -684,6 +686,7 @@ exports.updateWebsiteFields = async (req, res, next) => {
       'isBestseller',
       'isFeatured',
       'isWebsiteVisible',
+      'isPublished',
       'publishToWebsite',
       'seoTitle',
       'seoDescription',
