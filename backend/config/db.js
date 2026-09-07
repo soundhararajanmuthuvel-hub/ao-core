@@ -706,8 +706,12 @@ const connectDB = async () => {
     await syncModelAttributesToTable(ProductModel, 'Product');
     const ProductAuditLogModel = require('../models/ProductAuditLog');
     await syncModelAttributesToTable(ProductAuditLogModel, 'ProductAuditLog');
+    const ReturnRequestModel = require('../models/ReturnRequest');
+    await syncModelAttributesToTable(ReturnRequestModel, 'ReturnRequest');
+    const ReturnItemModel = require('../models/ReturnItem');
+    await syncModelAttributesToTable(ReturnItemModel, 'ReturnItem');
   } catch (syncErr) {
-    console.error('Failed to sync Product model attributes to table:', syncErr.message);
+    console.error('Failed to sync model attributes to table:', syncErr.message);
   }
 
   // Packing Work Order & Pack Size BOM enhancements

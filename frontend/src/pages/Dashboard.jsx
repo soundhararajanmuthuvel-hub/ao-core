@@ -575,32 +575,10 @@ export default function Dashboard() {
                   <StatCard label="Pending Dispatch Orders" value={dataLoading ? <span className="skeleton-loader" /> : cards.pendingDispatchOrders || 0} />
                   <StatCard label="Low Stock Products" value={dataLoading ? <span className="skeleton-loader" /> : cards.lowStockCount || 0} className={!dataLoading && cards.lowStockCount > 0 ? 'danger' : ''} />
                   <StatCard
-                    label="Today's Returns 🛡️"
-                    value={dataLoading ? <span className="skeleton-loader" /> : `${returnsMetrics?.todaysReturns || 0} Pks`}
-                    subtext={!dataLoading ? `${returnsMetrics?.recoveryRate ?? returnsMetrics?.recoveryPercentage ?? 0}% Recovery Rate` : ''}
+                    label="Customer Returns"
+                    value={dataLoading ? <span className="skeleton-loader" /> : `${(returnsMetrics?.returnRequests || 0) + (returnsMetrics?.toReceive || 0) + (returnsMetrics?.toRefund || 0)} Open`}
+                    subtext={!dataLoading ? `${returnsMetrics?.completed || 0} completed` : ''}
                     onClick={() => navigate('/sales/returns')}
-                    style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', labelStyle: { color: '#166534' }, valueStyle: { color: '#16a34a' } }}
-                  />
-                  <StatCard
-                    label="Pending QC Returns"
-                    value={dataLoading ? <span className="skeleton-loader" /> : (returnsMetrics?.pendingQc || 0)}
-                    subtext="Awaiting Inspection"
-                    onClick={() => navigate('/sales/returns')}
-                    style={{ backgroundColor: '#fff7ed', border: '1px solid #fed7aa', labelStyle: { color: '#c2410c' }, valueStyle: { color: '#ea580c' } }}
-                  />
-                  <StatCard
-                    label="Return Recovery Value"
-                    value={dataLoading ? <span className="skeleton-loader" /> : fmt(returnsMetrics?.recoveryValue ?? returnsMetrics?.stockRestoredVal ?? 0)}
-                    subtext="Restored Goods"
-                    onClick={() => navigate('/sales/returns')}
-                    style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', labelStyle: { color: '#047857' }, valueStyle: { color: '#10b981' } }}
-                  />
-                  <StatCard
-                    label="Active Batch Recalls 🚨"
-                    value={dataLoading ? <span className="skeleton-loader" /> : (returnsMetrics?.activeRecalls || 0)}
-                    subtext="Internal Hold"
-                    onClick={() => navigate('/sales/returns')}
-                    style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', labelStyle: { color: '#b91c1c' }, valueStyle: { color: '#ef4444' } }}
                   />
                   <StatCard
                     label="Top Selling Product"

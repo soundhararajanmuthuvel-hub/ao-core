@@ -131,6 +131,82 @@ exports.scanLookup = async (req, res) => {
   }
 };
 
+// 1B. SEARCH ORDERS / INVOICES FOR RETURN
+exports.orderSearch = async (req, res) => {
+  try {
+    const query = (req.query.query || req.query.search || '').trim();
+    if (!query) {
+      return res.json({ success: true, count: 0, data: [] });
+    }
+
+    const s = `%${query}%`;
+    const matchingCustomers = await Customer.findAll({
+      where: {
+        [Op.or]: [
+          { name: { [Op.like]: s } },
+          { phone: { [Op.like]: s } },
+          { businessName: { [Op.like]: s } }
+        ]
+      },
+      attributes: ['id']
+    });
+    const customerIds = matchingCustomers.map(c => c.id);
+
+    const orConditions = [
+      { invoiceNumber: { [Op.like]: s } }
+    ];
+    if (customerIds.length > 0) {
+      orConditions.push({ customerId: { [Op.in]: customerIds } });
+    }
+
+    const invoices = await Invoice.findAll({
+      where: {
+        [Op.or]: orConditions
+      },
+      include: [
+        { model: Customer, as: 'customer' },
+        { 
+          model: InvoiceItem, 
+          as: 'items',
+          include: [{ model: Product, as: 'product' }]
+        }
+      ],
+      order: [['date', 'DESC'], ['createdAt', 'DESC']],
+      limit: 15
+    });
+
+    const results = invoices.map(inv => ({
+      invoiceId: inv.id,
+      invoiceNumber: inv.invoiceNumber,
+      orderNumber: inv.orderNumber || inv.invoiceNumber,
+      date: inv.date || inv.createdAt,
+      totalAmount: Number(inv.total || inv.grandTotal || 0),
+      status: inv.status,
+      customer: {
+        id: inv.customer?.id,
+        name: inv.customer?.name || inv.customerName || 'Customer',
+        phone: inv.customer?.phone || inv.customer?.mobile || '',
+        customerType: inv.customer?.customerType || inv.customerType || 'Retail Shop'
+      },
+      items: (inv.items || []).map(item => ({
+        id: item.id,
+        productId: item.productId,
+        productName: item.product?.name || item.productName || 'Product',
+        sku: item.product?.sku || item.sku || '',
+        soldQty: Number(item.qty !== undefined ? item.qty : (item.quantity || 0)),
+        unitPrice: Number(item.unitPrice || item.price || 0),
+        batchNumber: item.batchNumber || `BATCH-${item.productId}`,
+        taxRate: Number(item.gstPercent || item.taxRate || 0)
+      }))
+    }));
+
+    res.json({ success: true, count: results.length, data: results, orders: results });
+  } catch (error) {
+    console.error('Order search error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // 2. CREATE RMA / RETURN REQUEST
 const { sequelize } = require('../config/db');
 const ActivityLog = require('../models/ActivityLog');
@@ -157,6 +233,20 @@ exports.createReturnRequest = async (req, res) => {
       items = []
     } = req.body;
 
+    // Support both items array and single product fields
+    let returnItems = Array.isArray(items) && items.length > 0 ? [...items] : [];
+    if (returnItems.length === 0 && (req.body.productId || req.body.productName)) {
+      returnItems.push({
+        productId: req.body.productId,
+        productName: req.body.productName,
+        quantity: req.body.quantity || 1,
+        unitPrice: req.body.unitPrice || 0,
+        batchNumber: req.body.batchNumber,
+        returnReason: req.body.returnReason || returnReason,
+        mfgCost: req.body.mfgCost
+      });
+    }
+
     const rmaNumber = await generateRmaNumber();
 
     // Check policy limits
@@ -172,7 +262,7 @@ exports.createReturnRequest = async (req, res) => {
     // Validate and calculate total return value
     let totalVal = 0;
     let totalQuantity = 0;
-    for (const it of items) {
+    for (const it of returnItems) {
       const q = parseFloat(it.quantity || 1);
       const p = parseFloat(it.unitPrice || 0);
       if (isNaN(p) || p < 0 || isNaN(q) || q <= 0) {
@@ -237,8 +327,26 @@ exports.createReturnRequest = async (req, res) => {
       });
 
       totalInvQty = inv.items && inv.items.length > 0 
-        ? inv.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+        ? inv.items.reduce((sum, item) => sum + Number(item.qty !== undefined ? item.qty : (item.quantity || 0)), 0)
         : Number(inv.totalQty || 10);
+
+      // Validate that item return qty does not exceed original item sold qty
+      if (inv.items) {
+        for (const it of returnItems) {
+          const matchedItem = inv.items.find(ii => ii.productId === it.productId || ii.id === it.invoiceItemId);
+          if (matchedItem) {
+            const soldQty = Number(matchedItem.qty !== undefined ? matchedItem.qty : (matchedItem.quantity || 0));
+            const returnQty = Number(it.quantity || 0);
+            if (returnQty > soldQty) {
+              await t.rollback();
+              return res.status(400).json({
+                success: false,
+                message: 'Return quantity cannot exceed sold quantity.'
+              });
+            }
+          }
+        }
+      }
 
       if (totalInvQty > 0 && (existingReturnedQty + totalQuantity) > totalInvQty) {
         await t.rollback();
@@ -295,7 +403,7 @@ exports.createReturnRequest = async (req, res) => {
       salesmanId: salesmanId || null,
       warehouseId,
       warehouseZone: 'Receiving',
-      returnType,
+      returnType: req.body.returnType || (req.body.actionType === 'Replacement' ? 'Replacement' : 'Refund'),
       returnReason,
       rootCause,
       status: 'Requested',
@@ -312,12 +420,20 @@ exports.createReturnRequest = async (req, res) => {
       mfgCost,
       transportCost,
       labourCost,
+      refundAmount: req.body.refundAmount !== undefined ? req.body.refundAmount : totalVal,
+      refundMethod: req.body.refundMethod || 'Original Payment Method',
+      refundStatus: 'Pending',
+      replacementProductId: req.body.replacementProductId || null,
+      replacementQuantity: req.body.replacementQuantity || 0,
+      productCondition: 'Good',
+      stockUpdated: false,
+      qcRemarks: req.body.additionalNotes || req.body.notes || req.body.qcRemarks || null,
       createdById: req.user ? req.user.id : null
     }, { transaction: t });
 
-    // Save Return Items & Create Stock Movements
-    if (items && items.length > 0) {
-      for (const item of items) {
+    // Save Return Items
+    if (returnItems && returnItems.length > 0) {
+      for (const item of returnItems) {
         const remainingDays = item.expiryDate 
           ? Math.max(0, Math.ceil((new Date(item.expiryDate) - new Date()) / (1000 * 60 * 60 * 24)))
           : 120;
@@ -339,22 +455,6 @@ exports.createReturnRequest = async (req, res) => {
           originalImageUrl: item.originalImageUrl || null,
           returnedImageUrl: item.returnedImageUrl || null,
         }, { transaction: t });
-
-        // Record Inventory Stock Movement
-        try {
-          await StockMovement.create({
-            productId: item.productId || 1,
-            batchNumber: item.batchNumber || 'ABC240715',
-            quantity: item.quantity || 1,
-            type: 'RETURN_IN',
-            sourceLocation: 'Customer Location',
-            destinationLocation: 'Receiving Zone',
-            reason: `${returnType} - ${returnReason}`,
-            referenceNumber: rmaNumber
-          }, { transaction: t });
-        } catch (mErr) {
-          console.error('StockMovement error notice:', mErr.message);
-        }
       }
     }
 
@@ -431,7 +531,8 @@ exports.createReturnRequest = async (req, res) => {
     res.status(201).json({
       success: true,
       message: `Return Authorization (${rmaNumber}) created successfully`,
-      data: returnReq
+      data: returnReq,
+      returnRequest: returnReq
     });
 
   } catch (error) {
@@ -549,6 +650,256 @@ exports.approveReturn = async (req, res) => {
     res.json({ success: true, message: 'Return Request Approved (RMA Active)', data: returnReq });
   } catch (error) {
     console.error('Approve Return error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 5B. RECEIVE RETURN (SIMPLE BUSINESS WORKFLOW)
+exports.receiveReturn = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const {
+      productCondition = 'Good', // 'Good', 'Damaged', 'Expired', 'Not Resalable'
+      remarks
+    } = req.body;
+
+    const returnReq = await ReturnRequest.findByPk(id, {
+      include: [{ model: ReturnItem, as: 'items' }],
+      transaction: t
+    });
+
+    if (!returnReq) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: 'Return Request not found.' });
+    }
+
+    if (returnReq.status === 'Cancelled') {
+      await t.rollback();
+      return res.status(400).json({ success: false, message: 'Cannot receive a cancelled return.' });
+    }
+
+    if (returnReq.status === 'Received' || returnReq.status === 'Refund Pending' || returnReq.status === 'Replacement Pending' || returnReq.status === 'Completed' || returnReq.status === 'Refunded') {
+      await t.rollback();
+      return res.status(400).json({ success: false, message: 'Product has already been received.' });
+    }
+
+    // Atomic Stock Update with Idempotency Protection
+    if (!returnReq.stockUpdated) {
+      if (productCondition === 'Good') {
+        for (const item of returnReq.items) {
+          const prod = await Product.findByPk(item.productId, { transaction: t });
+          if (prod) {
+            const addQty = parseFloat(item.quantity || 0);
+            prod.stock = parseFloat(prod.stock || 0) + addQty;
+            await prod.save({ transaction: t });
+
+            await StockMovement.create({
+              productId: prod.id,
+              type: 'IN',
+              quantity: addQty,
+              batchNumber: item.batchNumber || null,
+              reason: `Customer Return #${returnReq.rmaNumber} - Good Condition`,
+              referenceId: returnReq.id,
+              referenceType: 'ReturnRequest',
+              date: new Date()
+            }, { transaction: t });
+          }
+        }
+      } else {
+        // Damaged, Expired, Not Resalable -> Do NOT add to sellable stock; record in StockLoss
+        for (const item of returnReq.items) {
+          await StockLoss.create({
+            productId: item.productId,
+            batchNumber: item.batchNumber || null,
+            quantity: item.quantity,
+            costValue: (Number(item.unitPrice) || 0) * (Number(item.quantity) || 1),
+            reason: `Return #${returnReq.rmaNumber} (${productCondition}): ${remarks || returnReq.returnReason}`,
+            dispositionCategory: productCondition === 'Expired' ? 'Expired' : 'Destroyed',
+            approvedBy: req.user ? req.user.id : null,
+          }, { transaction: t });
+        }
+      }
+      returnReq.stockUpdated = true;
+    }
+
+    returnReq.productCondition = productCondition;
+    if (remarks) {
+      returnReq.qcRemarks = remarks;
+    }
+    returnReq.receivedAt = new Date();
+
+    // Set next status based on returnType
+    const nextStatus = (returnReq.returnType === 'Replacement') ? 'Replacement Pending' : 'Refund Pending';
+    returnReq.status = nextStatus;
+    returnReq.kanbanColumn = 'Received';
+
+    await returnReq.save({ transaction: t });
+    await t.commit();
+
+    invalidateReturnsCache();
+
+    res.json({
+      success: true,
+      message: `Return #${returnReq.rmaNumber} marked as received. Stock ${productCondition === 'Good' ? 'restored to available inventory' : 'marked as non-sellable'}.`,
+      data: returnReq
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error('Receive Return error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 5C. PROCESS REFUND
+exports.processRefund = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { refundMethod, refundAmount } = req.body;
+
+    const returnReq = await ReturnRequest.findByPk(id, { transaction: t });
+    if (!returnReq) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: 'Return Request not found.' });
+    }
+
+    if (returnReq.refundStatus === 'Refunded' || returnReq.status === 'Completed' || returnReq.status === 'Refunded') {
+      await t.rollback();
+      return res.status(400).json({ success: false, message: 'Refund has already been processed.' });
+    }
+
+    const amt = parseFloat(refundAmount !== undefined ? refundAmount : (returnReq.refundAmount || returnReq.totalValue || 0));
+    const method = refundMethod || returnReq.refundMethod || 'Original Payment Method';
+
+    // If Credit / Customer Balance, adjust customer balance safely
+    if (method === 'Credit / Customer Balance' && returnReq.customerId) {
+      const cust = await Customer.findByPk(returnReq.customerId, { transaction: t });
+      if (cust) {
+        cust.balance = Math.max(0, Number(cust.balance || 0) - amt);
+        await cust.save({ transaction: t });
+      }
+    }
+
+    returnReq.refundAmount = amt;
+    returnReq.refundMethod = method;
+    returnReq.refundStatus = 'Refunded';
+    returnReq.refundedAt = new Date();
+    returnReq.status = 'Completed';
+    returnReq.completedAt = new Date();
+    returnReq.kanbanColumn = 'Closed';
+
+    await returnReq.save({ transaction: t });
+    await t.commit();
+
+    invalidateReturnsCache();
+
+    res.json({
+      success: true,
+      message: `Refund of ₹${amt.toLocaleString('en-IN')} processed successfully via ${method}.`,
+      data: returnReq
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error('Process Refund error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 5D. PROCESS REPLACEMENT
+exports.processReplacement = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const returnReq = await ReturnRequest.findByPk(id);
+    if (!returnReq) {
+      return res.status(404).json({ success: false, message: 'Return Request not found.' });
+    }
+
+    if (returnReq.status === 'Completed') {
+      return res.status(400).json({ success: false, message: 'Replacement has already been processed.' });
+    }
+
+    returnReq.status = 'Completed';
+    returnReq.completedAt = new Date();
+    returnReq.kanbanColumn = 'Closed';
+    await returnReq.save();
+
+    invalidateReturnsCache();
+
+    res.json({
+      success: true,
+      message: `Replacement processed and return #${returnReq.rmaNumber} marked as completed.`,
+      data: returnReq
+    });
+  } catch (error) {
+    console.error('Process Replacement error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 5E. CANCEL RETURN
+exports.cancelReturn = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const returnReq = await ReturnRequest.findByPk(id, {
+      include: [{ model: ReturnItem, as: 'items' }],
+      transaction: t
+    });
+
+    if (!returnReq) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: 'Return Request not found.' });
+    }
+
+    if (returnReq.status === 'Completed' || returnReq.status === 'Refunded') {
+      await t.rollback();
+      return res.status(400).json({ success: false, message: 'Cannot cancel an already completed return.' });
+    }
+
+    // If stock was previously incremented with Good condition, reverse it atomically
+    if (returnReq.stockUpdated && returnReq.productCondition === 'Good') {
+      for (const item of returnReq.items) {
+        const prod = await Product.findByPk(item.productId, { transaction: t });
+        if (prod) {
+          const rollbackQty = parseFloat(item.quantity || 0);
+          prod.stock = Math.max(0, parseFloat(prod.stock || 0) - rollbackQty);
+          await prod.save({ transaction: t });
+
+          await StockMovement.create({
+            productId: prod.id,
+            type: 'OUT',
+            quantity: rollbackQty,
+            batchNumber: item.batchNumber || null,
+            reason: `Return Cancelled #${returnReq.rmaNumber} - Stock Rollback`,
+            referenceId: returnReq.id,
+            referenceType: 'ReturnRequest',
+            date: new Date()
+          }, { transaction: t });
+        }
+      }
+      returnReq.stockUpdated = false;
+    }
+
+    returnReq.status = 'Cancelled';
+    returnReq.kanbanColumn = 'Closed';
+    returnReq.actionTaken = `Cancelled: ${reason || 'User cancelled'}`;
+
+    await returnReq.save({ transaction: t });
+    await t.commit();
+
+    invalidateReturnsCache();
+
+    res.json({
+      success: true,
+      message: `Return #${returnReq.rmaNumber} has been cancelled.`,
+      data: returnReq
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error('Cancel Return error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -900,7 +1251,11 @@ exports.getDashboardMetrics = async (req, res) => {
       ncrCount,
       recallCount,
       creditNotesCount,
-      allReturns
+      allReturns,
+      returnRequestsCount,
+      toReceiveCount,
+      toRefundCount,
+      completedCount
     ] = await Promise.all([
       ReturnRequest.count({ where: { createdAt: { [Op.gte]: today } } }),
       ReturnRequest.count(),
@@ -911,7 +1266,11 @@ exports.getDashboardMetrics = async (req, res) => {
       ReturnCreditNote.count(),
       ReturnRequest.findAll({
         attributes: ['totalValue', 'recoveredValue', 'status', 'returnType', 'rootCause', 'returnReason', 'createdAt']
-      })
+      }),
+      ReturnRequest.count({ where: { status: { [Op.in]: ['Requested', 'Pending QC', 'QC Pending', 'Open'] } } }),
+      ReturnRequest.count({ where: { status: { [Op.in]: ['Approved', 'In Transit', 'Pending Receive'] } } }),
+      ReturnRequest.count({ where: { status: { [Op.in]: ['Received', 'Refund Pending'] } } }),
+      ReturnRequest.count({ where: { status: { [Op.in]: ['Completed', 'Refunded', 'Replaced', 'Closed'] } } })
     ]);
 
     let totalValSum = 0;
@@ -961,7 +1320,17 @@ exports.getDashboardMetrics = async (req, res) => {
 
     const payload = {
       success: true,
+      summary: {
+        returnRequests: returnRequestsCount,
+        toReceive: toReceiveCount,
+        toRefund: toRefundCount,
+        completed: completedCount
+      },
       metrics: {
+        returnRequests: returnRequestsCount,
+        toReceive: toReceiveCount,
+        toRefund: toRefundCount,
+        completed: completedCount,
         todaysReturns: todaysReturnsCount,
         pendingQc: pendingQc,
         recoveryValue: totalRecoveredVal,
@@ -1008,3 +1377,334 @@ exports.getDashboardMetrics = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// 12. APPROVE RETURN REQUEST
+exports.approveReturn = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const returnReq = await ReturnRequest.findByPk(id);
+    if (!returnReq) {
+      return res.status(404).json({ success: false, message: 'Return request not found' });
+    }
+
+    if (returnReq.status === 'Cancelled') {
+      return res.status(400).json({ success: false, message: 'Cannot approve a cancelled return' });
+    }
+
+    if (returnReq.status !== 'Approved' && returnReq.status !== 'Received' && returnReq.status !== 'Completed') {
+      returnReq.status = 'Approved';
+      returnReq.kanbanColumn = 'Approved';
+      returnReq.approvalLevel = req.user?.role || 'Manager';
+      await returnReq.save();
+      invalidateReturnsCache();
+    }
+
+    res.json({
+      success: true,
+      message: `Return ${returnReq.rmaNumber} approved successfully`,
+      data: returnReq,
+      returnRequest: returnReq
+    });
+  } catch (error) {
+    console.error('Approve return error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+exports.approveReturnRequest = exports.approveReturn;
+
+// 13. RECEIVE RETURN ITEM (INSPECTION & CONDITIONAL RESTOCK)
+exports.receiveReturn = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { condition = 'Good', notes = '', warehouseLocation = 'Main Warehouse' } = req.body;
+
+    const returnReq = await ReturnRequest.findByPk(id, {
+      include: [{ model: ReturnItem, as: 'items' }],
+      transaction: t
+    });
+
+    if (!returnReq) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: 'Return request not found' });
+    }
+
+    if (returnReq.status === 'Cancelled') {
+      await t.rollback();
+      return res.status(400).json({ success: false, message: 'Cannot receive a cancelled return' });
+    }
+
+    const itemsToProcess = returnReq.items && returnReq.items.length > 0
+      ? returnReq.items
+      : [{
+          productId: returnReq.replacementProductId,
+          quantity: returnReq.totalQty || 1,
+          productName: 'Returned Item'
+        }];
+
+    // IDEMPOTENCY GUARD: Only update inventory once
+    if (!returnReq.stockUpdated) {
+      if (condition === 'Good') {
+        for (const item of itemsToProcess) {
+          if (item.productId) {
+            const prod = await Product.findByPk(item.productId, { transaction: t });
+            if (prod) {
+              const qtyToAdd = Number(item.quantity || 1);
+              await prod.increment('stock', { by: qtyToAdd, transaction: t });
+
+              try {
+                await StockMovement.create({
+                  productId: item.productId,
+                  type: 'IN',
+                  quantity: qtyToAdd,
+                  reason: `Customer Return Restock (${returnReq.rmaNumber})`,
+                  referenceId: returnReq.id,
+                  createdById: req.user ? req.user.id : null
+                }, { transaction: t });
+              } catch (smErr) {
+                console.warn('StockMovement log error:', smErr.message);
+              }
+            }
+          }
+        }
+      } else {
+        // Damaged, Expired, or Not Resalable -> Log to StockLoss, do NOT add to sellable stock
+        for (const item of itemsToProcess) {
+          try {
+            await StockLoss.create({
+              itemType: 'Product',
+              productId: item.productId,
+              quantity: Number(item.quantity || 1),
+              reason: `${condition} Return`,
+              unitCost: Number(item.unitPrice || 0),
+              totalLossValue: Number(item.quantity || 1) * Number(item.unitPrice || 0),
+              notes: `Customer Return (${returnReq.rmaNumber}) - ${condition}`,
+              createdById: req.user ? req.user.id : null
+            }, { transaction: t });
+          } catch (slErr) {
+            console.warn('StockLoss log error:', slErr.message);
+          }
+        }
+      }
+      returnReq.stockUpdated = true;
+    }
+
+    returnReq.productCondition = condition;
+    returnReq.receivedAt = new Date();
+    returnReq.warehouseId = warehouseLocation || returnReq.warehouseId;
+    if (notes) {
+      returnReq.qcRemarks = returnReq.qcRemarks ? `${returnReq.qcRemarks}\n[Receipt] ${notes}` : `[Receipt] ${notes}`;
+    }
+
+    // Set next status based on actionType / returnType
+    const action = (returnReq.returnType || '').toLowerCase();
+    if (action.includes('replacement')) {
+      returnReq.status = 'Replacement Pending';
+      returnReq.kanbanColumn = 'Replacement Pending';
+    } else {
+      returnReq.status = 'Refund Pending';
+      returnReq.kanbanColumn = 'Refund Pending';
+    }
+
+    await returnReq.save({ transaction: t });
+    await t.commit();
+
+    invalidateReturnsCache();
+
+    res.json({
+      success: true,
+      message: `Return ${returnReq.rmaNumber} marked as received (${condition} Condition)`,
+      data: returnReq,
+      returnRequest: returnReq
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error('Receive return error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 14. PROCESS REFUND
+exports.processRefund = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { refundAmount, refundMethod, referenceNumber, notes } = req.body;
+
+    const returnReq = await ReturnRequest.findByPk(id);
+    if (!returnReq) {
+      return res.status(404).json({ success: false, message: 'Return request not found' });
+    }
+
+    if (returnReq.status === 'Cancelled') {
+      return res.status(400).json({ success: false, message: 'Cannot refund a cancelled return' });
+    }
+
+    const finalRefundAmount = refundAmount !== undefined ? Number(refundAmount) : Number(returnReq.refundAmount || returnReq.totalValue || 0);
+    returnReq.refundAmount = finalRefundAmount;
+    returnReq.refundMethod = refundMethod || returnReq.refundMethod || 'Original Payment Method';
+    returnReq.refundStatus = 'Completed';
+    returnReq.refundedAt = new Date();
+    returnReq.completedAt = new Date();
+    returnReq.status = 'Completed';
+    returnReq.kanbanColumn = 'Completed';
+
+    if (notes || referenceNumber) {
+      const refNote = referenceNumber ? `Ref #${referenceNumber}. ` : '';
+      const fullNote = `${refNote}${notes || ''}`.trim();
+      returnReq.qcRemarks = returnReq.qcRemarks ? `${returnReq.qcRemarks}\n[Refund] ${fullNote}` : `[Refund] ${fullNote}`;
+    }
+
+    await returnReq.save();
+    invalidateReturnsCache();
+
+    res.json({
+      success: true,
+      message: `Refund of ₹${finalRefundAmount} processed for ${returnReq.rmaNumber}`,
+      data: returnReq,
+      returnRequest: returnReq
+    });
+  } catch (error) {
+    console.error('Process refund error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 15. PROCESS REPLACEMENT
+exports.processReplacement = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { replacementProductId, replacementQuantity = 1, notes, dispatchTracking } = req.body;
+
+    const returnReq = await ReturnRequest.findByPk(id, { transaction: t });
+    if (!returnReq) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: 'Return request not found' });
+    }
+
+    if (returnReq.status === 'Cancelled') {
+      await t.rollback();
+      return res.status(400).json({ success: false, message: 'Cannot process replacement for a cancelled return' });
+    }
+
+    const prodId = replacementProductId || returnReq.replacementProductId;
+    const qty = Number(replacementQuantity || returnReq.replacementQuantity || 1);
+
+    if (prodId) {
+      const repProd = await Product.findByPk(prodId, { transaction: t });
+      if (repProd) {
+        await repProd.decrement('stock', { by: qty, transaction: t });
+        try {
+          await StockMovement.create({
+            productId: prodId,
+            type: 'OUT',
+            quantity: qty,
+            reason: `Replacement for Customer Return (${returnReq.rmaNumber})`,
+            referenceId: returnReq.id,
+            createdById: req.user ? req.user.id : null
+          }, { transaction: t });
+        } catch (smErr) {
+          console.warn('StockMovement replacement log error:', smErr.message);
+        }
+      }
+    }
+
+    returnReq.replacementProductId = prodId;
+    returnReq.replacementQuantity = qty;
+    returnReq.status = 'Completed';
+    returnReq.kanbanColumn = 'Completed';
+    returnReq.completedAt = new Date();
+
+    if (notes || dispatchTracking) {
+      const trackNote = dispatchTracking ? `Tracking: ${dispatchTracking}. ` : '';
+      const fullNote = `${trackNote}${notes || ''}`.trim();
+      returnReq.qcRemarks = returnReq.qcRemarks ? `${returnReq.qcRemarks}\n[Replacement] ${fullNote}` : `[Replacement] ${fullNote}`;
+    }
+
+    await returnReq.save({ transaction: t });
+    await t.commit();
+
+    invalidateReturnsCache();
+
+    res.json({
+      success: true,
+      message: `Replacement processed successfully for ${returnReq.rmaNumber}`,
+      data: returnReq,
+      returnRequest: returnReq
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error('Process replacement error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 16. CANCEL RETURN
+exports.cancelReturn = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { reason = 'Cancelled by user' } = req.body;
+
+    const returnReq = await ReturnRequest.findByPk(id, {
+      include: [{ model: ReturnItem, as: 'items' }],
+      transaction: t
+    });
+
+    if (!returnReq) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: 'Return request not found' });
+    }
+
+    if (returnReq.status === 'Cancelled') {
+      await t.rollback();
+      return res.json({ success: true, message: 'Return is already cancelled', data: returnReq });
+    }
+
+    // Rollback restocked inventory if it was already marked received in Good condition
+    if (returnReq.stockUpdated && returnReq.productCondition === 'Good') {
+      const itemsToRevert = returnReq.items && returnReq.items.length > 0 ? returnReq.items : [];
+      for (const item of itemsToRevert) {
+        if (item.productId) {
+          const prod = await Product.findByPk(item.productId, { transaction: t });
+          if (prod) {
+            const qty = Number(item.quantity || 1);
+            await prod.decrement('stock', { by: qty, transaction: t });
+            try {
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'OUT',
+                quantity: qty,
+                reason: `Cancelled Return Stock Reversal (${returnReq.rmaNumber})`,
+                referenceId: returnReq.id,
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
+            } catch (smErr) {}
+          }
+        }
+      }
+      returnReq.stockUpdated = false;
+    }
+
+    returnReq.status = 'Cancelled';
+    returnReq.kanbanColumn = 'Cancelled';
+    returnReq.qcRemarks = returnReq.qcRemarks ? `${returnReq.qcRemarks}\n[Cancelled] ${reason}` : `[Cancelled] ${reason}`;
+
+    await returnReq.save({ transaction: t });
+    await t.commit();
+
+    invalidateReturnsCache();
+
+    res.json({
+      success: true,
+      message: `Return ${returnReq.rmaNumber} has been cancelled`,
+      data: returnReq,
+      returnRequest: returnReq
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error('Cancel return error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+

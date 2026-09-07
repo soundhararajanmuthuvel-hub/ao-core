@@ -200,6 +200,46 @@ const ReturnRequest = sequelize.define('ReturnRequest', {
   actionTaken: {
     type: DataTypes.STRING,
     allowNull: true,
+  },
+  productCondition: {
+    type: DataTypes.STRING, // 'Good', 'Damaged', 'Expired', 'Not Resalable'
+    defaultValue: 'Good',
+  },
+  refundAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  refundMethod: {
+    type: DataTypes.STRING, // 'Original Payment Method', 'Cash', 'Bank Transfer', 'UPI', 'Credit / Customer Balance'
+    defaultValue: 'Original Payment Method',
+  },
+  refundStatus: {
+    type: DataTypes.STRING, // 'Pending', 'Refunded'
+    defaultValue: 'Pending',
+  },
+  replacementProductId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  replacementQuantity: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  stockUpdated: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  receivedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  refundedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  completedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
   }
 }, {
   timestamps: true,
