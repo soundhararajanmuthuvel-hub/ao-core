@@ -34,7 +34,7 @@ const getProductTypeStyle = (type) => {
   }
 };
 
-const empty = { name: '', sku: '', barcode: '', category: 'General', stock: 0, lowStockThreshold: 10, reorderQty: 100, preferredSupplierId: '', unit: 'pcs', purchasePrice: 0, sellingPrice: 0, gstPercent: 0, gstClass: '', supplier: '', productType: 'BULK_PRODUCT', parentProductId: '', packSize: '', conversionFactor: 1.0000 };
+const empty = { name: '', sku: '', barcode: '', category: 'General', stock: 0, lowStockThreshold: 10, reorderQty: 100, preferredSupplierId: '', unit: 'pcs', purchasePrice: 0, sellingPrice: 0, gstPercent: 0, hsnCode: '', gstClass: '', supplier: '', productType: 'BULK_PRODUCT', parentProductId: '', packSize: '', conversionFactor: 1.0000 };
 
 export default function Products() {
   const { toast } = useToast();
@@ -172,7 +172,12 @@ export default function Products() {
   useEffect(() => { productsApi.categories().then(({ data }) => setCategories(data.categories)); suppliersApi.list({ limit: 200 }).then(({ data }) => setSuppliers(data.suppliers || [])); }, []);
 
   const openModal = (p = null) => {
-    setForm(p);
+    if (p) {
+      // Normalise: hsnCode is canonical; fall back to gstClass for legacy data
+      setForm({ ...p, hsnCode: p.hsnCode || p.gstClass || '' });
+    } else {
+      setForm(empty);
+    }
     setModal(p ? 'edit' : 'create');
   };
 
@@ -232,8 +237,8 @@ export default function Products() {
   };
 
   const save = async () => {
-    if (form.gstClass) {
-      const hsnClean = String(form.gstClass).trim();
+    if (form.hsnCode) {
+      const hsnClean = String(form.hsnCode).trim();
       if (hsnClean !== '' && !/^\d{4}$|^\d{6}$|^\d{8}$/.test(hsnClean)) {
         toast('HSN Code must be exactly 4, 6, or 8 digits', 'error');
         return;
@@ -1288,8 +1293,8 @@ function ProductVariantManagement({ allProducts, loadProducts, toast }) {
               <input
                 className="form-control"
                 placeholder="4, 6 or 8 digits"
-                value={form.gstClass || ''}
-                onChange={(e) => setForm({ ...form, gstClass: e.target.value })}
+                value={form.hsnCode || ''}
+                onChange={(e) => setForm({ ...form, hsnCode: e.target.value })}
               />
             </div>
           </div>

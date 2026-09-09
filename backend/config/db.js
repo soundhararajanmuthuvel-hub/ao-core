@@ -621,6 +621,34 @@ const connectDB = async () => {
   await addColumnIfNotExist('Product', 'websiteLabels', "TEXT NULL");
   await addColumnIfNotExist('Products', 'websiteLabels', "TEXT NULL");
 
+  // ── HSN DATA MIGRATION ────────────────────────────────────────────────────
+  // hsnCode is the canonical HSN field. gstClass was historically misused for
+  // HSN in the old Products.jsx UI. Safely copy gstClass → hsnCode for any
+  // product that has HSN in gstClass but not yet in hsnCode.
+  // This is idempotent – it will never overwrite a valid hsnCode value.
+  try {
+    await sequelize.query(`
+      UPDATE Products
+      SET hsnCode = gstClass
+      WHERE (hsnCode IS NULL OR hsnCode = '')
+        AND gstClass IS NOT NULL
+        AND gstClass != ''
+        AND gstClass GLOB '[0-9][0-9][0-9][0-9]'
+        OR (hsnCode IS NULL OR hsnCode = '')
+        AND gstClass IS NOT NULL
+        AND gstClass != ''
+        AND gstClass GLOB '[0-9][0-9][0-9][0-9][0-9][0-9]'
+        OR (hsnCode IS NULL OR hsnCode = '')
+        AND gstClass IS NOT NULL
+        AND gstClass != ''
+        AND gstClass GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+    `);
+    console.log('[DB] HSN migration: copied valid gstClass HSN values → hsnCode where hsnCode was empty.');
+  } catch (migErr) {
+    console.warn('[DB] HSN migration warning (non-fatal):', migErr.message);
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   await addColumnIfNotExist('WebsiteProduct', 'imageUrl', "TEXT NULL");
   await addColumnIfNotExist('WebsiteProduct', 'imagePublicId', "VARCHAR(255) NULL");
   await addColumnIfNotExist('WebsiteProduct', 'managementProductId', "INTEGER NULL");

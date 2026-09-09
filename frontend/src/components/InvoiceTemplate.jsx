@@ -326,7 +326,8 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
                     </div>
                   )}
                 </td>
-                {!isThermal && isGstInvoice && <td style={{ padding: rowPadding, verticalAlign: 'top' }}>{item.product?.gstClass || '0000'}</td>}
+                {!isThermal && isGstInvoice && <td style={{ padding: rowPadding, verticalAlign: 'top' }}>{item.product?.hsnCode || item.product?.gstClass || '0000'}</td>}
+
                 <td style={{ padding: rowPadding, verticalAlign: 'top', textAlign: 'center' }}>
                   {Number(item.qty).toFixed(0)}
                   {Number(item.freeQty) > 0 && (

@@ -1404,8 +1404,8 @@ const loadSalesGstRows = async (filters = {}) => {
         {
           model: Product,
           as: 'product',
-          attributes: ['id', 'name', 'sku', 'gstPercent', 'gstClass'],
-          where: hsn ? { gstClass: hsn } : undefined,
+          attributes: ['id', 'name', 'sku', 'gstPercent', 'gstClass', 'hsnCode'],
+          where: hsn ? { [Op.or]: [{ hsnCode: hsn }, { gstClass: hsn }] } : undefined,
           required: hsn ? true : false
         }
       ]
@@ -1455,7 +1455,8 @@ const loadSalesGstRows = async (filters = {}) => {
         productId: item.productId,
         productName: item.name || item.product?.name || '',
         sku: item.product?.sku || '',
-        gstClass: item.product?.gstClass || 'General',
+        // hsnCode is canonical; gstClass is legacy fallback
+        gstClass: item.product?.hsnCode || item.product?.gstClass || 'General',
         qty,
         unitPrice,
         gstPercent,

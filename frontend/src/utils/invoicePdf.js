@@ -529,8 +529,9 @@ export async function buildInvoicePdfDoc(sale, settings) {
     ];
 
     if (!isThermal && isGstInvoice) {
-      row.push(item.product?.gstClass || '0000');
+      row.push(item.product?.hsnCode || item.product?.gstClass || '0000');
     }
+
 
     row.push(Number(item.qty).toFixed(0));
 

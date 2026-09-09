@@ -183,11 +183,11 @@ exports.createSale = async (req, res, next) => {
       const product = await Product.findByPk(item.product, { transaction: t });
       if (!product) throw new Error(`Product not found: ${item.product}`);
 
-      // If GST invoice, validate HSN (gstClass) and positive GST percentage
+      // If GST invoice, validate HSN (hsnCode is canonical; gstClass is legacy fallback)
       if (invoiceType === 'GST') {
-        const hsnCode = String(product.gstClass || '').trim();
+        const hsnCode = String(product.hsnCode || product.gstClass || '').trim();
         if (!/^\d{4}$|^\d{6}$|^\d{8}$/.test(hsnCode)) {
-          throw new Error(`Product ${product.name} must have a valid 4, 6, or 8 digit numeric HSN Code (got "${hsnCode}").`);
+          throw new Error(`Product ${product.name} is missing a valid HSN Code. Please update it in Product Master (HSN must be exactly 4, 6, or 8 numeric digits).`);
         }
         const itemGstPercent = Number(item.gstPercent) || Number(product.gstPercent || 0);
         if (itemGstPercent <= 0) {
@@ -432,7 +432,7 @@ exports.createSale = async (req, res, next) => {
       const summaryMap = {};
       for (const item of enrichedItems) {
         const prod = item.productId ? await Product.findByPk(item.productId, { transaction: t }) : null;
-        const hsn = (prod && prod.gstClass) ? String(prod.gstClass).trim() : '0000';
+        const hsn = String(prod?.hsnCode || prod?.gstClass || '0000').trim();
         const qty = Number(item.qty || 0);
         const unitPrice = Number(item.unitPrice || 0);
         const gstPercent = Number(item.gstPercent || 0);
@@ -1351,11 +1351,11 @@ exports.updateSale = async (req, res, next) => {
       const product = item.product ? await Product.findByPk(item.product, { transaction: t }) : null;
       
       if (product) {
-        // If GST invoice, validate HSN (gstClass) and positive GST percentage
+        // If GST invoice, validate HSN (hsnCode is canonical; gstClass is legacy fallback)
         if (invoiceType === 'GST') {
-          const hsnCode = String(product.gstClass || '').trim();
+          const hsnCode = String(product.hsnCode || product.gstClass || '').trim();
           if (!/^\d{4}$|^\d{6}$|^\d{8}$/.test(hsnCode)) {
-            throw new Error(`Product ${product.name} must have a valid 4, 6, or 8 digit numeric HSN Code (got "${hsnCode}").`);
+            throw new Error(`Product ${product.name} is missing a valid HSN Code. Please update it in Product Master (HSN must be exactly 4, 6, or 8 numeric digits).`);
           }
           const itemGstPercent = Number(item.gstPercent) || Number(product.gstPercent || 0);
           if (itemGstPercent <= 0) {
@@ -1652,7 +1652,7 @@ exports.updateSale = async (req, res, next) => {
       const summaryMap = {};
       for (const item of enrichedItems) {
         const prod = item.productId ? await Product.findByPk(item.productId, { transaction: t }) : null;
-        const hsn = (prod && prod.gstClass) ? String(prod.gstClass).trim() : '0000';
+        const hsn = String(prod?.hsnCode || prod?.gstClass || '0000').trim();
         const qty = Number(item.qty || 0);
         const unitPrice = Number(item.unitPrice || 0);
         const gstPercent = Number(item.gstPercent || 0);
