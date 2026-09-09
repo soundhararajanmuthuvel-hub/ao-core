@@ -74,6 +74,12 @@ self.addEventListener('fetch', (event) => {
 
   // 2. API requests - Network-First, fallback to cache if available, else custom error response
   if (isApiRequest) {
+    // Pure network request for health check endpoint (do not generate synthetic 503)
+    if (event.request.url.endsWith('/health') || event.request.url.includes('/health?')) {
+      event.respondWith(fetch(event.request));
+      return;
+    }
+
     event.respondWith(
       fetch(event.request)
         .catch(() => {

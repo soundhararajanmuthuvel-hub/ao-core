@@ -32,6 +32,9 @@ export default function Sidebar({ collapsed, open, onClose }) {
   const currentMenu = menuStructure;
 
   useEffect(() => {
+    const isDebugMenu = import.meta.env.DEV && (typeof window !== 'undefined' && localStorage.getItem('ao_debug_menu') === 'true');
+    if (!isDebugMenu) return;
+
     console.log('=== AO CORE ERP MENU CONFIGURATION AUDIT ===');
     console.log('User Role:', userRole);
     const desktopItems = currentMenu.map(item => {

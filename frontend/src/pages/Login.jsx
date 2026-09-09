@@ -5,6 +5,7 @@ import { useSettings } from '../context/SettingsContext';
 import { useToast } from '../context/ToastContext';
 import { resolveAssetUrl } from '../utils/url';
 import { useCompanyBrand } from '../context/CompanyBrandContext';
+import ConnectionBanner from '../components/ConnectionBanner';
 import './Login.css';
 
 export default function Login() {
@@ -145,6 +146,8 @@ export default function Login() {
               <p className="welcome-desc">Sign in to your enterprise account</p>
             </div>
             
+            <ConnectionBanner />
+
             <form onSubmit={handleSubmit} className="login-form">
               {/* Role Selection Dropdown */}
               <div className="form-group">

@@ -1,5 +1,9 @@
 const getRawApiUrl = () => {
-  const envUrl = import.meta.env.VITE_API_URL?.trim();
+  const envUrl = (
+    import.meta.env.VITE_API_URL || 
+    import.meta.env.VITE_BACKEND_URL || 
+    import.meta.env.API_URL
+  )?.trim();
   const isProductionHost = typeof window !== 'undefined' && 
     window.location.hostname !== 'localhost' && 
     window.location.hostname !== '127.0.0.1';
@@ -7,14 +11,14 @@ const getRawApiUrl = () => {
   if (isProductionHost) {
     // In production hosts, NEVER connect to localhost/127.0.0.1
     if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
-      return envUrl.replace(/\/$/, '');
+      return envUrl.replace(/\/+$/, '');
     }
     // Fallback to production backend address
     return 'https://erp.api.amudhasurabiy.com';
   } else {
     // In local development, use VITE_API_URL if defined, otherwise default to relative path to utilize Vite dev server proxy
     if (envUrl) {
-      return envUrl.replace(/\/$/, '');
+      return envUrl.replace(/\/+$/, '');
     }
     return '';
   }

@@ -9,6 +9,7 @@ import { usePWA } from '../context/PWAContext';
 import SalesmanApp from '../pages/SalesmanApp';
 import { useToast } from '../context/ToastContext';
 import { menuStructure } from './menuConfig';
+import ConnectionBanner from '../components/ConnectionBanner';
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -90,6 +91,7 @@ export default function AppLayout() {
       
       <div className={`main-area ${collapsed ? 'collapsed' : ''}`}>
         <Header onMenuToggle={handleMenuToggle} />
+        <ConnectionBanner />
         <main style={{ flex: 1, overflowX: 'hidden', position: 'relative' }}>
           <div style={{ width: '100%', height: '100%' }}>
             <Outlet />
