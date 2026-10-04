@@ -1,20 +1,21 @@
 const rateLimit = require('express-rate-limit');
 
 /**
- * Strict rate limiter for Admin authentication routes
- * 5 attempts per 15 minutes per IP
+ * Enterprise rate limiter for Admin authentication routes
+ * 30 attempts per 15 minutes per IP, ignores successful logins
  */
 const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per `window` (here, per 15 minutes)
+  max: 30, // Limit each IP to 30 failed attempts per 15 minutes
+  skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     success: false,
-    message: 'Too many login attempts from this IP, please try again after 15 minutes.',
+    message: 'Too many failed login attempts from this IP, please try again after 15 minutes.',
   },
   keyGenerator: (req) => {
-    return req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown-ip';
+    return req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown-ip';
   }
 });
 
