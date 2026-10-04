@@ -26,8 +26,11 @@ router.get('/:id', returnsController.getReturnById);
 router.put('/:id/approve', returnsController.approveReturn);
 router.put('/:id/receive', returnsController.receiveReturn);
 router.put('/:id/process-refund', returnsController.processRefund);
+router.post('/:id/refund', returnsController.processRefund);
 router.put('/:id/process-replacement', returnsController.processReplacement);
+router.post('/:id/replacement', returnsController.processReplacement);
 router.put('/:id/cancel', returnsController.cancelReturn);
+router.patch('/:id/cancel', returnsController.cancelReturn);
 router.post('/:id/qc-inspect', returnsController.qcInspect);
 router.put('/:id/close', returnsController.closeReturn);
 

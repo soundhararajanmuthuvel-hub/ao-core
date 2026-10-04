@@ -9,12 +9,12 @@ const getRawApiUrl = () => {
     window.location.hostname !== '127.0.0.1';
 
   if (isProductionHost) {
-    // In production hosts, NEVER connect to localhost/127.0.0.1
-    if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+    // In production hosts, NEVER connect to localhost/127.0.0.1 or outdated Railway domains
+    if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1') && !envUrl.includes('erp.api.amudhasurabiy.com')) {
       return envUrl.replace(/\/+$/, '');
     }
-    // Fallback to production backend address
-    return 'https://erp.api.amudhasurabiy.com';
+    // Fallback to active production Render backend
+    return 'https://ao-core-7oaw.onrender.com';
   } else {
     // In local development, use VITE_API_URL if defined, otherwise default to relative path to utilize Vite dev server proxy
     if (envUrl) {

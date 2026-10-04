@@ -389,9 +389,24 @@ exports.createReturnRequest = async (req, res) => {
     }
 
     // Estimate costs
+    // Estimate costs
     const mfgCost = totalVal * 0.55;
     const transportCost = 150;
     const labourCost = 100;
+
+    const requestType = (req.body.requestType || (req.body.actionType === 'Replacement' ? 'REPLACEMENT' : (req.body.actionType === 'Refund' ? 'REFUND' : 'REPLACEMENT'))).toUpperCase();
+    const productCondition = req.body.productCondition || 'Good';
+    const packagingCondition = req.body.packagingCondition || 'Good';
+    
+    // Automatic stock destination calculation (Rules 1, 2, 3)
+    let stockDestination = 'AVAILABLE_STOCK';
+    if (productCondition === 'Good' && packagingCondition === 'Good') {
+      stockDestination = 'AVAILABLE_STOCK';
+    } else if (productCondition === 'Good' && packagingCondition === 'Damaged') {
+      stockDestination = 'TRANSFER_STOCK';
+    } else {
+      stockDestination = 'DAMAGED_STOCK';
+    }
 
     const returnReq = await ReturnRequest.create({
       rmaNumber,
@@ -403,10 +418,11 @@ exports.createReturnRequest = async (req, res) => {
       salesmanId: salesmanId || null,
       warehouseId,
       warehouseZone: 'Receiving',
-      returnType: req.body.returnType || (req.body.actionType === 'Replacement' ? 'Replacement' : 'Refund'),
+      returnType: requestType === 'REPLACEMENT' ? 'Replacement' : 'Refund',
+      requestType,
       returnReason,
       rootCause,
-      status: 'Requested',
+      status: req.body.status || 'Requested',
       kanbanColumn: 'Requested',
       approvalLevel,
       courierName,
@@ -416,17 +432,21 @@ exports.createReturnRequest = async (req, res) => {
       customerSignatureUrl,
       totalQty: totalQuantity,
       totalValue: totalVal,
+      originalCalculatedAmount: totalVal,
       recoveredValue: totalGstReversal,
       mfgCost,
       transportCost,
       labourCost,
       refundAmount: req.body.refundAmount !== undefined ? req.body.refundAmount : totalVal,
       refundMethod: req.body.refundMethod || 'Original Payment Method',
-      refundStatus: 'Pending',
-      replacementProductId: req.body.replacementProductId || null,
-      replacementQuantity: req.body.replacementQuantity || 0,
-      productCondition: 'Good',
+      refundStatus: requestType === 'REFUND' ? 'REFUND REQUESTED' : 'Pending',
+      replacementProductId: req.body.replacementProductId || (returnItems[0] ? returnItems[0].productId : null),
+      replacementQuantity: req.body.replacementQuantity || totalQuantity || 0,
+      productCondition,
+      packagingCondition,
+      stockDestination,
       stockUpdated: false,
+      notes: req.body.notes || req.body.additionalNotes || null,
       qcRemarks: req.body.additionalNotes || req.body.notes || req.body.qcRemarks || null,
       createdById: req.user ? req.user.id : null
     }, { transaction: t });
@@ -449,13 +469,184 @@ exports.createReturnRequest = async (req, res) => {
           unit: item.unit || 'Pks',
           unitPrice: item.unitPrice || 250,
           lineTotal: (item.quantity || 1) * (item.unitPrice || 250),
-          qcConditionProduct: item.qcConditionProduct || 'Perfect',
-          qcConditionPackage: item.qcConditionPackage || 'Torn',
-          disposition: 'Pending QC',
+          qcConditionProduct: productCondition === 'Good' ? 'Perfect' : 'Damaged',
+          qcConditionPackage: packagingCondition === 'Good' ? 'Intact' : 'Torn',
+          disposition: stockDestination,
           originalImageUrl: item.originalImageUrl || null,
           returnedImageUrl: item.returnedImageUrl || null,
         }, { transaction: t });
       }
+    }
+
+    // IF PROCESS IMMEDIATELY (e.g. from shop return workflow)
+    const shouldProcessNow = req.body.processImmediately === true || req.body.actionType || req.body.requestType;
+    if (shouldProcessNow) {
+      // 1. Physical Return Stock Routing (Rules 1, 2, 3)
+      for (const item of returnItems) {
+        if (item.productId) {
+          const prod = await Product.findByPk(item.productId, { transaction: t });
+          if (prod) {
+            const qty = Number(item.quantity || 1);
+            if (stockDestination === 'AVAILABLE_STOCK') {
+              // RULE 1: Return to Available Stock
+              await prod.increment('stock', { by: qty, transaction: t });
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'IN',
+                quantity: qty,
+                reason: `Shop Return (${rmaNumber}) - Good Condition (Available Stock)`,
+                referenceId: returnReq.id,
+                referenceModel: 'ReturnRequest',
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
+            } else if (stockDestination === 'TRANSFER_STOCK') {
+              // RULE 2: Transfer to Repacking Stock
+              await prod.increment('repackingStock', { by: qty, transaction: t });
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'TRANSFER_IN',
+                quantity: qty,
+                reason: `Shop Return (${rmaNumber}) - Pack Damaged (Transfer/Repacking Stock)`,
+                referenceId: returnReq.id,
+                referenceModel: 'ReturnRequest',
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
+            } else {
+              // RULE 3: Damaged Stock
+              await prod.increment('damagedStock', { by: qty, transaction: t });
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'DAMAGE_IN',
+                quantity: qty,
+                reason: `Shop Return (${rmaNumber}) - Damaged Product (Damaged Stock)`,
+                referenceId: returnReq.id,
+                referenceModel: 'ReturnRequest',
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
+
+              try {
+                await StockLoss.create({
+                  itemType: 'Product',
+                  productId: item.productId,
+                  quantity: qty,
+                  reason: `Damaged Return (${rmaNumber})`,
+                  unitCost: Number(item.unitPrice || 0),
+                  totalLossValue: qty * Number(item.unitPrice || 0),
+                  notes: `Shop Return (${rmaNumber}) from Customer ID: ${customerId || 'Shop'}`,
+                  createdById: req.user ? req.user.id : null
+                }, { transaction: t });
+              } catch (slErr) {
+                console.warn('StockLoss notice:', slErr.message);
+              }
+            }
+          }
+        }
+      }
+      returnReq.stockUpdated = true;
+
+      // 2. Execute Request Type Action (REPLACEMENT vs REFUND)
+      if (requestType === 'REPLACEMENT') {
+        const repProdId = req.body.replacementProductId || (returnItems[0] ? returnItems[0].productId : null);
+        const repQty = Number(req.body.replacementQuantity || totalQuantity || 1);
+
+        if (repProdId) {
+          const repProd = await Product.findByPk(repProdId, { transaction: t });
+          if (!repProd) {
+            await t.rollback();
+            return res.status(404).json({ success: false, message: 'Replacement product not found.' });
+          }
+
+          if (Number(repProd.stock) < repQty) {
+            await t.rollback();
+            return res.status(400).json({
+              success: false,
+              message: `Insufficient available stock for replacement product (${repProd.name}). Available: ${repProd.stock}, Requested: ${repQty}. Cannot allow negative stock.`
+            });
+          }
+
+          // Deduct replacement quantity from available stock
+          await repProd.decrement('stock', { by: repQty, transaction: t });
+          await StockMovement.create({
+            productId: repProdId,
+            type: 'REPLACEMENT_OUT',
+            quantity: repQty,
+            reason: `Replacement Out for Return #${rmaNumber} to Customer #${customerId || 'Shop'}`,
+            referenceId: returnReq.id,
+            referenceModel: 'ReturnRequest',
+            createdById: req.user ? req.user.id : null
+          }, { transaction: t });
+        }
+
+        returnReq.replacementProductId = repProdId;
+        returnReq.replacementQuantity = repQty;
+        returnReq.replacementStatus = 'Completed';
+        returnReq.status = 'Completed';
+        returnReq.kanbanColumn = 'Completed';
+        returnReq.completedAt = new Date();
+      } else if (requestType === 'REFUND') {
+        const eligibleAmount = totalVal;
+        const finalRefundAmount = req.body.refundAmount !== undefined ? Number(req.body.refundAmount) : eligibleAmount;
+
+        if (finalRefundAmount > eligibleAmount && eligibleAmount > 0) {
+          if (req.user?.role !== 'admin' && req.user?.role !== 'Super Admin' && !req.body.refundAuthorizedById) {
+            await t.rollback();
+            return res.status(400).json({
+              success: false,
+              message: `Refund amount (₹${finalRefundAmount}) cannot exceed original invoice price (₹${eligibleAmount}) without admin authorization.`
+            });
+          }
+        }
+
+        returnReq.refundAmount = finalRefundAmount;
+        returnReq.refundMethod = req.body.refundMethod || 'Original Payment Method';
+        returnReq.refundStatus = 'REFUND PROCESSED';
+        returnReq.status = 'REFUND PROCESSED';
+        returnReq.kanbanColumn = 'Completed';
+        returnReq.refundedAt = new Date();
+        returnReq.completedAt = new Date();
+
+        // Create Payment record
+        const Payment = require('../models/Payment');
+        try {
+          const payCount = await Payment.count({ transaction: t });
+          const payNum = `REF-${new Date().getFullYear()}-${String(payCount + 1).padStart(5, '0')}`;
+          await Payment.create({
+            paymentNumber: payNum,
+            customerId: customerId || null,
+            amount: finalRefundAmount,
+            paymentMethod: (returnReq.refundMethod || 'cash').toLowerCase().includes('upi') ? 'upi' : ((returnReq.refundMethod || '').toLowerCase().includes('bank') ? 'bank' : 'cash'),
+            referenceNumber: req.body.referenceNumber || rmaNumber,
+            status: 'Success',
+            date: new Date()
+          }, { transaction: t });
+        } catch (payErr) {
+          console.warn('Payment record log notice:', payErr.message);
+        }
+
+        // Ledger double-entry posting
+        try {
+          const { postJournalEntry, getSystemAccount } = require('../services/ledgerService');
+          const salesRevAcc = await getSystemAccount('Revenue');
+          const cashAcc = await getSystemAccount('Cash');
+          if (salesRevAcc && cashAcc && finalRefundAmount > 0) {
+            await postJournalEntry({
+              entryDate: new Date(),
+              referenceId: returnReq.id,
+              referenceModel: 'ReturnRequest',
+              referenceNumber: rmaNumber,
+              description: `Sales Refund for ${returnReq.rmaNumber}`,
+              lines: [
+                { accountId: salesRevAcc, debit: finalRefundAmount, credit: 0, description: 'Sales Return Debit' },
+                { accountId: cashAcc, debit: 0, credit: finalRefundAmount, description: 'Refund Payment Credit' }
+              ]
+            }, t);
+          }
+        } catch (glErr) {
+          console.warn('GL posting notice:', glErr.message);
+        }
+      }
+
+      await returnReq.save({ transaction: t });
     }
 
     // Financial Posting: Generate Credit Note if Credit Note Return Type
@@ -1243,133 +1434,87 @@ exports.getDashboardMetrics = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [
-      todaysReturnsCount,
-      totalReturnsCount,
-      pendingQc,
-      repackingCount,
-      ncrCount,
-      recallCount,
-      creditNotesCount,
-      allReturns,
-      returnRequestsCount,
-      toReceiveCount,
-      toRefundCount,
-      completedCount
-    ] = await Promise.all([
-      ReturnRequest.count({ where: { createdAt: { [Op.gte]: today } } }),
-      ReturnRequest.count(),
-      ReturnRequest.count({ where: { status: { [Op.in]: ['Requested', 'Pending QC', 'QC Pending'] } } }),
-      RepackWorkOrder.count({ where: { status: 'In Progress' } }),
-      ManufacturingNcr.count({ where: { status: 'Open' } }),
-      BatchRecall.count({ where: { isRecalled: true } }),
-      ReturnCreditNote.count(),
-      ReturnRequest.findAll({
-        attributes: ['totalValue', 'recoveredValue', 'status', 'returnType', 'rootCause', 'returnReason', 'createdAt']
-      }),
-      ReturnRequest.count({ where: { status: { [Op.in]: ['Requested', 'Pending QC', 'QC Pending', 'Open'] } } }),
-      ReturnRequest.count({ where: { status: { [Op.in]: ['Approved', 'In Transit', 'Pending Receive'] } } }),
-      ReturnRequest.count({ where: { status: { [Op.in]: ['Received', 'Refund Pending'] } } }),
-      ReturnRequest.count({ where: { status: { [Op.in]: ['Completed', 'Refunded', 'Replaced', 'Closed'] } } })
-    ]);
+    let todaysReturnsCount = 0;
+    let totalReturnsCount = 0;
+    let pendingCount = 0;
+    let repackCount = 0;
+    let replacementsCount = 0;
+    let refundsCount = 0;
+    let allReturns = [];
 
-    let totalValSum = 0;
-    let totalRecoveredVal = 0;
-    let totalLossVal = 0;
-    const causeCounts = {};
-    const monthlyMap = {};
-
-    allReturns.forEach(r => {
-      const val = Number(r.totalValue || 0);
-      const gstRec = Number(r.recoveredValue || 0);
-      totalValSum += val;
-      if (r.returnType === 'Destroy' || r.status === 'Rejected') {
-        totalLossVal += val;
-      } else {
-        totalRecoveredVal += (val + gstRec);
+    try {
+      todaysReturnsCount = await ReturnRequest.count({ where: { createdAt: { [Op.gte]: today } } });
+      totalReturnsCount = await ReturnRequest.count();
+      pendingCount = await ReturnRequest.count({ where: { status: { [Op.in]: ['Requested', 'Pending', 'REFUND REQUESTED', 'Pending Receive', 'QC Pending', 'Open'] } } });
+      repackCount = (await Product.sum('repackingStock')) || 0;
+      replacementsCount = await ReturnRequest.count({ where: { returnType: 'Replacement' } });
+      refundsCount = await ReturnRequest.count({ where: { returnType: 'Refund' } });
+      allReturns = await ReturnRequest.findAll({
+        attributes: ['id', 'status', 'totalValue', 'returnType', 'createdAt'],
+        raw: true
+      });
+    } catch (dbQueryErr) {
+      console.warn('[Returns] getDashboardMetrics partial query fallback:', dbQueryErr.message);
+      // Fallback with raw query if columns differ
+      try {
+        const [rawResults] = await sequelize.query(`SELECT id, status, totalValue, returnType, createdAt FROM return_requests;`);
+        allReturns = rawResults || [];
+        totalReturnsCount = allReturns.length;
+        todaysReturnsCount = allReturns.filter(r => new Date(r.createdAt) >= today).length;
+        pendingCount = allReturns.filter(r => ['Requested', 'Pending', 'REFUND REQUESTED', 'Pending Receive', 'QC Pending', 'Open'].includes(r.status)).length;
+        replacementsCount = allReturns.filter(r => r.returnType === 'Replacement').length;
+        refundsCount = allReturns.filter(r => r.returnType === 'Refund').length;
+      } catch (rawErr) {
+        console.warn('[Returns] Raw table query fallback also skipped:', rawErr.message);
       }
+    }
 
-      const cause = r.rootCause || r.returnReason || 'Other';
-      causeCounts[cause] = (causeCounts[cause] || 0) + 1;
-
-      if (r.createdAt) {
-        const monthLabel = new Date(r.createdAt).toLocaleString('default', { month: 'short' });
-        monthlyMap[monthLabel] = (monthlyMap[monthLabel] || 0) + 1;
+    let totalRefundedVal = 0;
+    allReturns.forEach(r => {
+      const st = (r.status || '').toUpperCase();
+      const rst = (r.refundStatus || '').toUpperCase();
+      if (st.includes('REFUND PROCESSED') || st.includes('REFUNDED') || st.includes('COMPLETED') || rst.includes('PROCESSED') || rst.includes('COMPLETED')) {
+        totalRefundedVal += Number(r.refundAmount || r.totalValue || 0);
       }
     });
-
-    const sumTotal = totalRecoveredVal + totalLossVal;
-    const recoveryRate = sumTotal > 0 ? Number(((totalRecoveredVal / sumTotal) * 100).toFixed(1)) : 0;
-    const lossRate = sumTotal > 0 ? Number(((totalLossVal / sumTotal) * 100).toFixed(1)) : 0;
-
-    const rootCauseChartData = Object.keys(causeCounts).map(name => ({
-      name,
-      count: causeCounts[name],
-      percentage: totalReturnsCount > 0 ? Number(((causeCounts[name] / totalReturnsCount) * 100).toFixed(1)) : 0
-    }));
-
-    const monthlyReturnsChartData = Object.keys(monthlyMap).map(month => ({
-      month,
-      returns: monthlyMap[month]
-    }));
-
-    const recoveryTrendChartData = [
-      { name: 'Recovered Value', value: totalRecoveredVal },
-      { name: 'Loss Value', value: totalLossVal }
-    ].filter(item => item.value > 0);
 
     const payload = {
       success: true,
       summary: {
-        returnRequests: returnRequestsCount,
-        toReceive: toReceiveCount,
-        toRefund: toRefundCount,
-        completed: completedCount
+        returnsToday: todaysReturnsCount,
+        pendingReturns: pendingCount,
+        replacements: replacementsCount,
+        refunds: refundsCount,
+        refundValue: totalRefundedVal,
+        // Backward-compatible keys
+        returnRequests: pendingCount,
+        toReceive: pendingCount,
+        toRefund: refundsCount,
+        completed: totalReturnsCount - pendingCount
       },
       metrics: {
-        returnRequests: returnRequestsCount,
-        toReceive: toReceiveCount,
-        toRefund: toRefundCount,
-        completed: completedCount,
+        returnsToday: todaysReturnsCount,
+        pendingReturns: pendingCount,
+        replacements: replacementsCount,
+        refunds: refundsCount,
+        refundValue: totalRefundedVal,
         todaysReturns: todaysReturnsCount,
-        pendingQc: pendingQc,
-        recoveryValue: totalRecoveredVal,
-        recoveryRate: recoveryRate,
-        activeRecalls: recallCount,
+        pendingQc: pendingCount,
+        recoveryValue: totalRefundedVal,
         totalReturns: totalReturnsCount
       },
-      charts: {
-        rootCause: rootCauseChartData,
-        monthlyReturns: monthlyReturnsChartData,
-        recoveryTrend: recoveryTrendChartData
-      },
       data: {
-        todaysReturns: todaysReturnsCount,
-        pendingQc: pendingQc,
-        repackingQueue: repackingCount,
-        stockRestoredVal: totalRecoveredVal,
-        transferredVal: Math.round(totalRecoveredVal * 0.35),
-        destroyedVal: totalLossVal,
-        recoveryPercentage: recoveryRate,
-        lossPercentage: lossRate,
-        openNcrs: ncrCount,
-        activeRecalls: recallCount,
-        creditNotes: creditNotesCount,
-        totalReturns: totalReturnsCount,
-        rootCauseBreakdown: rootCauseChartData
+        returnsToday: todaysReturnsCount,
+        pendingReturns: pendingCount,
+        replacements: replacementsCount,
+        refunds: refundsCount,
+        refundValue: totalRefundedVal,
+        totalReturns: totalReturnsCount
       }
     };
 
     metricsCache = payload;
     metricsCacheTimestamp = Date.now();
-
-    try {
-      await ActivityLog.create({
-        action: 'Dashboard Refresh',
-        module: 'Returns',
-        details: `Returns Dashboard metrics refreshed. Total returns: ${totalReturnsCount}`
-      });
-    } catch (e) {}
 
     res.json(payload);
   } catch (error) {
@@ -1387,11 +1532,11 @@ exports.approveReturn = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Return request not found' });
     }
 
-    if (returnReq.status === 'Cancelled') {
+    if (returnReq.status === 'Cancelled' || returnReq.status === 'CANCELLED') {
       return res.status(400).json({ success: false, message: 'Cannot approve a cancelled return' });
     }
 
-    if (returnReq.status !== 'Approved' && returnReq.status !== 'Received' && returnReq.status !== 'Completed') {
+    if (returnReq.status !== 'Approved' && returnReq.status !== 'Received' && returnReq.status !== 'Completed' && returnReq.status !== 'REFUND PROCESSED') {
       returnReq.status = 'Approved';
       returnReq.kanbanColumn = 'Approved';
       returnReq.approvalLevel = req.user?.role || 'Manager';
@@ -1417,7 +1562,10 @@ exports.receiveReturn = async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { id } = req.params;
-    const { condition = 'Good', notes = '', warehouseLocation = 'Main Warehouse' } = req.body;
+    const productCondition = req.body.productCondition || req.body.condition || 'Good';
+    const packagingCondition = req.body.packagingCondition || 'Good';
+    const notes = req.body.notes || '';
+    const warehouseLocation = req.body.warehouseLocation || 'Main Warehouse';
 
     const returnReq = await ReturnRequest.findByPk(id, {
       include: [{ model: ReturnItem, as: 'items' }],
@@ -1429,9 +1577,19 @@ exports.receiveReturn = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Return request not found' });
     }
 
-    if (returnReq.status === 'Cancelled') {
+    if (returnReq.status === 'Cancelled' || returnReq.status === 'CANCELLED') {
       await t.rollback();
       return res.status(400).json({ success: false, message: 'Cannot receive a cancelled return' });
+    }
+
+    // Determine stock destination (Rules 1, 2, 3)
+    let stockDestination = 'AVAILABLE_STOCK';
+    if (productCondition === 'Good' && packagingCondition === 'Good') {
+      stockDestination = 'AVAILABLE_STOCK';
+    } else if (productCondition === 'Good' && packagingCondition === 'Damaged') {
+      stockDestination = 'TRANSFER_STOCK';
+    } else {
+      stockDestination = 'DAMAGED_STOCK';
     }
 
     const itemsToProcess = returnReq.items && returnReq.items.length > 0
@@ -1439,65 +1597,87 @@ exports.receiveReturn = async (req, res) => {
       : [{
           productId: returnReq.replacementProductId,
           quantity: returnReq.totalQty || 1,
-          productName: 'Returned Item'
+          productName: 'Returned Item',
+          unitPrice: Number(returnReq.totalValue || 0)
         }];
 
     // IDEMPOTENCY GUARD: Only update inventory once
     if (!returnReq.stockUpdated) {
-      if (condition === 'Good') {
-        for (const item of itemsToProcess) {
-          if (item.productId) {
-            const prod = await Product.findByPk(item.productId, { transaction: t });
-            if (prod) {
-              const qtyToAdd = Number(item.quantity || 1);
+      for (const item of itemsToProcess) {
+        if (item.productId) {
+          const prod = await Product.findByPk(item.productId, { transaction: t });
+          if (prod) {
+            const qtyToAdd = Number(item.quantity || 1);
+
+            if (stockDestination === 'AVAILABLE_STOCK') {
+              // RULE 1: Product Good + Pack Good -> Return to Available Stock
               await prod.increment('stock', { by: qtyToAdd, transaction: t });
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'IN',
+                quantity: qtyToAdd,
+                reason: `Shop Return Restock (${returnReq.rmaNumber}) - Good Condition (Available Stock)`,
+                referenceId: returnReq.id,
+                referenceModel: 'ReturnRequest',
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
+            } else if (stockDestination === 'TRANSFER_STOCK') {
+              // RULE 2: Product Good + Pack Damaged -> Transfer to Repacking Stock
+              await prod.increment('repackingStock', { by: qtyToAdd, transaction: t });
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'TRANSFER_IN',
+                quantity: qtyToAdd,
+                reason: `Shop Return (${returnReq.rmaNumber}) - Pack Damaged (Transfer/Repacking Stock)`,
+                referenceId: returnReq.id,
+                referenceModel: 'ReturnRequest',
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
+            } else {
+              // RULE 3: Product Damaged -> Damaged Stock
+              await prod.increment('damagedStock', { by: qtyToAdd, transaction: t });
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'DAMAGE_IN',
+                quantity: qtyToAdd,
+                reason: `Shop Return (${returnReq.rmaNumber}) - Damaged Product (Damaged Stock)`,
+                referenceId: returnReq.id,
+                referenceModel: 'ReturnRequest',
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
 
               try {
-                await StockMovement.create({
+                await StockLoss.create({
+                  itemType: 'Product',
                   productId: item.productId,
-                  type: 'IN',
                   quantity: qtyToAdd,
-                  reason: `Customer Return Restock (${returnReq.rmaNumber})`,
-                  referenceId: returnReq.id,
+                  reason: `Damaged Return (${returnReq.rmaNumber})`,
+                  unitCost: Number(item.unitPrice || 0),
+                  totalLossValue: qtyToAdd * Number(item.unitPrice || 0),
+                  notes: `Shop Return (${returnReq.rmaNumber}) - Condition: ${productCondition}, Pack: ${packagingCondition}`,
                   createdById: req.user ? req.user.id : null
                 }, { transaction: t });
-              } catch (smErr) {
-                console.warn('StockMovement log error:', smErr.message);
+              } catch (slErr) {
+                console.warn('StockLoss log error:', slErr.message);
               }
             }
-          }
-        }
-      } else {
-        // Damaged, Expired, or Not Resalable -> Log to StockLoss, do NOT add to sellable stock
-        for (const item of itemsToProcess) {
-          try {
-            await StockLoss.create({
-              itemType: 'Product',
-              productId: item.productId,
-              quantity: Number(item.quantity || 1),
-              reason: `${condition} Return`,
-              unitCost: Number(item.unitPrice || 0),
-              totalLossValue: Number(item.quantity || 1) * Number(item.unitPrice || 0),
-              notes: `Customer Return (${returnReq.rmaNumber}) - ${condition}`,
-              createdById: req.user ? req.user.id : null
-            }, { transaction: t });
-          } catch (slErr) {
-            console.warn('StockLoss log error:', slErr.message);
           }
         }
       }
       returnReq.stockUpdated = true;
     }
 
-    returnReq.productCondition = condition;
+    returnReq.productCondition = productCondition;
+    returnReq.packagingCondition = packagingCondition;
+    returnReq.stockDestination = stockDestination;
     returnReq.receivedAt = new Date();
     returnReq.warehouseId = warehouseLocation || returnReq.warehouseId;
     if (notes) {
       returnReq.qcRemarks = returnReq.qcRemarks ? `${returnReq.qcRemarks}\n[Receipt] ${notes}` : `[Receipt] ${notes}`;
+      returnReq.notes = returnReq.notes ? `${returnReq.notes}\n${notes}` : notes;
     }
 
-    // Set next status based on actionType / returnType
-    const action = (returnReq.returnType || '').toLowerCase();
+    const action = ((returnReq.requestType || returnReq.returnType || '').toLowerCase());
     if (action.includes('replacement')) {
       returnReq.status = 'Replacement Pending';
       returnReq.kanbanColumn = 'Replacement Pending';
@@ -1513,7 +1693,7 @@ exports.receiveReturn = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Return ${returnReq.rmaNumber} marked as received (${condition} Condition)`,
+      message: `Return ${returnReq.rmaNumber} marked as received (${productCondition} Product / ${packagingCondition} Pack -> ${stockDestination})`,
       data: returnReq,
       returnRequest: returnReq
     });
@@ -1526,35 +1706,183 @@ exports.receiveReturn = async (req, res) => {
 
 // 14. PROCESS REFUND
 exports.processRefund = async (req, res) => {
+  const t = await sequelize.transaction();
   try {
     const { id } = req.params;
     const { refundAmount, refundMethod, referenceNumber, notes } = req.body;
 
-    const returnReq = await ReturnRequest.findByPk(id);
+    const returnReq = await ReturnRequest.findByPk(id, {
+      include: [{ model: ReturnItem, as: 'items' }],
+      transaction: t
+    });
+
     if (!returnReq) {
+      await t.rollback();
       return res.status(404).json({ success: false, message: 'Return request not found' });
     }
 
-    if (returnReq.status === 'Cancelled') {
+    if (returnReq.status === 'Cancelled' || returnReq.status === 'CANCELLED') {
+      await t.rollback();
       return res.status(400).json({ success: false, message: 'Cannot refund a cancelled return' });
     }
 
-    const finalRefundAmount = refundAmount !== undefined ? Number(refundAmount) : Number(returnReq.refundAmount || returnReq.totalValue || 0);
+    // Physical stock receipt if not yet updated
+    if (!returnReq.stockUpdated) {
+      const prodCond = req.body.productCondition || returnReq.productCondition || 'Good';
+      const packCond = req.body.packagingCondition || returnReq.packagingCondition || 'Good';
+      let dest = 'AVAILABLE_STOCK';
+      if (prodCond === 'Good' && packCond === 'Good') dest = 'AVAILABLE_STOCK';
+      else if (prodCond === 'Good' && packCond === 'Damaged') dest = 'TRANSFER_STOCK';
+      else dest = 'DAMAGED_STOCK';
+
+      const itemsToProcess = returnReq.items && returnReq.items.length > 0 ? returnReq.items : [];
+      for (const item of itemsToProcess) {
+        if (item.productId) {
+          const prod = await Product.findByPk(item.productId, { transaction: t });
+          if (prod) {
+            const qty = Number(item.quantity || 1);
+            if (dest === 'AVAILABLE_STOCK') {
+              await prod.increment('stock', { by: qty, transaction: t });
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'IN',
+                quantity: qty,
+                reason: `Shop Return Restock (${returnReq.rmaNumber}) - Good Condition (Available Stock)`,
+                referenceId: returnReq.id,
+                referenceModel: 'ReturnRequest',
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
+            } else if (dest === 'TRANSFER_STOCK') {
+              await prod.increment('repackingStock', { by: qty, transaction: t });
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'TRANSFER_IN',
+                quantity: qty,
+                reason: `Shop Return (${returnReq.rmaNumber}) - Pack Damaged (Transfer/Repacking Stock)`,
+                referenceId: returnReq.id,
+                referenceModel: 'ReturnRequest',
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
+            } else {
+              await prod.increment('damagedStock', { by: qty, transaction: t });
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'DAMAGE_IN',
+                quantity: qty,
+                reason: `Shop Return (${returnReq.rmaNumber}) - Damaged Product (Damaged Stock)`,
+                referenceId: returnReq.id,
+                referenceModel: 'ReturnRequest',
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
+            }
+          }
+        }
+      }
+      returnReq.stockDestination = dest;
+      returnReq.stockUpdated = true;
+    }
+
+    const eligibleAmount = Number(returnReq.originalCalculatedAmount || returnReq.totalValue || 0);
+    const finalRefundAmount = refundAmount !== undefined ? Number(refundAmount) : eligibleAmount;
+
+    if (finalRefundAmount > eligibleAmount && eligibleAmount > 0) {
+      if (req.user?.role !== 'admin' && req.user?.role !== 'Super Admin' && !req.body.refundAuthorizedById) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `Refund amount (₹${finalRefundAmount}) cannot exceed original invoice price (₹${eligibleAmount}) without admin authorization.`
+        });
+      }
+    }
+
     returnReq.refundAmount = finalRefundAmount;
     returnReq.refundMethod = refundMethod || returnReq.refundMethod || 'Original Payment Method';
-    returnReq.refundStatus = 'Completed';
+    returnReq.refundStatus = 'REFUND PROCESSED';
+    returnReq.status = 'REFUND PROCESSED';
+    returnReq.kanbanColumn = 'Completed';
     returnReq.refundedAt = new Date();
     returnReq.completedAt = new Date();
-    returnReq.status = 'Completed';
-    returnReq.kanbanColumn = 'Completed';
 
     if (notes || referenceNumber) {
       const refNote = referenceNumber ? `Ref #${referenceNumber}. ` : '';
       const fullNote = `${refNote}${notes || ''}`.trim();
       returnReq.qcRemarks = returnReq.qcRemarks ? `${returnReq.qcRemarks}\n[Refund] ${fullNote}` : `[Refund] ${fullNote}`;
+      returnReq.notes = returnReq.notes ? `${returnReq.notes}\n${fullNote}` : fullNote;
     }
 
-    await returnReq.save();
+    // Record Payment
+    const Payment = require('../models/Payment');
+    try {
+      const payCount = await Payment.count({ transaction: t });
+      const payNum = `REF-${new Date().getFullYear()}-${String(payCount + 1).padStart(5, '0')}`;
+      await Payment.create({
+        paymentNumber: payNum,
+        customerId: returnReq.customerId || null,
+        amount: finalRefundAmount,
+        paymentMethod: (returnReq.refundMethod || 'cash').toLowerCase().includes('upi') ? 'upi' : ((returnReq.refundMethod || '').toLowerCase().includes('bank') ? 'bank' : 'cash'),
+        referenceNumber: referenceNumber || returnReq.rmaNumber,
+        status: 'Success',
+        date: new Date()
+      }, { transaction: t });
+    } catch (payErr) {
+      console.warn('Payment record log notice:', payErr.message);
+    }
+
+    // Update customer balance if credit/balance refund
+    if (returnReq.customerId) {
+      try {
+        const cust = await Customer.findByPk(returnReq.customerId, { transaction: t });
+        if (cust && (returnReq.refundMethod === 'Customer Balance / Credit Note' || returnReq.refundMethod === 'Credit' || returnReq.refundMethod === 'Store Credit / Customer Balance')) {
+          cust.balance = Math.max(0, Number(cust.balance || 0) - finalRefundAmount);
+          await cust.save({ transaction: t });
+        }
+      } catch (custErr) {
+        console.warn('Customer balance adjustment notice:', custErr.message);
+      }
+    }
+
+    // Update invoice balance
+    if (returnReq.invoiceId) {
+      try {
+        const inv = await Invoice.findByPk(returnReq.invoiceId, { transaction: t });
+        if (inv) {
+          inv.balance = Math.max(0, Number(inv.balance || 0) - finalRefundAmount);
+          if (inv.balance <= 0) {
+            inv.paymentStatus = 'Refunded';
+            inv.status = 'Returned';
+          }
+          await inv.save({ transaction: t });
+        }
+      } catch (invErr) {
+        console.warn('Invoice balance adjustment notice:', invErr.message);
+      }
+    }
+
+    // Ledger double-entry posting
+    try {
+      const { postJournalEntry, getSystemAccount } = require('../services/ledgerService');
+      const salesRevAcc = await getSystemAccount('Revenue');
+      const cashAcc = await getSystemAccount('Cash');
+      if (salesRevAcc && cashAcc && finalRefundAmount > 0) {
+        await postJournalEntry({
+          entryDate: new Date(),
+          referenceId: returnReq.id,
+          referenceModel: 'ReturnRequest',
+          referenceNumber: returnReq.rmaNumber,
+          description: `Sales Refund for ${returnReq.rmaNumber}`,
+          lines: [
+            { accountId: salesRevAcc, debit: finalRefundAmount, credit: 0, description: 'Sales Return Debit' },
+            { accountId: cashAcc, debit: 0, credit: finalRefundAmount, description: 'Refund Payment Credit' }
+          ]
+        }, t);
+      }
+    } catch (glErr) {
+      console.warn('GL posting notice:', glErr.message);
+    }
+
+    await returnReq.save({ transaction: t });
+    await t.commit();
+
     invalidateReturnsCache();
 
     res.json({
@@ -1564,6 +1892,7 @@ exports.processRefund = async (req, res) => {
       returnRequest: returnReq
     });
   } catch (error) {
+    await t.rollback();
     console.error('Process refund error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
@@ -1574,43 +1903,118 @@ exports.processReplacement = async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { id } = req.params;
-    const { replacementProductId, replacementQuantity = 1, notes, dispatchTracking } = req.body;
+    const { replacementProductId, replacementQuantity, notes, dispatchTracking } = req.body;
 
-    const returnReq = await ReturnRequest.findByPk(id, { transaction: t });
+    const returnReq = await ReturnRequest.findByPk(id, {
+      include: [{ model: ReturnItem, as: 'items' }],
+      transaction: t
+    });
+
     if (!returnReq) {
       await t.rollback();
       return res.status(404).json({ success: false, message: 'Return request not found' });
     }
 
-    if (returnReq.status === 'Cancelled') {
+    if (returnReq.status === 'Cancelled' || returnReq.status === 'CANCELLED') {
       await t.rollback();
       return res.status(400).json({ success: false, message: 'Cannot process replacement for a cancelled return' });
     }
 
-    const prodId = replacementProductId || returnReq.replacementProductId;
-    const qty = Number(replacementQuantity || returnReq.replacementQuantity || 1);
+    // 1. Ensure physical returned stock is received into correct destination
+    if (!returnReq.stockUpdated) {
+      const prodCond = req.body.productCondition || returnReq.productCondition || 'Good';
+      const packCond = req.body.packagingCondition || returnReq.packagingCondition || 'Good';
+      let dest = 'AVAILABLE_STOCK';
+      if (prodCond === 'Good' && packCond === 'Good') dest = 'AVAILABLE_STOCK';
+      else if (prodCond === 'Good' && packCond === 'Damaged') dest = 'TRANSFER_STOCK';
+      else dest = 'DAMAGED_STOCK';
 
-    if (prodId) {
-      const repProd = await Product.findByPk(prodId, { transaction: t });
-      if (repProd) {
-        await repProd.decrement('stock', { by: qty, transaction: t });
-        try {
-          await StockMovement.create({
-            productId: prodId,
-            type: 'OUT',
-            quantity: qty,
-            reason: `Replacement for Customer Return (${returnReq.rmaNumber})`,
-            referenceId: returnReq.id,
-            createdById: req.user ? req.user.id : null
-          }, { transaction: t });
-        } catch (smErr) {
-          console.warn('StockMovement replacement log error:', smErr.message);
+      const itemsToProcess = returnReq.items && returnReq.items.length > 0 ? returnReq.items : [];
+      for (const item of itemsToProcess) {
+        if (item.productId) {
+          const prod = await Product.findByPk(item.productId, { transaction: t });
+          if (prod) {
+            const qty = Number(item.quantity || 1);
+            if (dest === 'AVAILABLE_STOCK') {
+              await prod.increment('stock', { by: qty, transaction: t });
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'IN',
+                quantity: qty,
+                reason: `Shop Return Restock (${returnReq.rmaNumber}) - Good Condition (Available Stock)`,
+                referenceId: returnReq.id,
+                referenceModel: 'ReturnRequest',
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
+            } else if (dest === 'TRANSFER_STOCK') {
+              await prod.increment('repackingStock', { by: qty, transaction: t });
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'TRANSFER_IN',
+                quantity: qty,
+                reason: `Shop Return (${returnReq.rmaNumber}) - Pack Damaged (Transfer/Repacking Stock)`,
+                referenceId: returnReq.id,
+                referenceModel: 'ReturnRequest',
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
+            } else {
+              await prod.increment('damagedStock', { by: qty, transaction: t });
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'DAMAGE_IN',
+                quantity: qty,
+                reason: `Shop Return (${returnReq.rmaNumber}) - Damaged Product (Damaged Stock)`,
+                referenceId: returnReq.id,
+                referenceModel: 'ReturnRequest',
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
+            }
+          }
         }
       }
+      returnReq.stockDestination = dest;
+      returnReq.stockUpdated = true;
     }
+
+    // 2. Issue Replacement from Available Stock
+    const prodId = replacementProductId || returnReq.replacementProductId || (returnReq.items && returnReq.items[0]?.productId);
+    const qty = Number(replacementQuantity || returnReq.replacementQuantity || returnReq.totalQty || 1);
+
+    if (!prodId) {
+      await t.rollback();
+      return res.status(400).json({ success: false, message: 'Replacement product must be specified.' });
+    }
+
+    const repProd = await Product.findByPk(prodId, { transaction: t });
+    if (!repProd) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: 'Replacement product not found.' });
+    }
+
+    // Strictly prevent negative stock
+    if (Number(repProd.stock) < qty) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient available stock for replacement (${repProd.name}). Available: ${repProd.stock}, Requested: ${qty}. Cannot allow negative stock.`
+      });
+    }
+
+    // Deduct replacement quantity from available stock
+    await repProd.decrement('stock', { by: qty, transaction: t });
+    await StockMovement.create({
+      productId: prodId,
+      type: 'REPLACEMENT_OUT',
+      quantity: qty,
+      reason: `Replacement Out for Return (${returnReq.rmaNumber})`,
+      referenceId: returnReq.id,
+      referenceModel: 'ReturnRequest',
+      createdById: req.user ? req.user.id : null
+    }, { transaction: t });
 
     returnReq.replacementProductId = prodId;
     returnReq.replacementQuantity = qty;
+    returnReq.replacementStatus = 'Completed';
     returnReq.status = 'Completed';
     returnReq.kanbanColumn = 'Completed';
     returnReq.completedAt = new Date();
@@ -1619,6 +2023,7 @@ exports.processReplacement = async (req, res) => {
       const trackNote = dispatchTracking ? `Tracking: ${dispatchTracking}. ` : '';
       const fullNote = `${trackNote}${notes || ''}`.trim();
       returnReq.qcRemarks = returnReq.qcRemarks ? `${returnReq.qcRemarks}\n[Replacement] ${fullNote}` : `[Replacement] ${fullNote}`;
+      returnReq.notes = returnReq.notes ? `${returnReq.notes}\n${fullNote}` : fullNote;
     }
 
     await returnReq.save({ transaction: t });
@@ -1628,7 +2033,7 @@ exports.processReplacement = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Replacement processed successfully for ${returnReq.rmaNumber}`,
+      message: `Replacement of ${qty} × ${repProd.name} processed successfully for ${returnReq.rmaNumber}`,
       data: returnReq,
       returnRequest: returnReq
     });
@@ -1656,37 +2061,75 @@ exports.cancelReturn = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Return request not found' });
     }
 
-    if (returnReq.status === 'Cancelled') {
+    if (returnReq.status === 'Cancelled' || returnReq.status === 'CANCELLED') {
       await t.rollback();
       return res.json({ success: true, message: 'Return is already cancelled', data: returnReq });
     }
 
-    // Rollback restocked inventory if it was already marked received in Good condition
-    if (returnReq.stockUpdated && returnReq.productCondition === 'Good') {
+    // Roll back inventory based on stockDestination
+    if (returnReq.stockUpdated) {
       const itemsToRevert = returnReq.items && returnReq.items.length > 0 ? returnReq.items : [];
       for (const item of itemsToRevert) {
         if (item.productId) {
           const prod = await Product.findByPk(item.productId, { transaction: t });
           if (prod) {
             const qty = Number(item.quantity || 1);
-            await prod.decrement('stock', { by: qty, transaction: t });
-            try {
+            if (returnReq.stockDestination === 'AVAILABLE_STOCK') {
+              await prod.decrement('stock', { by: qty, transaction: t });
               await StockMovement.create({
                 productId: item.productId,
                 type: 'OUT',
                 quantity: qty,
-                reason: `Cancelled Return Stock Reversal (${returnReq.rmaNumber})`,
+                reason: `Cancelled Return Reversal (${returnReq.rmaNumber}) - Available Stock`,
                 referenceId: returnReq.id,
                 createdById: req.user ? req.user.id : null
               }, { transaction: t });
-            } catch (smErr) {}
+            } else if (returnReq.stockDestination === 'TRANSFER_STOCK') {
+              await prod.decrement('repackingStock', { by: qty, transaction: t });
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'TRANSFER_OUT',
+                quantity: qty,
+                reason: `Cancelled Return Reversal (${returnReq.rmaNumber}) - Repacking Stock`,
+                referenceId: returnReq.id,
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
+            } else if (returnReq.stockDestination === 'DAMAGED_STOCK') {
+              await prod.decrement('damagedStock', { by: qty, transaction: t });
+              await StockMovement.create({
+                productId: item.productId,
+                type: 'DAMAGE_OUT',
+                quantity: qty,
+                reason: `Cancelled Return Reversal (${returnReq.rmaNumber}) - Damaged Stock`,
+                referenceId: returnReq.id,
+                createdById: req.user ? req.user.id : null
+              }, { transaction: t });
+            }
           }
         }
       }
+
+      // If replacement was issued, add back replacement stock to Available Stock
+      if (returnReq.replacementStatus === 'Completed' && returnReq.replacementProductId) {
+        const repProd = await Product.findByPk(returnReq.replacementProductId, { transaction: t });
+        if (repProd) {
+          const repQty = Number(returnReq.replacementQuantity || 1);
+          await repProd.increment('stock', { by: repQty, transaction: t });
+          await StockMovement.create({
+            productId: returnReq.replacementProductId,
+            type: 'IN',
+            quantity: repQty,
+            reason: `Cancelled Replacement Return Reversal (${returnReq.rmaNumber})`,
+            referenceId: returnReq.id,
+            createdById: req.user ? req.user.id : null
+          }, { transaction: t });
+        }
+      }
+
       returnReq.stockUpdated = false;
     }
 
-    returnReq.status = 'Cancelled';
+    returnReq.status = 'CANCELLED';
     returnReq.kanbanColumn = 'Cancelled';
     returnReq.qcRemarks = returnReq.qcRemarks ? `${returnReq.qcRemarks}\n[Cancelled] ${reason}` : `[Cancelled] ${reason}`;
 

@@ -2,6 +2,8 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
 import RoleRoute from './RoleRoute';
+import ScopeRoute from './ScopeRoute';
+import { useAuth } from '../context/AuthContext';
 import GlobalLoader from '../components/GlobalLoader';
 
 function DesktopOnlyRoute({ children }) {
@@ -28,6 +30,19 @@ function DesktopOnlyRoute({ children }) {
   }
 
   return children;
+}
+
+function IndexRoute() {
+  const { user } = useAuth();
+  const activeScope = user?.activeScope || localStorage.getItem('ao_active_scope') || 'management_billing';
+  if (activeScope === 'website_admin') {
+    return <Navigate to="/website" replace />;
+  }
+  return (
+    <ScopeRoute scope="management_billing">
+      <Dashboard />
+    </ScopeRoute>
+  );
 }
 
 import AppLayout from '../layout/AppLayout';
@@ -61,9 +76,6 @@ const WebsiteManagement = lazy(() => import('../pages/WebsiteManagement'));
 const ReturnRecoveryModule = lazy(() => import('../pages/ReturnRecoveryModule'));
 const QuickBilling = lazy(() => import('../pages/QuickBilling'));
 
-
-
-
 // CRM Pages
 const CrmDashboard = lazy(() => import('../pages/CrmDashboard'));
 const Leads = lazy(() => import('../pages/Leads'));
@@ -92,353 +104,432 @@ export default function AppRoutes() {
         <Route path="/track/:trackingNumber" element={<PublicTracking />} />
         <Route path="/track" element={<PublicTracking />} />
         <Route path="/reviews/portal/:token" element={<ReviewPortal />} />
-      <Route
-        path="/sales/:id/print"
-        element={
-          <ProtectedRoute>
-            <RoleRoute roles={['Super Admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive']}>
-              <SalePrint />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Dashboard />} />
-
-        {/* CRM Routes */}
+        
         <Route
-          path="crm"
+          path="/sales/:id/print"
           element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager']}>
-              <CrmDashboard />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="crm/leads"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
-              <Leads />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="crm/ai-lead-importer"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
-              <AiLeadImporter />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="crm/customer-map"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
-              <CustomerMap />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="crm/opportunities"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
-              <Opportunities />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="crm/followups"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
-              <FollowUps />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="crm/re-engagement"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
-              <ReEngagement />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="crm/whatsapp-logs"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager']}>
-              <WhatsAppLogs />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="crm/reviews"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager']}>
-              <CustomerReviews />
-            </RoleRoute>
-          }
-        />
-
-        {/* Field Sales / SFA Routes */}
-        <Route
-          path="field-sales"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
-              <FieldSalesDashboard />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="field-sales/analytics"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager']}>
-              <FieldSalesAnalytics />
-            </RoleRoute>
+            <ProtectedRoute>
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive']}>
+                  <SalePrint />
+                </RoleRoute>
+              </ScopeRoute>
+            </ProtectedRoute>
           }
         />
         
         <Route
-          path="route-planner"
+          path="/"
           element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
-              <RoutePlanner />
-            </RoleRoute>
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
           }
-        />
-        <Route
-          path="customer-visits"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
-              <CustomerVisits />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="mobile-catalog"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
-              <MobileCatalog />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="field-ordering"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
-              <FieldOrdering />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="delivery-tracking"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Delivery Staff', 'Dispatch Executive']}>
-              <DeliveryTracking />
-            </RoleRoute>
-          }
-        />
-        
-        {/* Simplified Consolidated Pages & Role-based Routing */}
-        <Route
-          path="products"
-          element={
-            <RoleRoute roles={['Super Admin', 'Store Keeper']}>
-              <ProductsPage />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="products/catalog-center"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
-              <CatalogCenter />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="manufacturing"
-          element={
-            <DesktopOnlyRoute>
-              <RoleRoute roles={['Super Admin', 'Manufacturing Manager']}>
-                <ManufacturingPage />
-              </RoleRoute>
-            </DesktopOnlyRoute>
-          }
-        />
-        <Route
-          path="sales"
-          element={
-            <RoleRoute roles={['Super Admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive']}>
-              <SalesPage />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="quick-billing"
-          element={
-            <RoleRoute roles={['Super Admin', 'Billing Executive', 'Sales Executive']}>
-              <QuickBilling />
-            </RoleRoute>
-          }
-        />
+        >
+          <Route index element={<IndexRoute />} />
 
-        <Route
-          path="order-noting"
-          element={
-            <RoleRoute roles={['Super Admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive', 'Store Keeper']}>
-              <OrderNoting />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="inventory"
-          element={
-            <RoleRoute roles={['Super Admin', 'Store Keeper', 'Manufacturing Manager']}>
-              <InventoryPage />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="returns"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager', 'Sales Manager', 'Billing Executive']}>
-              <ReturnRecoveryModule />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="sales/returns"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager', 'Sales Manager', 'Billing Executive', 'Sales Executive']}>
-              <ReturnRecoveryModule />
-            </RoleRoute>
-          }
-        />
+          {/* CRM Routes (Management & Billing) */}
+          <Route
+            path="crm"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager']}>
+                  <CrmDashboard />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="crm/leads"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+                  <Leads />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="crm/ai-lead-importer"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+                  <AiLeadImporter />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="crm/customer-map"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+                  <CustomerMap />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="crm/opportunities"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+                  <Opportunities />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="crm/followups"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+                  <FollowUps />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="crm/re-engagement"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+                  <ReEngagement />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="crm/whatsapp-logs"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager']}>
+                  <WhatsAppLogs />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="crm/reviews"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager']}>
+                  <CustomerReviews />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
 
+          {/* Field Sales / SFA Routes (Management & Billing) */}
+          <Route
+            path="field-sales"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+                  <FieldSalesDashboard />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="field-sales/analytics"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager']}>
+                  <FieldSalesAnalytics />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          
+          <Route
+            path="route-planner"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+                  <RoutePlanner />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="customer-visits"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+                  <CustomerVisits />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="mobile-catalog"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+                  <MobileCatalog />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="field-ordering"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+                  <FieldOrdering />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="delivery-tracking"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Delivery Staff', 'Dispatch Executive']}>
+                  <DeliveryTracking />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          
+          {/* Core ERP Pages (Management & Billing) */}
+          <Route
+            path="products"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'Store Keeper']}>
+                  <ProductsPage />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="products/catalog-center"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+                  <CatalogCenter />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="manufacturing"
+            element={
+              <ScopeRoute scope="management_billing">
+                <DesktopOnlyRoute>
+                  <RoleRoute roles={['Super Admin', 'Manufacturing Manager']}>
+                    <ManufacturingPage />
+                  </RoleRoute>
+                </DesktopOnlyRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="sales"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive']}>
+                  <SalesPage />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="quick-billing"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'Billing Executive', 'Sales Executive']}>
+                  <QuickBilling />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
 
-        <Route
-          path="customers"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Executive', 'Billing Executive', 'Sales Manager', 'Salesman']}>
-              <CustomersPage />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="sales-targets"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
-              <SalesTargets />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="reports"
-          element={
-            <DesktopOnlyRoute>
-              <RoleRoute roles={['Super Admin']}>
-                <ReportsPage />
-              </RoleRoute>
-            </DesktopOnlyRoute>
-          }
-        />
-        <Route
-          path="settings"
-          element={
-            <DesktopOnlyRoute>
-              <RoleRoute roles={['Super Admin']}>
-                <Settings />
-              </RoleRoute>
-            </DesktopOnlyRoute>
-          }
-        />
-        <Route
-          path="settings/integrations-marketplace"
-          element={
-            <DesktopOnlyRoute>
-              <RoleRoute roles={['Super Admin']}>
-                <IntegrationsMarketplace />
-              </RoleRoute>
-            </DesktopOnlyRoute>
-          }
-        />
-        <Route
-          path="settings/developer-center"
-          element={
-            <DesktopOnlyRoute>
-              <RoleRoute roles={['Super Admin', 'admin']}>
-                <DeveloperCenter />
-              </RoleRoute>
-            </DesktopOnlyRoute>
-          }
-        />
-        <Route
-          path="website"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin']}>
-              <WebsiteManagement />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="users"
-          element={
-            <RoleRoute roles={['Super Admin']}>
-              <Users />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="suppliers"
-          element={
-            <RoleRoute roles={['Super Admin', 'admin', 'Manufacturing Manager', 'Store Keeper']}>
-              <Suppliers />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="ai-assistant"
-          element={
-            <RoleRoute roles={['Super Admin']}>
-              <AIAssistant />
-            </RoleRoute>
-          }
-        />
+          <Route
+            path="order-noting"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive', 'Store Keeper']}>
+                  <OrderNoting />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="inventory"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'Store Keeper', 'Manufacturing Manager']}>
+                  <InventoryPage />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="returns"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager', 'Sales Manager', 'Billing Executive']}>
+                  <ReturnRecoveryModule />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="sales/returns"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Store Keeper', 'Manufacturing Manager', 'Sales Manager', 'Billing Executive', 'Sales Executive']}>
+                  <ReturnRecoveryModule />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
 
-        {/* Detailed views / sub-routes */}
-        <Route
-          path="sales/:id"
-          element={
-            <RoleRoute roles={['Super Admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive']}>
-              <SaleView />
-            </RoleRoute>
-          }
-        />
+          <Route
+            path="customers"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Executive', 'Billing Executive', 'Sales Manager', 'Salesman']}>
+                  <CustomersPage />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="sales-targets"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Sales Manager', 'Salesman', 'Sales Executive']}>
+                  <SalesTargets />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="reports"
+            element={
+              <ScopeRoute scope="management_billing">
+                <DesktopOnlyRoute>
+                  <RoleRoute roles={['Super Admin']}>
+                    <ReportsPage />
+                  </RoleRoute>
+                </DesktopOnlyRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="settings"
+            element={
+              <ScopeRoute scope="management_billing">
+                <DesktopOnlyRoute>
+                  <RoleRoute roles={['Super Admin']}>
+                    <Settings />
+                  </RoleRoute>
+                </DesktopOnlyRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="settings/integrations-marketplace"
+            element={
+              <ScopeRoute scope="management_billing">
+                <DesktopOnlyRoute>
+                  <RoleRoute roles={['Super Admin']}>
+                    <IntegrationsMarketplace />
+                  </RoleRoute>
+                </DesktopOnlyRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="settings/developer-center"
+            element={
+              <ScopeRoute scope="management_billing">
+                <DesktopOnlyRoute>
+                  <RoleRoute roles={['Super Admin', 'admin']}>
+                    <DeveloperCenter />
+                  </RoleRoute>
+                </DesktopOnlyRoute>
+              </ScopeRoute>
+            }
+          />
 
-        {/* Redirects for backward compatibility */}
-        <Route path="sales/create" element={<Navigate to="/sales?tab=new" replace />} />
-        <Route path="sales/new" element={<Navigate to="/sales?tab=new" replace />} />
-        <Route path="repack" element={<Navigate to="/manufacturing?tab=repacking" replace />} />
-        <Route path="raw-materials" element={<Navigate to="/products?tab=raw-materials" replace />} />
-        <Route path="packaging-materials" element={<Navigate to="/products?tab=packaging-materials" replace />} />
-        <Route path="shipping" element={<Navigate to="/sales?tab=shipping" replace />} />
-        <Route path="white-label" element={<Navigate to="/customers?tab=white-label" replace />} />
-        <Route path="organic-stores" element={<Navigate to="/customers?tab=organic-stores" replace />} />
-        <Route path="retail-shops" element={<Navigate to="/customers?tab=retail-shops" replace />} />
-        <Route path="d2c-customers" element={<Navigate to="/customers?tab=d2c-customers" replace />} />
-        <Route path="customer-analytics" element={<Navigate to="/customers?tab=analytics" replace />} />
-        <Route path="ai-analytics" element={<Navigate to="/dashboard" replace />} />
+          {/* Website / Storefront Admin Route */}
+          <Route
+            path="website"
+            element={
+              <ScopeRoute scope="website_admin">
+                <RoleRoute roles={['Super Admin', 'admin', 'Website Admin']}>
+                  <WebsiteManagement />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
 
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+          {/* Users & Suppliers & AI (Management & Billing) */}
+          <Route
+            path="users"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin']}>
+                  <Users />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="suppliers"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'admin', 'Manufacturing Manager', 'Store Keeper']}>
+                  <Suppliers />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+          <Route
+            path="ai-assistant"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin']}>
+                  <AIAssistant />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+
+          {/* Detailed views / sub-routes */}
+          <Route
+            path="sales/:id"
+            element={
+              <ScopeRoute scope="management_billing">
+                <RoleRoute roles={['Super Admin', 'Billing Executive', 'Sales Executive', 'Dispatch Executive']}>
+                  <SaleView />
+                </RoleRoute>
+              </ScopeRoute>
+            }
+          />
+
+          {/* Redirects for backward compatibility */}
+          <Route path="sales/create" element={<Navigate to="/sales?tab=new" replace />} />
+          <Route path="sales/new" element={<Navigate to="/sales?tab=new" replace />} />
+          <Route path="repack" element={<Navigate to="/manufacturing?tab=repacking" replace />} />
+          <Route path="raw-materials" element={<Navigate to="/products?tab=raw-materials" replace />} />
+          <Route path="packaging-materials" element={<Navigate to="/products?tab=packaging-materials" replace />} />
+          <Route path="shipping" element={<Navigate to="/sales?tab=shipping" replace />} />
+          <Route path="white-label" element={<Navigate to="/customers?tab=white-label" replace />} />
+          <Route path="organic-stores" element={<Navigate to="/customers?tab=organic-stores" replace />} />
+          <Route path="retail-shops" element={<Navigate to="/customers?tab=retail-shops" replace />} />
+          <Route path="d2c-customers" element={<Navigate to="/customers?tab=d2c-customers" replace />} />
+          <Route path="customer-analytics" element={<Navigate to="/customers?tab=analytics" replace />} />
+          <Route path="ai-analytics" element={<Navigate to="/dashboard" replace />} />
+
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </Suspense>
   );
 }

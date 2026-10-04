@@ -34,16 +34,17 @@ import {
 import client from '../api/client';
 import { resolveAssetUrl } from '../utils/url';
 import ErrorBoundary from '../components/ErrorBoundary';
+import EnterpriseProductEditor from '../components/EnterpriseProductEditor';
 
 const API_BASE = '/website-admin';
 
 export default function WebsiteManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') || 'api-key';
+  const initialTab = searchParams.get('tab') || 'analytics';
   const [activeTab, setActiveTabState] = useState(initialTab);
 
   useEffect(() => {
-    const tabFromUrl = searchParams.get('tab') || 'api-key';
+    const tabFromUrl = searchParams.get('tab') || 'analytics';
     setActiveTabState(tabFromUrl);
   }, [searchParams]);
 
@@ -80,7 +81,6 @@ export default function WebsiteManagement() {
   const [showResetPassModal, setShowResetPassModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [newPassInput, setNewPassInput] = useState('');
-
 
   const [showApproveReferralModal, setShowApproveReferralModal] = useState(false);
   const [selectedReferral, setSelectedReferral] = useState(null);
@@ -121,7 +121,9 @@ export default function WebsiteManagement() {
         const res = await client.get(`${API_BASE}/api-key`);
         setApiKeyData(res.data.data);
       } else if (tab === 'products') {
-        // Tab products displays the unified redirection message to Master Products
+        const res = await client.get(`${API_BASE}/products`);
+        setProducts(res.data.data || []);
+        setManagementProductsList(res.data.data || []);
       } else if (tab === 'orders') {
         const res = await client.get(`${API_BASE}/orders`);
         setOrders(res.data.data || []);
@@ -278,6 +280,22 @@ export default function WebsiteManagement() {
     }
   };
 
+  const handleTogglePublishedInWebsiteAdmin = async (product) => {
+    const prodId = product.id || product._id || product.productId;
+    const nextVal = !product.isPublished;
+    try {
+      await client.put(`${API_BASE}/products/${prodId}`, {
+        ...product,
+        isPublished: nextVal,
+        publishToWebsite: nextVal
+      });
+      setMsg({ type: 'success', text: `Product "${product.name}" is now ${nextVal ? 'Published to Storefront (ON)' : 'Hidden from Storefront (OFF)'}` });
+      fetchDataForTab('products');
+    } catch (err) {
+      setMsg({ type: 'error', text: 'Failed to update storefront visibility.' });
+    }
+  };
+
   return (
     <div className="page" style={{ padding: '1.5rem', fontFamily: 'Inter, sans-serif' }}>
       {/* HEADER BAR */}
@@ -287,21 +305,13 @@ export default function WebsiteManagement() {
             <Globe style={{ color: 'var(--primary-color)' }} /> Website / Storefront
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.2rem' }}>
-            Storefront Orders, Customers, Reviews, Referrals & Integrations for Blovit Storefront
+            Storefront Orders, Master Products, Customers, Reviews, Referrals & Settings for Blovit Storefront
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <Link
-            to="/products"
-            className="btn btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', fontWeight: 600 }}
-            title="Products are managed from Management & Billing → Inventory → Products"
-          >
-            <Package size={16} /> Go to Products
-          </Link>
           <span className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.8rem' }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }}></span>
-            REST API Online
+            Storefront API Active
           </span>
         </div>
       </div>
@@ -317,13 +327,14 @@ export default function WebsiteManagement() {
       {/* NAVIGATION TABS */}
       <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1.5rem', overflowX: 'auto', paddingBottom: '0.2rem' }}>
         {[
-          { id: 'api-key', label: 'API Key & Auth', icon: Key },
+          { id: 'analytics', label: 'Website Dashboard', icon: BarChart2 },
+          { id: 'products', label: 'Website Products', icon: Package },
           { id: 'orders', label: 'Orders & Fulfillment', icon: ShoppingCart },
           { id: 'customers', label: 'Customers', icon: Users },
           { id: 'reviews', label: 'Reviews & Testimonials', icon: Star },
           { id: 'referrals', label: 'Referrals System', icon: Gift },
           { id: 'shipping', label: 'Shipping & Coupons', icon: Tag },
-          { id: 'analytics', label: 'CRM & Analytics', icon: BarChart2 },
+          { id: 'api-key', label: 'API Key & Auth', icon: Key },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -405,23 +416,128 @@ export default function WebsiteManagement() {
       )}
 
 
-      {/* TAB: PRODUCTS REDIRECT TO MASTER PRODUCTS */}
+      {/* TAB: PRODUCTS MANAGEMENT */}
       {!loading && activeTab === 'products' && (
-        <div className="card" style={{ padding: '2.5rem 2rem', textAlign: 'center', maxWidth: '600px', margin: '2rem auto' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📦</div>
-          <h3 style={{ fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
-            Product Management
-          </h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-            Products are managed from <strong>Management & Billing → Inventory → Products</strong>.
-          </p>
-          <Link
-            to="/products"
-            className="btn btn-primary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.75rem', fontWeight: 700, fontSize: '0.95rem', textDecoration: 'none' }}
-          >
-            <Package size={18} /> Go to Product Management
-          </Link>
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontWeight: 700, margin: 0 }}>Website Products ({products.length})</h3>
+              <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Single Master Product System — Direct Storefront Publishing & Marketing Content
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input
+                type="search"
+                placeholder="Search products..."
+                value={productSearchQuery}
+                onChange={(e) => setProductSearchQuery(e.target.value)}
+                style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.85rem', minWidth: '200px' }}
+              />
+              <select
+                value={productFilter}
+                onChange={(e) => setProductFilter(e.target.value)}
+                style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.85rem' }}
+              >
+                <option value="all">All Master Products</option>
+                <option value="published">Published (Storefront ON)</option>
+                <option value="offline">Offline (Storefront OFF)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="card" style={{ overflowX: 'auto' }}>
+            <table className="table" style={{ width: '100%' }}>
+              <thead>
+                <tr>
+                  <th style={{ width: '60px' }}>Image</th>
+                  <th>Product Name</th>
+                  <th>SKU</th>
+                  <th>Category</th>
+                  <th>Selling Price</th>
+                  <th>MRP</th>
+                  <th>Stock</th>
+                  <th>Show on Website</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products
+                  .filter((p) => {
+                    const matchesSearch = !productSearchQuery || 
+                      p.name?.toLowerCase().includes(productSearchQuery.toLowerCase()) || 
+                      p.sku?.toLowerCase().includes(productSearchQuery.toLowerCase());
+                    const isPublished = !!p.isPublished;
+                    if (productFilter === 'published') return matchesSearch && isPublished;
+                    if (productFilter === 'offline') return matchesSearch && !isPublished;
+                    return matchesSearch;
+                  })
+                  .map((p) => {
+                    const isPublished = !!p.isPublished;
+                    return (
+                      <tr key={p.id || p._id}>
+                        <td>
+                          <img
+                            src={p.imageUrl || resolveAssetUrl(p.image) || 'https://demo.amudhasurabiy.com/images/products/placeholder-product.webp'}
+                            alt={p.name}
+                            style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-color)' }}
+                            onError={(e) => { e.target.src = 'https://demo.amudhasurabiy.com/images/products/placeholder-product.webp'; }}
+                          />
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{p.name}</div>
+                          {p.shortDescription && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', maxWidth: '280px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {p.shortDescription}
+                            </div>
+                          )}
+                        </td>
+                        <td><code style={{ fontSize: '0.8rem' }}>{p.sku || 'N/A'}</code></td>
+                        <td><span className="badge badge-secondary">{p.category || 'General'}</span></td>
+                        <td><strong>₹{p.price || p.sellingPrice || 0}</strong></td>
+                        <td style={{ color: 'var(--text-secondary)' }}>₹{p.mrp || p.compareAtPrice || 0}</td>
+                        <td>
+                          <span className={`badge ${Number(p.stock) > 0 ? 'badge-success' : 'badge-danger'}`}>
+                            {p.stock || 0} {p.unit || 'pcs'}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePublishedInWebsiteAdmin(p)}
+                            className={`btn btn-sm ${isPublished ? 'btn-success' : 'btn-secondary'}`}
+                            style={{
+                              padding: '0.25rem 0.6rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              borderRadius: '20px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem'
+                            }}
+                          >
+                            {isPublished ? '🌐 ON (Published)' : '🔒 OFF (ERP Only)'}
+                          </button>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              setEditingProduct(p);
+                              setShowProductModal(true);
+                            }}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', fontWeight: 600 }}
+                          >
+                            <Edit2 size={14} /> Edit Website Info
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -875,6 +991,26 @@ export default function WebsiteManagement() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL: ENTERPRISE PRODUCT EDITOR (WEBSITE MODE) */}
+      {showProductModal && editingProduct && (
+        <EnterpriseProductEditor
+          isOpen={showProductModal}
+          product={editingProduct}
+          mode="website"
+          managementProductsList={managementProductsList}
+          onClose={() => {
+            setShowProductModal(false);
+            setEditingProduct(null);
+          }}
+          onSaveSuccess={() => {
+            setShowProductModal(false);
+            setEditingProduct(null);
+            fetchDataForTab('products');
+            setMsg({ type: 'success', text: 'Master product website details saved successfully!' });
+          }}
+        />
       )}
     </div>
   );

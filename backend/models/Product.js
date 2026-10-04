@@ -29,6 +29,14 @@ const Product = sequelize.define('Product', {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0,
   },
+  repackingStock: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  damagedStock: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
   lowStockThreshold: {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 10,

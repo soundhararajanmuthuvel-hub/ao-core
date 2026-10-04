@@ -202,10 +202,26 @@ const ReturnRequest = sequelize.define('ReturnRequest', {
     allowNull: true,
   },
   productCondition: {
-    type: DataTypes.STRING, // 'Good', 'Damaged', 'Expired', 'Not Resalable'
+    type: DataTypes.STRING, // 'Good', 'Damaged'
     defaultValue: 'Good',
   },
+  packagingCondition: {
+    type: DataTypes.STRING, // 'Good', 'Damaged'
+    defaultValue: 'Good',
+  },
+  stockDestination: {
+    type: DataTypes.STRING, // 'AVAILABLE_STOCK', 'TRANSFER_STOCK', 'DAMAGED_STOCK'
+    defaultValue: 'AVAILABLE_STOCK',
+  },
+  requestType: {
+    type: DataTypes.STRING, // 'REPLACEMENT', 'REFUND'
+    defaultValue: 'REPLACEMENT',
+  },
   refundAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  originalCalculatedAmount: {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0,
   },
@@ -214,8 +230,8 @@ const ReturnRequest = sequelize.define('ReturnRequest', {
     defaultValue: 'Original Payment Method',
   },
   refundStatus: {
-    type: DataTypes.STRING, // 'Pending', 'Refunded'
-    defaultValue: 'Pending',
+    type: DataTypes.STRING, // 'REFUND REQUESTED', 'REFUND PROCESSED', 'REFUND FAILED', 'CANCELLED'
+    defaultValue: 'REFUND REQUESTED',
   },
   replacementProductId: {
     type: DataTypes.INTEGER,
@@ -224,6 +240,22 @@ const ReturnRequest = sequelize.define('ReturnRequest', {
   replacementQuantity: {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0,
+  },
+  replacementTransactionId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  replacementStatus: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  refundAuthorizedById: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  notes: {
+    type: DataTypes.TEXT,
+    allowNull: true,
   },
   stockUpdated: {
     type: DataTypes.BOOLEAN,

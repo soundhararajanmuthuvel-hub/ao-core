@@ -6,7 +6,7 @@ import { useCompanyBrand } from '../context/CompanyBrandContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { sfaApi, ordersApi, shippingApi, productsApi, customersApi } from '../api';
-import { menuStructure } from './menuConfig';
+import { menuStructure, websiteMenuStructure } from './menuConfig';
 
 const badgeStyle = {
   fontSize: '0.7rem',
@@ -28,14 +28,15 @@ export default function Sidebar({ collapsed, open, onClose }) {
 
   const userRole = user?.role || '';
   const isUserAdmin = userRole === 'admin' || userRole === 'Super Admin';
+  const activeScope = user?.activeScope || localStorage.getItem('ao_active_scope') || 'management_billing';
 
-  const currentMenu = menuStructure;
+  const currentMenu = activeScope === 'website_admin' ? websiteMenuStructure : menuStructure;
 
   useEffect(() => {
     const isDebugMenu = import.meta.env.DEV && (typeof window !== 'undefined' && localStorage.getItem('ao_debug_menu') === 'true');
     if (!isDebugMenu) return;
 
-    console.log('=== AO CORE ERP MENU CONFIGURATION AUDIT ===');
+    console.log(`=== AO CORE [${activeScope}] MENU CONFIGURATION AUDIT ===`);
     console.log('User Role:', userRole);
     const desktopItems = currentMenu.map(item => {
       const allowed = hasAccess(item);
@@ -47,7 +48,7 @@ export default function Sidebar({ collapsed, open, onClose }) {
       };
     });
     console.table(desktopItems);
-  }, [userRole]);
+  }, [userRole, activeScope]);
 
   const [expandedMenus, setExpandedMenus] = useState(() => {
     const saved = localStorage.getItem('sidebar_expanded_menus');
@@ -105,7 +106,10 @@ export default function Sidebar({ collapsed, open, onClose }) {
 
   const hasAccess = (item) => {
     if (isUserAdmin) return true;
-    return item.roles.includes(userRole);
+    if (activeScope === 'website_admin') {
+      return item.roles?.includes(userRole) || item.roles?.includes('Website Admin');
+    }
+    return item.roles?.includes(userRole);
   };
 
   const isChildActive = (group) => {
@@ -146,7 +150,7 @@ export default function Sidebar({ collapsed, open, onClose }) {
       style={{ overflowX: 'hidden' }}
     >
       <Link 
-        to="/" 
+        to={activeScope === 'website_admin' ? '/website' : '/'} 
         className={`sidebar-brand-card ${collapsed ? 'collapsed' : ''}`}
         onClick={onClose}
         style={{
@@ -166,8 +170,8 @@ export default function Sidebar({ collapsed, open, onClose }) {
           {!collapsed && (
             <div className="brand-info">
               <h1 className="brand-name">{settings?.companyName || 'Amudhasurabiy Organics'}</h1>
-              <div className="brand-subtitle" style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 700 }}>
-                🏭 Manufacturing ERP
+              <div className="brand-subtitle" style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 700 }}>
+                {activeScope === 'website_admin' ? '🌐 Website / Storefront Admin' : '🏭 Management & Billing ERP'}
               </div>
             </div>
           )}

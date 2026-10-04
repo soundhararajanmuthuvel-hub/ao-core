@@ -23,14 +23,24 @@ import {
 
 export const websiteMenuStructure = [
   {
-    id: 'ws-api-key',
+    id: 'ws-analytics',
     type: 'link',
-    to: '/website?tab=api-key',
-    tabId: 'api-key',
-    icon: Key,
-    emoji: '🔑',
-    label: 'API Key & Settings',
-    roles: ['Super Admin', 'admin']
+    to: '/website?tab=analytics',
+    tabId: 'analytics',
+    icon: BarChart2,
+    emoji: '📊',
+    label: 'Website Dashboard',
+    roles: ['Super Admin', 'admin', 'Website Admin']
+  },
+  {
+    id: 'ws-products',
+    type: 'link',
+    to: '/website?tab=products',
+    tabId: 'products',
+    icon: Package,
+    emoji: '📦',
+    label: 'Website Products',
+    roles: ['Super Admin', 'admin', 'Website Admin']
   },
   {
     id: 'ws-orders',
@@ -39,8 +49,8 @@ export const websiteMenuStructure = [
     tabId: 'orders',
     icon: ShoppingCart,
     emoji: '🛒',
-    label: 'Orders',
-    roles: ['Super Admin', 'admin']
+    label: 'Website Orders',
+    roles: ['Super Admin', 'admin', 'Website Admin']
   },
   {
     id: 'ws-customers',
@@ -49,8 +59,8 @@ export const websiteMenuStructure = [
     tabId: 'customers',
     icon: Users,
     emoji: '👥',
-    label: 'Customers',
-    roles: ['Super Admin', 'admin']
+    label: 'Website Customers',
+    roles: ['Super Admin', 'admin', 'Website Admin']
   },
   {
     id: 'ws-reviews',
@@ -60,7 +70,7 @@ export const websiteMenuStructure = [
     icon: Star,
     emoji: '⭐',
     label: 'Reviews & Testimonials',
-    roles: ['Super Admin', 'admin']
+    roles: ['Super Admin', 'admin', 'Website Admin']
   },
   {
     id: 'ws-referrals',
@@ -70,7 +80,7 @@ export const websiteMenuStructure = [
     icon: Gift,
     emoji: '🎁',
     label: 'Referrals',
-    roles: ['Super Admin', 'admin']
+    roles: ['Super Admin', 'admin', 'Website Admin']
   },
   {
     id: 'ws-shipping',
@@ -80,17 +90,17 @@ export const websiteMenuStructure = [
     icon: Tag,
     emoji: '🏷️',
     label: 'Shipping & Coupons',
-    roles: ['Super Admin', 'admin']
+    roles: ['Super Admin', 'admin', 'Website Admin']
   },
   {
-    id: 'ws-analytics',
+    id: 'ws-api-key',
     type: 'link',
-    to: '/website?tab=analytics',
-    tabId: 'analytics',
-    icon: BarChart2,
-    emoji: '📊',
-    label: 'CRM & Analytics',
-    roles: ['Super Admin', 'admin']
+    to: '/website?tab=api-key',
+    tabId: 'api-key',
+    icon: Key,
+    emoji: '🔑',
+    label: 'Website Settings & API',
+    roles: ['Super Admin', 'admin', 'Website Admin']
   }
 ];
 

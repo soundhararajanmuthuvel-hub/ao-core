@@ -177,6 +177,7 @@ export default function Dashboard() {
   const { isInstallable, isInstalled, installApp } = usePWA();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [dashboardError, setDashboardError] = useState(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [returnsMetrics, setReturnsMetrics] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -237,34 +238,35 @@ export default function Dashboard() {
   useEffect(() => {
     const loadDashboardData = async () => {
       setDataLoading(true);
-      try {
-        if (isSuperAdmin) {
-          const { data } = await analyticsApi.getHomeDashboard();
-          if (data.success) {
-            setAdminData(data.analytics);
-            setSfaTracking(data.sfaLive?.liveTracking || []);
-            setSfaVisits([]);
-            setSfaAnalytics({
-              assignedCustomers: data.totalCustomerCount || 0,
-              visitedCustomers: data.sfaLive?.todayVisitsCount || 0,
-              ordersGenerated: data.analytics?.todayOrders || 0,
-              orderConversionRate: data.sfaLive?.todayVisitsCount > 0 ? parseFloat(((data.analytics?.todayOrders / data.sfaLive?.todayVisitsCount) * 100).toFixed(1)) : 0
-            });
-            setAlerts(data.stockAlerts);
-            setStoreData(prev => ({ ...prev, lowStock: (data.stockAlerts?.critical || []).concat(data.stockAlerts?.warning || []).slice(0, 5) }));
-            setBackordersCount(data.analytics?.delayedOrdersCount || 0);
-            setWooStats(data.wooStats);
-          }
+      setDashboardError(null);
+    try {
+      if (isSuperAdmin) {
+        const { data } = await analyticsApi.getHomeDashboard();
+        if (data.success) {
+          setAdminData(data.analytics);
+          setSfaTracking(data.sfaLive?.liveTracking || []);
+          setSfaVisits([]);
+          setSfaAnalytics({
+            assignedCustomers: data.totalCustomerCount || 0,
+            visitedCustomers: data.sfaLive?.todayVisitsCount || 0,
+            ordersGenerated: data.analytics?.todayOrders || 0,
+            orderConversionRate: data.sfaLive?.todayVisitsCount > 0 ? parseFloat(((data.analytics?.todayOrders / data.sfaLive?.todayVisitsCount) * 100).toFixed(1)) : 0
+          });
+          setAlerts(data.stockAlerts);
+          setStoreData(prev => ({ ...prev, lowStock: (data.stockAlerts?.critical || []).concat(data.stockAlerts?.warning || []).slice(0, 5) }));
+          setBackordersCount(data.analytics?.delayedOrdersCount || 0);
+          setWooStats(data.wooStats);
         }
+      }
 
-        try {
-          const retRes = await returnsApi.getDashboardMetrics();
-          if (retRes.data?.success) {
-            setReturnsMetrics(retRes.data.metrics || retRes.data.data || null);
-          }
-        } catch (e) {
-          console.error('Error loading returns metrics on dashboard:', e);
+      try {
+        const retRes = await returnsApi.getDashboardMetrics();
+        if (retRes.data?.success) {
+          setReturnsMetrics(retRes.data.metrics || retRes.data.data || null);
         }
+      } catch (e) {
+        console.error('Error loading returns metrics on dashboard:', e);
+      }
 
         if (role === 'Manufacturing Manager') {
           const [runsRes, rawReportRes, recipesRes, plannerRes] = await Promise.allSettled([
@@ -323,6 +325,7 @@ export default function Dashboard() {
         }
       } catch (err) {
         console.error('Error loading role dashboard data:', err);
+        setDashboardError(err.response?.data?.message || err.message || 'Unable to load dashboard metrics from server.');
       } finally {
         setDataLoading(false);
       }
@@ -378,6 +381,35 @@ export default function Dashboard() {
           </div>
           <Link to="/sales?tab=new" className="btn btn-primary" style={{ padding: '0.6rem 1.25rem', fontWeight: 600 }}>+ New Invoice</Link>
         </div>
+
+        {dashboardError && (
+          <div className="card" style={{ borderLeft: '6px solid #ef4444', backgroundColor: '#fef2f2', padding: '1rem 1.25rem', borderRadius: '10px', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <strong style={{ color: '#991b1b', fontSize: '0.95rem', display: 'block' }}>⚠️ Dashboard Live Data Unavailable</strong>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.82rem', color: '#7f1d1d' }}>
+                {dashboardError}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-sm btn-danger"
+              onClick={() => {
+                setDataLoading(true);
+                setDashboardError(null);
+                analyticsApi.getHomeDashboard().then(({ data }) => {
+                  if (data.success) {
+                    setAdminData(data.analytics);
+                    setAlerts(data.stockAlerts);
+                    setWooStats(data.wooStats);
+                  }
+                }).catch(e => setDashboardError(e.message)).finally(() => setDataLoading(false));
+              }}
+              style={{ fontWeight: 700, padding: '0.4rem 0.8rem', cursor: 'pointer' }}
+            >
+              🔄 Retry Dashboard
+            </button>
+          </div>
+        )}
 
         {/* AI Suggestions Widget */}
         <AiSuggestionsWidget />

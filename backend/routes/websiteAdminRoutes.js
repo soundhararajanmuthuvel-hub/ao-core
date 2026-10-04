@@ -57,8 +57,11 @@ const upload = multer({
   },
 });
 
-// All website admin routes require AO Core ERP Admin Auth
+const { requireScope } = require('../middleware/scopeAuth');
+
+// All website admin routes require AO Core Auth and website_admin access scope
 router.use(auth);
+router.use(requireScope('website_admin'));
 
 // API Key Management
 router.get('/api-key', getApiKey);

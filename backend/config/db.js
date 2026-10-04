@@ -200,7 +200,19 @@ const tableNameMap = {
   WebsiteReferral: 'website_referrals',
   WebsiteShippingRule: 'website_shipping_rules',
   WebsiteCoupon: 'website_coupons',
-  WebsiteEvent: 'website_events'
+  WebsiteEvent: 'website_events',
+  ReturnPolicy: 'return_policies',
+  ReturnRequest: 'return_requests',
+  ReturnItem: 'return_items',
+  RepackWorkOrder: 'repack_work_orders',
+  ManufacturingNcr: 'manufacturing_ncrs',
+  SupplierClaim: 'supplier_claims',
+  BatchRecall: 'batch_recalls',
+  ReturnCreditNote: 'return_credit_notes',
+  ProductShelfLifeRule: 'product_shelf_life_rules',
+  ReturnAiInsight: 'return_ai_insights',
+  TradeScheme: 'trade_schemes',
+  ProductAuditLog: 'product_audit_logs'
 };
 
 // Global hook to enforce lowercase table names mapping to prevent Linux/MySQL case sensitivity issues
@@ -382,6 +394,18 @@ const connectDB = async () => {
   require('../models/WebsiteShippingRule');
   require('../models/WebsiteCoupon');
   require('../models/WebsiteEvent');
+  require('../models/ReturnPolicy');
+  require('../models/ReturnRequest');
+  require('../models/ReturnItem');
+  require('../models/RepackWorkOrder');
+  require('../models/ManufacturingNcr');
+  require('../models/SupplierClaim');
+  require('../models/BatchRecall');
+  require('../models/ReturnCreditNote');
+  require('../models/ProductShelfLifeRule');
+  require('../models/ReturnAiInsight');
+  require('../models/TradeScheme');
+  require('../models/ProductAuditLog');
 
   const shouldAlter = false;
   await dropStaleSqliteBackupTables();
@@ -848,6 +872,26 @@ const connectDB = async () => {
   await addColumnIfNotExist('ManufacturingRecipes', 'yieldPacks', "DECIMAL(10, 2) DEFAULT 0.00");
   await addColumnIfNotExist('ManufacturingRecipes', 'packWeight', "DECIMAL(10, 3) DEFAULT 0.000");
   await addColumnIfNotExist('ManufacturingRecipes', 'wastagePercent', "DECIMAL(5, 2) DEFAULT 0.00");
+
+  // Return Requests schema extension
+  await addColumnIfNotExist('ReturnRequest', 'productCondition', "VARCHAR(255) DEFAULT 'Good'");
+  await addColumnIfNotExist('ReturnRequest', 'packagingCondition', "VARCHAR(255) DEFAULT 'Good'");
+  await addColumnIfNotExist('ReturnRequest', 'stockDestination', "VARCHAR(255) DEFAULT 'AVAILABLE_STOCK'");
+  await addColumnIfNotExist('ReturnRequest', 'requestType', "VARCHAR(255) DEFAULT 'REPLACEMENT'");
+  await addColumnIfNotExist('ReturnRequest', 'refundAmount', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('ReturnRequest', 'originalCalculatedAmount', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('ReturnRequest', 'refundMethod', "VARCHAR(255) DEFAULT 'Original Payment Method'");
+  await addColumnIfNotExist('ReturnRequest', 'refundStatus', "VARCHAR(255) DEFAULT 'REFUND REQUESTED'");
+  await addColumnIfNotExist('ReturnRequest', 'replacementProductId', "INTEGER NULL");
+  await addColumnIfNotExist('ReturnRequest', 'replacementQuantity', "DECIMAL(10, 2) DEFAULT 0.00");
+  await addColumnIfNotExist('ReturnRequest', 'replacementTransactionId', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('ReturnRequest', 'replacementStatus', "VARCHAR(255) NULL");
+  await addColumnIfNotExist('ReturnRequest', 'refundAuthorizedById', "INTEGER NULL");
+  await addColumnIfNotExist('ReturnRequest', 'notes', "TEXT NULL");
+  await addColumnIfNotExist('ReturnRequest', 'stockUpdated', "TINYINT DEFAULT 0");
+  await addColumnIfNotExist('ReturnRequest', 'receivedAt', "DATETIME NULL");
+  await addColumnIfNotExist('ReturnRequest', 'refundedAt', "DATETIME NULL");
+  await addColumnIfNotExist('ReturnRequest', 'completedAt', "DATETIME NULL");
 
   try {
     if (dialect === 'mysql') {

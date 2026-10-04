@@ -320,11 +320,12 @@ export function AuthProvider({ children }) {
     return () => clearInterval(monitorInterval);
   }, [connectionStatus, isOffline, offlineMode, loadUser]);
 
-  const login = async (email, password) => {
+  const login = async (email, password, portal = 'management_billing') => {
     try {
-      const { data } = await authApi.login({ email, password });
+      const { data } = await authApi.login({ email, password, portal });
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('ao_active_scope', data.user?.activeScope || portal);
       setUser(data.user);
       setConnectionError(false);
       setErrorDetails(null);
@@ -358,8 +359,13 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('ao_active_scope');
+    localStorage.removeItem('offline_data_products');
+    localStorage.removeItem('offline_data_customers');
+    localStorage.removeItem('offline_data_sales');
+    localStorage.removeItem('offline_data_settings');
     try {
-      sessionStorage.removeItem('offline_mode');
+      sessionStorage.clear();
     } catch (e) {}
     setOfflineMode(false);
     setConnectionError(false);

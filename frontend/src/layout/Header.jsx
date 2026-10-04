@@ -682,26 +682,26 @@ export default function Header({ onMenuToggle }) {
               </span>
             </div>
 
-            {/* SINGLE ERP MODULE BADGE */}
-            <div className="module-badge-container" style={{ position: 'relative', marginRight: '0.75rem' }}>
+            {/* ACTIVE PORTAL BADGE */}
+            <div className="portal-badge-container" style={{ position: 'relative', marginRight: '0.75rem' }}>
               <div
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '0.45rem',
-                  padding: '0.4rem 0.85rem',
-                  borderRadius: '8px',
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: '6px',
                   border: '1px solid var(--border)',
-                  background: 'var(--bg-page)',
+                  background: (user?.activeScope || localStorage.getItem('ao_active_scope')) === 'website_admin' ? 'rgba(59, 130, 246, 0.08)' : 'rgba(90, 45, 12, 0.08)',
                   color: 'var(--text-primary)',
                   fontWeight: 700,
-                  fontSize: '0.85rem',
+                  fontSize: '0.8rem',
                   letterSpacing: '0.2px',
                   userSelect: 'none'
                 }}
-                title="AO Core Master ERP: Products, Inventory, Manufacturing, Billing & Sales"
+                title={`Signed into ${(user?.activeScope || localStorage.getItem('ao_active_scope')) === 'website_admin' ? 'Website / Storefront Admin' : 'Management & Billing ERP'}`}
               >
-                <span>📊 Management & Billing</span>
+                <span>{(user?.activeScope || localStorage.getItem('ao_active_scope')) === 'website_admin' ? '🌐 Website Admin' : '🏢 Management & Billing'}</span>
               </div>
             </div>
 
