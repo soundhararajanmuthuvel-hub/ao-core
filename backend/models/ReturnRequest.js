@@ -276,7 +276,6 @@ const ReturnRequest = sequelize.define('ReturnRequest', {
 }, {
   timestamps: true,
   indexes: [
-    { fields: ['rmaNumber'] },
     { fields: ['status'] },
     { fields: ['customerId'] },
     { fields: ['invoiceId'] },

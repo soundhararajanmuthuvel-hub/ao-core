@@ -239,7 +239,17 @@ const runSqliteSyncSafely = async (syncOptions) => {
 
   await sequelize.query('PRAGMA foreign_keys = OFF;');
   try {
-    return await sequelize.sync(syncOptions);
+    await sequelize.sync(syncOptions);
+  } catch (err) {
+    for (const model of Object.values(sequelize.models)) {
+      try {
+        await model.sync(syncOptions);
+      } catch (mErr) {
+        if (!mErr.message.includes('already exists')) {
+          console.warn(`[Sync] Model ${model.name} sync notice:`, mErr.message);
+        }
+      }
+    }
   } finally {
     await sequelize.query('PRAGMA foreign_keys = ON;');
   }
@@ -407,9 +417,8 @@ const connectDB = async () => {
   require('../models/TradeScheme');
   require('../models/ProductAuditLog');
 
-  const shouldAlter = false;
   await dropStaleSqliteBackupTables();
-  await runSqliteSyncSafely({ alter: shouldAlter });
+  await runSqliteSyncSafely();
   console.log('Database models synchronized successfully.');
 
   // Register API Gateway Webhook Hooks

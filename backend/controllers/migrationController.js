@@ -2019,14 +2019,14 @@ exports.restoreBackup = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Backup file missing' });
   }
 
-  const zipPath = req.file.buffer;
+  const zipInput = req.file.buffer || req.file.path;
   const dialect = sequelize.getDialect();
   const useTransaction = dialect !== 'sqlite';
   const t = useTransaction ? await sequelize.transaction() : null;
   const opt = t ? { transaction: t } : {};
 
   try {
-    const zip = new AdmZip(zipPath);
+    const zip = new AdmZip(zipInput);
     const entry = zip.getEntry('db_backup.json');
     if (!entry) {
       if (t) await t.rollback();

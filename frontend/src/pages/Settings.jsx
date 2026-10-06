@@ -48,6 +48,7 @@ export default function SettingsPage() {
   const [modalLoading, setModalLoading] = useState(false);
   const [actionSuccess, setActionSuccess] = useState(false);
   const [backupFileName, setBackupFileName] = useState('');
+  const [backupDownloading, setBackupDownloading] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'database' && user?.role !== 'Super Admin') {
@@ -437,21 +438,49 @@ export default function SettingsPage() {
 
   // Database Management Handlers
   const handleDownloadBackup = async () => {
+    if (backupDownloading) return;
+    setBackupDownloading(true);
     try {
-      toast('Generating database backup zip...', 'info');
+      toast('Generating database backup...', 'info');
       const response = await databaseApi.backup();
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      
+      let filename = `ao-core-backup-${new Date().toISOString().split('T')[0]}.sql`;
+      const disposition = response.headers?.['content-disposition'] || response.headers?.['Content-Disposition'];
+      if (disposition) {
+        const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (match && match[1]) {
+          filename = match[1].replace(/['"]/g, '').trim();
+        }
+      }
+
+      const contentType = response.headers?.['content-type'] || 'application/sql';
+      const blob = new Blob([response.data], { type: contentType });
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      
-      const timestamp = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').split('.')[0];
-      link.setAttribute('download', `backup_${timestamp}_${user?.name?.replace(/\s+/g, '_') || 'Admin'}.zip`);
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
-      toast('✓ Database backup downloaded successfully', 'success');
+      window.URL.revokeObjectURL(url);
+      
+      toast('✓ Backup downloaded successfully.', 'success');
     } catch (err) {
-      toast('Backup download failed', 'error');
+      let errorMessage = 'Database backup could not be generated.';
+      try {
+        if (err.response?.data instanceof Blob) {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          if (json?.message) errorMessage = json.message;
+        } else if (err.response?.data?.message) {
+          errorMessage = err.response.data.message;
+        } else if (err.message) {
+          errorMessage = err.message;
+        }
+      } catch (_) {}
+      toast(`✕ Database backup failed: ${errorMessage}`, 'error');
+    } finally {
+      setBackupDownloading(false);
     }
   };
 
@@ -1792,16 +1821,17 @@ export default function SettingsPage() {
                       <strong style={{ fontSize: '1rem', color: '#1e293b' }}>Backup Database</strong>
                     </div>
                     <p style={{ color: '#64748b', fontSize: '0.85rem', lineHeight: '1.4', marginBottom: '1.5rem' }}>
-                      Download a full ZIP archive containing the SQLite database file and a complete JSON export of all database tables.
+                      Download a full database backup archive containing the complete SQL schema DDL and table data.
                     </p>
                   </div>
                   <button
                     type="button"
                     className="btn btn-primary"
                     onClick={handleDownloadBackup}
+                    disabled={backupDownloading}
                     style={{ width: '100%', fontWeight: 700 }}
                   >
-                    📥 Download Backup
+                    {backupDownloading ? '⏳ Downloading...' : '📥 Download Backup'}
                   </button>
                 </div>
 

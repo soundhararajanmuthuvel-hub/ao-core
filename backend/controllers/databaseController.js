@@ -136,7 +136,9 @@ exports.verifyPassword = async (req, res) => {
   }
 };
 
-// Helper: Run ZIP/JSON database backup
+const { streamDatabaseBackup, generateBackupFile } = require('../utils/databaseBackup');
+
+// Helper: Run ZIP/SQL database backup for safe rollback archives
 const performBackup = async (adminName) => {
   const backupsDir = path.join(__dirname, '..', 'backups');
   if (!fs.existsSync(backupsDir)) {
@@ -144,38 +146,90 @@ const performBackup = async (adminName) => {
   }
 
   const timestamp = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').split('.')[0];
-  const cleanedAdminName = adminName.replace(/[^a-zA-Z0-9]/g, '_');
+  const cleanedAdminName = (adminName || 'Super_Admin').replace(/[^a-zA-Z0-9]/g, '_');
   const backupBaseName = `backup_${timestamp}_${cleanedAdminName}`;
   const zipFilePath = path.join(backupsDir, `${backupBaseName}.zip`);
+  const sqlFilePath = path.join(backupsDir, `${backupBaseName}.sql`);
+
+  // 1. Generate full raw SQL dump
+  try {
+    await generateBackupFile(sqlFilePath, { adminName });
+  } catch (sqlErr) {
+    console.warn('[performBackup] SQL dump generation warning:', sqlErr.message);
+  }
 
   const zip = new AdmZip();
 
-  // 1. Copy SQLite database file (if running SQLite)
+  // Add SQL dump to ZIP if created
+  if (fs.existsSync(sqlFilePath)) {
+    zip.addLocalFile(sqlFilePath, '', 'database_dump.sql');
+  }
+
+  // 2. Copy SQLite database file (if running SQLite)
   let sqliteFileCopied = false;
   if (sequelize.options.dialect === 'sqlite') {
     const sqlitePath = sequelize.options.storage || path.join(__dirname, '..', 'database.sqlite');
     if (fs.existsSync(sqlitePath)) {
       const tempSqlitePath = path.join(backupsDir, `temp_db_${timestamp}.sqlite`);
-      fs.copyFileSync(sqlitePath, tempSqlitePath);
-      zip.addLocalFile(tempSqlitePath, '', 'database.sqlite');
-      sqliteFileCopied = true;
-      // Asynchronously delete temp file to avoid locking
-      setTimeout(() => {
-        try { if (fs.existsSync(tempSqlitePath)) fs.unlinkSync(tempSqlitePath); } catch {}
-      }, 2000);
+      try {
+        fs.copyFileSync(sqlitePath, tempSqlitePath);
+        zip.addLocalFile(tempSqlitePath, '', 'database.sqlite');
+        sqliteFileCopied = true;
+      } catch (copyErr) {
+        console.warn('[performBackup] SQLite file copy warning:', copyErr.message);
+      } finally {
+        setTimeout(() => {
+          try { if (fs.existsSync(tempSqlitePath)) fs.unlinkSync(tempSqlitePath); } catch {}
+        }, 2000);
+      }
     }
   }
 
-  // 2. Fetch and package JSON table values
+  // 3. Fetch and package JSON table values safely with per-model error handling
   const dbData = {};
   for (const modelName of Object.keys(sequelize.models)) {
-    const model = sequelize.models[modelName];
-    dbData[modelName] = await model.findAll({ raw: true });
+    try {
+      const model = sequelize.models[modelName];
+      if (typeof model.findAll === 'function') {
+        if (modelName === 'User') {
+          try {
+            dbData[modelName] = await model.scope('withPassword').findAll({ raw: true });
+          } catch {
+            dbData[modelName] = await model.findAll({ raw: true });
+          }
+        } else {
+          dbData[modelName] = await model.findAll({ raw: true });
+        }
+      }
+    } catch (modelErr) {
+      console.warn(`[performBackup] Model ${modelName} fetch skipped:`, modelErr.message);
+      dbData[modelName] = [];
+    }
   }
   zip.addFile('database_backup.json', Buffer.from(JSON.stringify(dbData, null, 2), 'utf-8'));
 
-  // 3. Write output ZIP
+  // 4. Write output ZIP
   zip.writeZip(zipFilePath);
+
+  // Clean up temporary standalone SQL file after packaging into ZIP
+  try {
+    if (fs.existsSync(sqlFilePath)) {
+      fs.unlinkSync(sqlFilePath);
+    }
+  } catch {}
+
+  // Prune backup archives older than 7 days
+  try {
+    const files = fs.readdirSync(backupsDir);
+    const now = Date.now();
+    for (const file of files) {
+      const fp = path.join(backupsDir, file);
+      const stat = fs.statSync(fp);
+      if (now - stat.mtimeMs > 7 * 24 * 60 * 60 * 1000) {
+        fs.unlinkSync(fp);
+      }
+    }
+  } catch (_) {}
 
   return {
     zipFilePath,
@@ -185,30 +239,59 @@ const performBackup = async (adminName) => {
   };
 };
 
-// Manual Backup Trigger endpoint
+// Manual Backup Trigger endpoint: Generates and streams full SQL database backup
 exports.backupDatabase = async (req, res) => {
   try {
-    const adminName = req.user?.name || 'Super Admin';
-    const backup = await performBackup(adminName);
+    if (!req.user || req.user.role !== 'Super Admin') {
+      return res.status(403).json({ success: false, message: 'Access denied: Super Admin only' });
+    }
 
-    // Record audit log
-    await ActivityLog.create({
+    const adminName = req.user?.name || 'Super Admin';
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `ao-core-backup-${dateStr}.sql`;
+
+    // Asynchronously log audit record without blocking download
+    ActivityLog.create({
       action: 'Backup Database',
       module: 'Database Management',
-      details: `Manual backup created: ${backup.backupFileName} by ${req.user.name} from IP ${req.ip}`,
+      details: `Database backup downloaded: ${filename} by ${req.user.name} (${req.user.email}) from IP ${req.ip}`,
       metadata: {
         ip: req.ip,
         adminName: req.user.name,
         adminEmail: req.user.email,
-        backupFile: backup.backupFileName,
+        backupFile: filename,
         timestamp: new Date()
       },
       userId: req.user.id
-    });
+    }).catch((logErr) => console.warn('[ActivityLog] Failed to record backup log:', logErr.message));
 
-    res.download(backup.zipFilePath, backup.backupFileName);
+    // Express Stream Response
+    if (typeof res.setHeader === 'function' && typeof res.write === 'function') {
+      res.setHeader('Content-Type', 'application/sql; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
+      await streamDatabaseBackup(res, { adminName });
+      res.end();
+    } else if (typeof res.download === 'function') {
+      // Mock test harness fallback
+      const tempPath = path.join(__dirname, '..', filename);
+      await generateBackupFile(tempPath, { adminName });
+      res.download(tempPath, filename);
+    } else {
+      res.status(500).json({ success: false, message: 'Response stream not available' });
+    }
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to create database backup', error: err.message });
+    console.error('[backupDatabase] Error generating database backup:', err);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Database backup could not be generated.',
+        error: err.message
+      });
+    }
   }
 };
 

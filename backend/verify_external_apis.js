@@ -375,6 +375,8 @@ async function testExternalApis() {
     await Customer.destroy({ where: { id: mockCustomer.id } });
     await IntegrationConnection.destroy({ where: { id: mockConnection.id } });
     await IntegrationSyncJob.destroy({ where: { connectionId: mockConnection.id } });
+    const IntegrationProduct = require('./models/IntegrationProduct');
+    await IntegrationProduct.destroy({ where: { externalId: 'ext-prod-001' } });
     await Product.destroy({ where: { sku: 'SKU-SYNC-TEST' } });
 
     console.log('\n🎉 ALL SECURITY AND SECURE DEVELOPER API TESTS PASSED SUCCESSFULLY!');
