@@ -344,13 +344,13 @@ const getDashboardDataInternal = async () => {
   const topProducts = await sequelize.query(
     isPostgres
       ? `SELECT 
-           ii."productId" AS productId,
+           ii."productId" AS "productId",
            ii.name,
-           SUM(ii.qty) AS totalQty,
+           SUM(ii.qty) AS "totalQty",
            SUM(ii."lineTotal") AS revenue
          FROM invoice_items ii
          GROUP BY ii."productId", ii.name
-         ORDER BY "totalQty" DESC
+         ORDER BY SUM(ii.qty) DESC
          LIMIT 5`
       : `SELECT 
            ii.productId AS productId,
