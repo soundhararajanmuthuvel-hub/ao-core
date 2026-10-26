@@ -82,6 +82,14 @@ exports.getDatabaseHealth = async (req, res) => {
             missingColumns.push(`products.${col}`);
           }
         }
+      } else if (dialect === 'postgres') {
+        const [results] = await sequelize.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'products';");
+        const existingColNames = results.map(r => r.column_name);
+        for (const col of keyProductColumns) {
+          if (!existingColNames.includes(col)) {
+            missingColumns.push(`products.${col}`);
+          }
+        }
       } else {
         const [results] = await sequelize.query("SHOW COLUMNS FROM products;");
         const existingColNames = results.map(r => r.Field);

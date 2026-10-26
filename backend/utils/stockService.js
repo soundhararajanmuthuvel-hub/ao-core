@@ -39,20 +39,27 @@ const updateStock = async (productId, delta, opts = {}) => {
   if (delta < 0 && !opts.batchNumber) {
     let qtyToDeduct = Math.abs(delta);
     
-    // Find active batches with positive remaining stock
-    const activeBatches = await StockMovement.sequelize.query(
-      `SELECT batchNumber, expiryDate, SUM(quantity) AS remaining
-       FROM stock_movements
-       WHERE productId = :productId AND batchNumber IS NOT NULL AND batchNumber != ''
-       GROUP BY batchNumber, expiryDate
-       HAVING remaining > 0
-       ORDER BY COALESCE(expiryDate, '9999-12-31') ASC, MIN(id) ASC`,
-      {
-        replacements: { productId },
-        type: StockMovement.sequelize.QueryTypes.SELECT,
-        ...queryOpts
-      }
-    );
+    // Find active batches with positive remaining stock (properly quoted for PostgreSQL & MySQL)
+    const isPostgres = StockMovement.sequelize.options.dialect === 'postgres';
+    const activeBatchesQuery = isPostgres
+      ? `SELECT "batchNumber", "expiryDate", SUM(quantity) AS remaining
+         FROM stock_movements
+         WHERE "productId" = :productId AND "batchNumber" IS NOT NULL AND "batchNumber" != ''
+         GROUP BY "batchNumber", "expiryDate"
+         HAVING SUM(quantity) > 0
+         ORDER BY COALESCE("expiryDate", '9999-12-31') ASC, MIN(id) ASC`
+      : `SELECT batchNumber, expiryDate, SUM(quantity) AS remaining
+         FROM stock_movements
+         WHERE productId = :productId AND batchNumber IS NOT NULL AND batchNumber != ''
+         GROUP BY batchNumber, expiryDate
+         HAVING remaining > 0
+         ORDER BY COALESCE(expiryDate, '9999-12-31') ASC, MIN(id) ASC`;
+
+    const activeBatches = await StockMovement.sequelize.query(activeBatchesQuery, {
+      replacements: { productId },
+      type: StockMovement.sequelize.QueryTypes.SELECT,
+      ...queryOpts
+    });
 
     for (const batch of activeBatches) {
       if (qtyToDeduct <= 0) break;

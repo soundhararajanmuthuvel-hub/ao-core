@@ -33,7 +33,7 @@ const getSequelizeLoggingOptions = () => {
 let sequelize;
 
 if (dialect === 'postgres') {
-  console.log('Using Postgres/Supabase database connection URL...');
+  console.log('Using PostgreSQL database connection URL...');
 
   sequelize = new Sequelize(dbUrl, {
     dialect: 'postgres',
@@ -41,19 +41,31 @@ if (dialect === 'postgres') {
       ssl: {
         require: true,
         rejectUnauthorized: false
-      }
+      },
+      keepAlive: true,
+      statement_timeout: 30000,
     },
     pool: {
-      max: 5,
+      max: 10,
       min: 0,
-      acquire: 30000,
-      idle: 10000,
+      acquire: 10000, // connectionTimeoutMillis ~10000
+      idle: 30000,    // idleTimeoutMillis ~30000
+      evict: 10000,
     },
     ...getSequelizeLoggingOptions(),
     define: {
       timestamps: true,
     },
   });
+
+  // Handle pool error events to prevent dropped connections from crashing the app
+  try {
+    if (sequelize.connectionManager && sequelize.connectionManager.pool) {
+      sequelize.connectionManager.pool.on('error', (err) => {
+        console.warn('[Postgres Pool Warning] Unexpected idle client error:', err.message);
+      });
+    }
+  } catch (_) {}
 } else if (process.env.DATABASE_URL || process.env.MYSQL_URL) {
   console.log('Using MySQL database connection URL...');
   sequelize = new Sequelize(process.env.DATABASE_URL || process.env.MYSQL_URL, {
@@ -445,6 +457,16 @@ const connectDB = async () => {
         const tName = (col.TABLE_NAME || '').toLowerCase();
         if (!tableColumnsCache[tName]) tableColumnsCache[tName] = [];
         tableColumnsCache[tName].push((col.COLUMN_NAME || '').toLowerCase());
+      }
+    } else if (dialect === 'postgres') {
+      const columns = await sequelize.query(
+        `SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public'`,
+        { type: Sequelize.QueryTypes.SELECT }
+      );
+      for (const col of columns) {
+        const tName = (col.table_name || '').toLowerCase();
+        if (!tableColumnsCache[tName]) tableColumnsCache[tName] = [];
+        tableColumnsCache[tName].push((col.column_name || '').toLowerCase());
       }
     } else {
       const tables = await sequelize.query(
@@ -996,6 +1018,18 @@ const connectDB = async () => {
         if (existingIndex.length === 0) {
           console.log(`Creating index ${indexName} on ${resolvedTableName}...`);
           await sequelize.query(`CREATE INDEX ${indexName} ON ${resolvedTableName} (${columnsArray.join(', ')});`);
+        }
+      } else if (dialect === 'postgres') {
+        const existingIndex = await sequelize.query(
+          `SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = :resolvedTableName AND indexname = :indexName`,
+          {
+            replacements: { resolvedTableName, indexName: indexName.toLowerCase() },
+            type: Sequelize.QueryTypes.SELECT
+          }
+        );
+        if (existingIndex.length === 0) {
+          console.log(`Creating index ${indexName} on "${resolvedTableName}"...`);
+          await sequelize.query(`CREATE INDEX IF NOT EXISTS "${indexName.toLowerCase()}" ON "${resolvedTableName}" (${columnsArray.map(c => `"${c}"`).join(', ')});`);
         }
       } else {
         const existingIndexes = await sequelize.query(`PRAGMA index_list(${resolvedTableName});`, {

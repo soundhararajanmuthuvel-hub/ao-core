@@ -275,9 +275,24 @@ const getDashboardDataInternal = async () => {
 
   const outstandingTrend = getTrendData(unpaidInvoices);
 
+  const isPostgres = sequelize.options.dialect === 'postgres';
+
   // Monthly revenue and profit trend (conditional on dialect)
-  const monthlyQuery = isMySQL
-    ? `SELECT 
+  let monthlyQuery;
+  if (isPostgres) {
+    monthlyQuery = `SELECT 
+         EXTRACT(YEAR FROM i.date)::integer AS year,
+         EXTRACT(MONTH FROM i.date)::integer AS month,
+         COALESCE(SUM(i."grandTotal"), 0) AS revenue,
+         COUNT(DISTINCT i.id) AS orders,
+         COALESCE(SUM((ii.qty * ii."unitPrice") - ((ii.qty + COALESCE(ii."freeQty", 0)) * COALESCE(ii."purchasePrice", 0))), 0) AS profit
+       FROM invoices i
+       LEFT JOIN invoice_items ii ON i.id = ii."invoiceId"
+       GROUP BY EXTRACT(YEAR FROM i.date), EXTRACT(MONTH FROM i.date)
+       ORDER BY year ASC, month ASC
+       LIMIT 12`;
+  } else if (isMySQL) {
+    monthlyQuery = `SELECT 
          YEAR(i.date) AS year,
          MONTH(i.date) AS month,
          COALESCE(SUM(i.grandTotal), 0) AS revenue,
@@ -287,8 +302,9 @@ const getDashboardDataInternal = async () => {
        LEFT JOIN invoice_items ii ON i.id = ii.invoiceId
        GROUP BY YEAR(i.date), MONTH(i.date)
        ORDER BY year ASC, month ASC
-       LIMIT 12`
-    : `SELECT 
+       LIMIT 12`;
+  } else {
+    monthlyQuery = `SELECT 
          strftime('%Y', i.date) AS year,
          strftime('%m', i.date) AS month,
          COALESCE(SUM(i.grandTotal), 0) AS revenue,
@@ -299,34 +315,56 @@ const getDashboardDataInternal = async () => {
        GROUP BY strftime('%Y', i.date), strftime('%m', i.date)
        ORDER BY year ASC, month ASC
        LIMIT 12`;
+  }
 
   const monthlyRevenue = await sequelize.query(monthlyQuery, { type: sequelize.QueryTypes.SELECT });
 
   // Top 5 selling products
   const topProducts = await sequelize.query(
-    `SELECT 
-       ii.productId AS productId,
-       ii.name,
-       SUM(ii.qty) AS totalQty,
-       SUM(ii.lineTotal) AS revenue
-     FROM invoice_items ii
-     GROUP BY ii.productId, ii.name
-     ORDER BY totalQty DESC
-     LIMIT 5`,
+    isPostgres
+      ? `SELECT 
+           ii."productId" AS productId,
+           ii.name,
+           SUM(ii.qty) AS totalQty,
+           SUM(ii."lineTotal") AS revenue
+         FROM invoice_items ii
+         GROUP BY ii."productId", ii.name
+         ORDER BY "totalQty" DESC
+         LIMIT 5`
+      : `SELECT 
+           ii.productId AS productId,
+           ii.name,
+           SUM(ii.qty) AS totalQty,
+           SUM(ii.lineTotal) AS revenue
+         FROM invoice_items ii
+         GROUP BY ii.productId, ii.name
+         ORDER BY totalQty DESC
+         LIMIT 5`,
     { type: sequelize.QueryTypes.SELECT }
   );
 
   // 30-day sales trend (conditional on dialect)
-  const trendQuery = isMySQL
-    ? `SELECT 
+  let trendQuery;
+  if (isPostgres) {
+    trendQuery = `SELECT 
+         TO_CHAR(date, 'YYYY-MM-DD') AS date,
+         COALESCE(SUM("grandTotal"), 0) AS total,
+         COUNT(id) AS count
+       FROM invoices
+       GROUP BY TO_CHAR(date, 'YYYY-MM-DD')
+       ORDER BY date ASC
+       LIMIT 30`;
+  } else if (isMySQL) {
+    trendQuery = `SELECT 
          DATE_FORMAT(date, '%Y-%m-%d') AS date,
          COALESCE(SUM(grandTotal), 0) AS total,
          COUNT(id) AS count
        FROM invoices
        GROUP BY DATE_FORMAT(date, '%Y-%m-%d')
        ORDER BY date ASC
-       LIMIT 30`
-    : `SELECT 
+       LIMIT 30`;
+  } else {
+    trendQuery = `SELECT 
          strftime('%Y-%m-%d', date) AS date,
          COALESCE(SUM(grandTotal), 0) AS total,
          COUNT(id) AS count
@@ -334,6 +372,7 @@ const getDashboardDataInternal = async () => {
        GROUP BY strftime('%Y-%m-%d', date)
        ORDER BY date ASC
        LIMIT 30`;
+  }
 
   const salesTrend = await sequelize.query(trendQuery, { type: sequelize.QueryTypes.SELECT });
 

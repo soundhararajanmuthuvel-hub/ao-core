@@ -141,29 +141,22 @@ app.get('/', (req, res) => {
 });
 
 /* =========================
-   HEALTH CHECK
+   HEALTH CHECKS
 ========================= */
-app.get('/api/health', async (req, res) => {
+const getLivenessHealth = (req, res) => {
   const os = require('os');
-  let dbStatus = 'Disconnected';
-  try {
-    await connectDB.sequelize.authenticate();
-    dbStatus = 'Connected';
-  } catch {}
-
   const memUsage = process.memoryUsage();
   
-  res.json({
+  res.status(200).json({
     success: true,
     status: 'OK',
-    database: dbStatus,
+    uptimeSeconds: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
     telemetry: {
-      uptimeSeconds: process.uptime(),
       memory: {
         rss: `${Math.round(memUsage.rss / 1024 / 1024)} MB`,
         heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)} MB`,
         heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)} MB`,
-        external: `${Math.round(memUsage.external / 1024 / 1024)} MB`,
       },
       cpu: {
         loadAvg: os.loadavg(),
@@ -173,13 +166,42 @@ app.get('/api/health', async (req, res) => {
     aiStatus: {
       gemini: process.env.GEMINI_API_KEY ? 'Active' : 'Disabled (Key Missing)',
       cerebras: process.env.CEREBRAS_API_KEY ? 'Active' : 'Disabled (Key Missing)',
-    },
-    websiteIntegration: 'Active',
-    imageApi: 'Active',
-    ordersApi: 'Active',
-    paymentsApi: 'Active',
+    }
   });
-});
+};
+
+const getDatabaseHealthCheck = async (req, res) => {
+  const { sequelize } = require('./config/db');
+  const start = Date.now();
+  try {
+    await sequelize.authenticate();
+    const latencyMs = Date.now() - start;
+    res.status(200).json({
+      success: true,
+      status: 'Healthy',
+      database: 'Connected',
+      dialect: sequelize.getDialect(),
+      latencyMs,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(503).json({
+      success: false,
+      status: 'Unhealthy',
+      database: 'Disconnected',
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+// Fast Liveness probes (returns 200 without touching DB)
+app.get('/health', getLivenessHealth);
+app.get('/api/health', getLivenessHealth);
+
+// Deep Readiness probes (verifies DB connection)
+app.get('/health/db', getDatabaseHealthCheck);
+app.get('/api/health/db', getDatabaseHealthCheck);
 
 app.post('/api/client-error', (req, res) => {
   // Only log client errors in development — avoid logging arbitrary client JSON to stdout in production
