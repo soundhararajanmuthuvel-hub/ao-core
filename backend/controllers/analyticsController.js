@@ -65,11 +65,17 @@ const getDashboardDataInternal = async () => {
       { type: sequelize.QueryTypes.SELECT }
     ),
     sequelize.query(
-      `SELECT 
-         COALESCE(SUM(grandTotal), 0) AS todaySales,
-         COUNT(id) AS todayOrders
-       FROM invoices
-       WHERE date >= :today AND date < :tomorrow AND type = 'invoice' AND status NOT IN ('Draft', 'Cancelled')`,
+      isPostgres
+        ? `SELECT 
+             COALESCE(SUM("grandTotal"), 0) AS "todaySales",
+             COUNT(id) AS "todayOrders"
+           FROM invoices
+           WHERE date >= :today AND date < :tomorrow AND type = 'invoice' AND status NOT IN ('Draft', 'Cancelled')`
+        : `SELECT 
+             COALESCE(SUM(grandTotal), 0) AS todaySales,
+             COUNT(id) AS todayOrders
+           FROM invoices
+           WHERE date >= :today AND date < :tomorrow AND type = 'invoice' AND status NOT IN ('Draft', 'Cancelled')`,
       {
         replacements: { today, tomorrow },
         type: sequelize.QueryTypes.SELECT,
@@ -291,8 +297,6 @@ const getDashboardDataInternal = async () => {
   };
 
   const outstandingTrend = getTrendData(unpaidInvoices);
-
-  const isPostgres = sequelize.options.dialect === 'postgres';
 
   // Monthly revenue and profit trend (conditional on dialect)
   let monthlyQuery;
