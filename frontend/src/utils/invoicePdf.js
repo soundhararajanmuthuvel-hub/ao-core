@@ -140,28 +140,29 @@ export async function buildInvoicePdfDoc(sale, settings) {
   // Load Company Logo
   let logoLoaded = false;
   let logoImg = null;
-  if (settings?.logo || settings?.logoUrl) {
+  try {
+    let logoUrl = null;
     try {
-      let logoUrl = null;
-      try {
-        const cached = localStorage.getItem('cached_brand_data');
-        if (cached) {
-          logoUrl = JSON.parse(cached).logoUrl;
-        }
-      } catch (_) {}
-      if (!logoUrl) {
-        logoUrl = getActiveLogoUrl(settings);
+      const cached = localStorage.getItem('cached_brand_data');
+      if (cached) {
+        logoUrl = JSON.parse(cached).logoUrl;
       }
-      logoImg = await loadImage(logoUrl);
+    } catch (_) {}
+    if (!logoUrl && (settings?.logo || settings?.logoUrl)) {
+      logoUrl = getActiveLogoUrl(settings);
+    }
+    if (!logoUrl) {
+      logoUrl = '/default-logo.png';
+    }
+    logoImg = await loadImage(logoUrl);
+    logoLoaded = true;
+  } catch (err) {
+    console.error('Failed to load active logo, using default placeholder:', err);
+    try {
+      logoImg = await loadImage('/default-logo.png');
       logoLoaded = true;
-    } catch (err) {
-      console.error('Failed to load active logo, using default placeholder:', err);
-      try {
-        logoImg = await loadImage('/default-logo.png');
-        logoLoaded = true;
-      } catch (e) {
-        console.error('Default logo placeholder also failed:', e);
-      }
+    } catch (e) {
+      console.error('Default logo placeholder also failed:', e);
     }
   }
 

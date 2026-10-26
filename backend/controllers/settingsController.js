@@ -116,7 +116,9 @@ exports.getCompanyLogoImage = async (req, res, next) => {
       const cleanPath = logoUrl.startsWith('/') ? logoUrl.substring(1) : logoUrl;
       const localPath = path.join(__dirname, '..', cleanPath);
       if (fs.existsSync(localPath)) {
-        res.setHeader('Content-Type', 'image/jpeg');
+        const ext = path.extname(localPath).toLowerCase();
+        const contentType = ext === '.png' ? 'image/png' : ext === '.svg' ? 'image/svg+xml' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+        res.setHeader('Content-Type', contentType);
         return res.sendFile(localPath);
       }
     }

@@ -54,7 +54,8 @@ function convertNumberToWords(amount) {
 }
 
 export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-capture' }) {
-  const { logoUrl } = useCompanyBrand();
+  const brand = useCompanyBrand();
+  const effectiveLogoUrl = brand?.logoUrl || settings?.logoUrl || settings?.logo || '/default-logo.png';
   if (!sale) return null;
 
   // Determine GST SPLIT
@@ -183,7 +184,7 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
         }}
       >
         {/* Company Logo */}
-        {format !== 'Thermal' && logoUrl && (
+        {effectiveLogoUrl && (
           <div 
             className="invoice-logo-container" 
             style={{ 
@@ -201,11 +202,16 @@ export default function InvoiceTemplate({ sale, settings, captureId = 'invoice-c
             }}
           >
             <img 
-              src={logoUrl || '/default-logo.png'} 
+              src={effectiveLogoUrl} 
               alt="Logo" 
               className="invoice-logo-img" 
               style={{ maxWidth: '85%', maxHeight: '85%', objectFit: 'contain' }}
               crossOrigin="anonymous" 
+              onError={(e) => {
+                if (e.target.src !== `${window.location.origin}/default-logo.png`) {
+                  e.target.src = '/default-logo.png';
+                }
+              }}
             />
           </div>
         )}
