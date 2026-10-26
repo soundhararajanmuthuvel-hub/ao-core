@@ -21,6 +21,7 @@ const getDashboardDataInternal = async () => {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   const isMySQL = sequelize.options.dialect === 'mysql';
+  const isPostgres = sequelize.options.dialect === 'postgres';
 
   // Calculate start/end of current month for Monthly Revenue KPI card
   const now = new Date();
@@ -48,12 +49,19 @@ const getDashboardDataInternal = async () => {
   ] = await Promise.all([
     Product.count({ where: { isArchived: false } }),
     sequelize.query(
-      `SELECT 
-         COUNT(DISTINCT i.id) AS totalSales,
-         COALESCE(SUM(i.grandTotal), 0) AS revenue,
-         COALESCE(SUM((ii.qty * ii.unitPrice) - ((ii.qty + COALESCE(ii.freeQty, 0)) * COALESCE(ii.purchasePrice, 0))), 0) AS profit
-       FROM invoices i
-       LEFT JOIN invoice_items ii ON i.id = ii.invoiceId`,
+      isPostgres
+        ? `SELECT 
+             COUNT(DISTINCT i.id) AS "totalSales",
+             COALESCE(SUM(i."grandTotal"), 0) AS revenue,
+             COALESCE(SUM((ii.qty * ii."unitPrice") - ((ii.qty + COALESCE(ii."freeQty", 0)) * COALESCE(ii."purchasePrice", 0))), 0) AS profit
+           FROM invoices i
+           LEFT JOIN invoice_items ii ON i.id = ii."invoiceId"`
+        : `SELECT 
+             COUNT(DISTINCT i.id) AS totalSales,
+             COALESCE(SUM(i.grandTotal), 0) AS revenue,
+             COALESCE(SUM((ii.qty * ii.unitPrice) - ((ii.qty + COALESCE(ii.freeQty, 0)) * COALESCE(ii.purchasePrice, 0))), 0) AS profit
+           FROM invoices i
+           LEFT JOIN invoice_items ii ON i.id = ii.invoiceId`,
       { type: sequelize.QueryTypes.SELECT }
     ),
     sequelize.query(
@@ -103,19 +111,28 @@ const getDashboardDataInternal = async () => {
       }
     }),
     sequelize.query(
-      `SELECT COALESCE(SUM(pci.qty), 0) AS total
-       FROM packing_conversions pc
-       JOIN packing_conversion_items pci ON pc.id = pci.packingConversionId
-       WHERE pc.date >= :today AND pc.date < :tomorrow AND pc.status = 'completed'`,
+      isPostgres
+        ? `SELECT COALESCE(SUM(pci.qty), 0) AS total
+           FROM packing_conversions pc
+           JOIN packing_conversion_items pci ON pc.id = pci."packingConversionId"
+           WHERE pc.date >= :today AND pc.date < :tomorrow AND pc.status = 'completed'`
+        : `SELECT COALESCE(SUM(pci.qty), 0) AS total
+           FROM packing_conversions pc
+           JOIN packing_conversion_items pci ON pc.id = pci.packingConversionId
+           WHERE pc.date >= :today AND pc.date < :tomorrow AND pc.status = 'completed'`,
       {
         replacements: { today, tomorrow },
         type: sequelize.QueryTypes.SELECT,
       }
     ),
     sequelize.query(
-      `SELECT COALESCE(SUM(qtyToProduce), 0) AS total
-       FROM manufacturing_entries
-       WHERE date >= :today AND date < :tomorrow AND status = 'completed'`,
+      isPostgres
+        ? `SELECT COALESCE(SUM("qtyToProduce"), 0) AS total
+           FROM manufacturing_entries
+           WHERE date >= :today AND date < :tomorrow AND status = 'completed'`
+        : `SELECT COALESCE(SUM(qtyToProduce), 0) AS total
+           FROM manufacturing_entries
+           WHERE date >= :today AND date < :tomorrow AND status = 'completed'`,
       {
         replacements: { today, tomorrow },
         type: sequelize.QueryTypes.SELECT,
