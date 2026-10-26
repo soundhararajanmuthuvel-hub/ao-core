@@ -201,7 +201,7 @@ const getDashboardDataInternal = async () => {
   const unpaidInvoices = await Invoice.findAll({
     where: {
       type: 'invoice',
-      paymentStatus: { [Op.notIn]: ['paid', 'PAID'] },
+      paymentStatus: { [Op.ne]: 'paid' },
       status: { [Op.notIn]: ['Draft', 'Cancelled'] }
     },
     include: [{

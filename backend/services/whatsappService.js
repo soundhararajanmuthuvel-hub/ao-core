@@ -375,7 +375,7 @@ async function runAutoPaymentReminders() {
 
   const invoices = await Invoice.findAll({
     where: {
-      paymentStatus: { [Op.notIn]: ['paid', 'PAID'] },
+      paymentStatus: { [Op.ne]: 'paid' },
       status: { [Op.notIn]: ['Cancelled', 'Draft'] },
       dueDate: { [Op.ne]: null }
     },

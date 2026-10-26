@@ -380,7 +380,7 @@ exports.getCustomerDependencies = async (req, res, next) => {
     const unpaidInvoices = await Invoice.findAll({
       where: {
         customerId,
-        paymentStatus: { [Op.notIn]: ['paid', 'PAID'] },
+        paymentStatus: { [Op.ne]: 'paid' },
         status: { [Op.notIn]: ['Cancelled', 'Draft'] } // draft shouldn't be counted in outstanding
       }
     });
